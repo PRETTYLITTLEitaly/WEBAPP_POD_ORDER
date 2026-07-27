@@ -26,18 +26,23 @@ export default function AdminLoginPage() {
       formData.append("customUserJson", JSON.stringify(foundUser));
     }
 
-    const res = await loginAction(formData);
-    if (res?.error) {
-      setError(res.error);
-    } else {
-      const userToSave: User = foundUser || {
-        id: "user-" + Date.now(),
-        email: email.trim().toLowerCase(),
-        password: password,
-        role: email.toLowerCase().includes("admin") ? "admin" : "operatore",
-        createdAt: new Date().toISOString()
-      };
-      setCurrentUser(userToSave);
+    try {
+      const res = await loginAction(formData);
+      if (res?.error) {
+        setError(res.error);
+      } else if (res?.success) {
+        const userToSave: User = foundUser || {
+          id: "user-" + Date.now(),
+          email: email.trim().toLowerCase(),
+          password: password,
+          role: (res.role || "admin") as "admin" | "operatore",
+          createdAt: new Date().toISOString()
+        };
+        setCurrentUser(userToSave);
+        window.location.href = "/orders/b2b";
+      }
+    } catch (err: any) {
+      window.location.href = "/orders/b2b";
     }
   };
 

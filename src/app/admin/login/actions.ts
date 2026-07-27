@@ -58,7 +58,7 @@ export async function loginAction(formData: FormData) {
       path: "/",
     });
     
-    redirect("/orders/b2b");
+    return { success: true, role: userRole };
   } else {
     return { error: "Email o password errate." };
   }

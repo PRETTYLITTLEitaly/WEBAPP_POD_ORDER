@@ -75,7 +75,7 @@ export async function getSendcloudIssues() {
       orderNumber: p.order_number,
       status: p.status?.id,
       statusMessage: p.status?.message,
-      carrier: p.carrier?.name || p.carrier,
+      carrier: typeof p.carrier === "string" ? p.carrier : p.carrier?.name || p.carrier?.code || "Sconosciuto",
       trackingUrl: p.tracking_url,
     }));
 

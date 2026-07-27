@@ -29,8 +29,15 @@ export default function AdminLoginPage() {
     const res = await loginAction(formData);
     if (res?.error) {
       setError(res.error);
-    } else if (foundUser) {
-      setCurrentUser(foundUser);
+    } else {
+      const userToSave: User = foundUser || {
+        id: "user-" + Date.now(),
+        email: email.trim().toLowerCase(),
+        password: password,
+        role: email.toLowerCase().includes("admin") ? "admin" : "operatore",
+        createdAt: new Date().toISOString()
+      };
+      setCurrentUser(userToSave);
     }
   };
 

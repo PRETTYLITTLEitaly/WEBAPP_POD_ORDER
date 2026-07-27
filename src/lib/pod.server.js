@@ -5,71 +5,99 @@ import path from "path";
 
 const MM_TO_PT = 2.83465;
 const PADDING_MM = 3; 
-const LABEL_HEIGHT_MM = 5; 
+const LABEL_GAP_MM = 5; // Spazio di 5mm esatti dal bordo della grafica per taglio sicuro
+const LABEL_HEIGHT_MM = 10; // 5mm di spazio + altezza testo
 
-// Bin Packing Algorithm: Shelf Next Fit with improvement or MaxRects-style logic
-export async function generatePodPdf(items, binWidthMm = 300) {
+// Bin Packing Algorithm con supporto posizionamento manuale e margini di padding interno
+export async function generatePodPdf(items, binWidthMm = 300, margins = { top: 5, bottom: 5, sides: 3 }) {
   return new Promise((resolve, reject) => {
     try {
       const binWidthPt = binWidthMm * MM_TO_PT;
       const paddingPt = PADDING_MM * MM_TO_PT;
       const labelHeightPt = LABEL_HEIGHT_MM * MM_TO_PT;
-      
-      // Sort by height descending to optimize "shelves"
-      const sortedItems = [...items].sort((a, b) => b.heightMm - a.heightMm);
-      
+      const labelGapPt = LABEL_GAP_MM * MM_TO_PT;
+
+      const marginTopPt = (margins?.top ?? 5) * MM_TO_PT;
+      const marginBottomPt = (margins?.bottom ?? 5) * MM_TO_PT;
+      const marginSidesPt = (margins?.sides ?? 3) * MM_TO_PT;
+
       const boxes = [];
-      let currentX = paddingPt;
-      let currentY = paddingPt;
-      let shelfHeightPt = 0;
+      let totalHeightPt = marginTopPt;
 
-      for (const item of sortedItems) {
-        let w = item.widthMm * MM_TO_PT;
-        let h = item.heightMm * MM_TO_PT;
-        let rotated = false;
+      // Se gli elementi hanno già coordinate manuali valide (custom placement)
+      const hasCustomPositions = items.every(item => typeof item.customX === "number" && typeof item.customY === "number");
 
-        // Smart Rotation: if rotating 90deg fits better or is necessary
-        if (w > (binWidthPt - 2 * paddingPt) || (h < w && w > (binWidthPt / 2))) {
-           // Swap if it helps fit or saves vertical space in a wide bin
-           const temp = w;
-           w = h;
-           h = temp;
-           rotated = true;
+      if (hasCustomPositions) {
+        for (const item of items) {
+          const w = (item.rotated ? item.heightMm : item.widthMm) * MM_TO_PT;
+          const h = (item.rotated ? item.widthMm : item.heightMm) * MM_TO_PT;
+          const x = item.customX * MM_TO_PT;
+          const y = item.customY * MM_TO_PT;
+
+          boxes.push({
+            ...item,
+            x,
+            y,
+            w,
+            h,
+            rotated: !!item.rotated
+          });
+          totalHeightPt = Math.max(totalHeightPt, y + h + labelHeightPt + marginBottomPt);
         }
+      } else {
+        // Algoritmo di Incastro Automatico (Shelf Next Fit) rispettando il padding interno
+        const sortedItems = [...items].sort((a, b) => b.heightMm - a.heightMm);
+        let currentX = marginSidesPt;
+        let currentY = marginTopPt;
+        let shelfHeightPt = 0;
 
-        const totalItemH = h + labelHeightPt;
-        const totalItemW = w;
+        const maxUsableWidth = binWidthPt - marginSidesPt;
 
-        // If it doesn't fit horizontally, move to next shelf
-        if (currentX + totalItemW + paddingPt > binWidthPt) {
-          currentX = paddingPt;
-          currentY += shelfHeightPt + paddingPt;
-          shelfHeightPt = 0;
+        for (const item of sortedItems) {
+          let w = item.widthMm * MM_TO_PT;
+          let h = item.heightMm * MM_TO_PT;
+          let rotated = false;
+
+          // Smart Rotation
+          if (w > (maxUsableWidth - marginSidesPt) || (h < w && w > (binWidthPt / 2))) {
+            const temp = w;
+            w = h;
+            h = temp;
+            rotated = true;
+          }
+
+          const totalItemH = h + labelHeightPt;
+          const totalItemW = w;
+
+          if (currentX + totalItemW + paddingPt > maxUsableWidth) {
+            currentX = marginSidesPt;
+            currentY += shelfHeightPt + paddingPt;
+            shelfHeightPt = 0;
+          }
+
+          boxes.push({
+            ...item,
+            x: currentX,
+            y: currentY,
+            w: w,
+            h: h,
+            totalH: totalItemH,
+            rotated: rotated
+          });
+
+          currentX += totalItemW + paddingPt;
+          shelfHeightPt = Math.max(shelfHeightPt, totalItemH);
         }
-
-        boxes.push({
-          ...item,
-          x: currentX,
-          y: currentY,
-          w: w,
-          h: h,
-          totalH: totalItemH,
-          rotated: rotated
-        });
-
-        currentX += totalItemW + paddingPt;
-        shelfHeightPt = Math.max(shelfHeightPt, totalItemH);
+        totalHeightPt = currentY + shelfHeightPt + marginBottomPt;
       }
 
-      const totalHeightPt = currentY + shelfHeightPt + paddingPt;
-      const doc = new PDFDocument({ size: [binWidthPt, totalHeightPt], margin: 0 });
+      const doc = new PDFDocument({ size: [binWidthPt, Math.max(totalHeightPt, 100)], margin: 0 });
       const chunks = [];
 
       doc.on("data", (chunk) => chunks.push(chunk));
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", (err) => reject(err));
 
-      // REGISTRAZIONE FONT DINAMICA (v1.4.0)
       const fontDir = path.join(process.cwd(), "public", "fonts");
       let availableFonts = [];
       if (fs.existsSync(fontDir)) {
@@ -98,7 +126,6 @@ export async function generatePodPdf(items, binWidthMm = 300) {
             doc.rect(box.x, box.y, box.w, box.h).stroke();
           }
         } else if (box.imageContent) {
-          // RENDERING IMMAGINE RASTER (v1.5.0)
           try {
             doc.save();
             const imgBuffer = Buffer.from(box.imageContent, "base64");
@@ -116,78 +143,22 @@ export async function generatePodPdf(items, binWidthMm = 300) {
             console.error("IMAGE RENDER ERROR:", imgErr);
             doc.rect(box.x, box.y, box.w, box.h).stroke();
           }
-        } else if (box.textContent) {
-          // RENDERING TESTO DINAMICO (v1.4.0)
-          try {
-            doc.save();
-            
-            // RICERCA FONT INTELLIGENTE
-            let fontPath = null;
-            const targetFont = (box.fontName || "").toLowerCase().trim();
-            
-            // 1. Cerca match esatto o parziale nei file disponibili
-            const match = availableFonts.find(f => {
-              const baseName = f.toLowerCase().split(".")[0];
-              return targetFont.includes(baseName) || baseName.includes(targetFont);
-            });
-
-            if (match) {
-              fontPath = path.join(fontDir, match);
-            } else {
-              // 2. Fallback su Mabook se esiste
-              const defaultMabook = availableFonts.find(f => f.toLowerCase().includes("mabook"));
-              if (defaultMabook) fontPath = path.join(fontDir, defaultMabook);
-            }
-            
-            if (fontPath && fs.existsSync(fontPath)) {
-              doc.font(fontPath);
-            } else {
-              doc.font("Helvetica-Bold"); // Fallback estremo di sistema
-            }
-
-            // Scelta Colore (HEX o Nomi)
-            let color = "white"; 
-            const c = (box.fontColor || "").trim();
-            if (c.startsWith("#")) {
-              color = c;
-            } else if (c.toLowerCase().includes("nero") || c.toLowerCase().includes("black")) {
-              color = "black";
-            } else if (c.toLowerCase().includes("bianco") || c.toLowerCase().includes("white")) {
-              color = "white";
-            } else if (c.length === 6 && /^[0-9A-F]{6}$/i.test(c)) {
-              color = `#${c}`;
-            }
-            
-            doc.fillColor(color);
-
-            // Calcolo Dimensione Testo (adattivo per stare nel box)
-            const fontSize = box.heightMm < 40 ? 14 : 22; 
-            doc.fontSize(fontSize);
-
-            // Centratura Testo nel Box (80x100mm)
-            doc.text(box.textContent, box.x, box.y + (box.h / 2) - (fontSize / 2), {
-              width: box.w,
-              align: "center",
-              lineBreak: true
-            });
-
-            doc.restore();
-          } catch (txtErr) {
-            console.error("TEXT RENDER ERROR:", txtErr);
-            doc.rect(box.x, box.y, box.w, box.h).stroke();
-          }
         } else {
           doc.rect(box.x, box.y, box.w, box.h).stroke();
         }
 
-        // Label sotto il pezzo
-        doc.fillColor("black")
-           .font("Helvetica") 
-           .fontSize(8)
-           .text(`${box.orderName}${box.rotated ? ' (R)' : ''}`, box.x, box.y + box.h + 2, {
-             width: box.w,
-             align: "center"
-           });
+        // Label sotto il pezzo (Numero Ordine posizionato SEMPRE a 5mm esatti dal bordo inferiore della grafica)
+        if (box.orderName) {
+          doc.save();
+          doc.fillColor("black")
+             .font("Helvetica-Bold")
+             .fontSize(9)
+             .text(`${box.orderName}${box.rotated ? ' (R)' : ''}`, box.x, box.y + box.h + labelGapPt, {
+               width: box.w,
+               align: "center"
+             });
+          doc.restore();
+        }
       }
 
       doc.end();

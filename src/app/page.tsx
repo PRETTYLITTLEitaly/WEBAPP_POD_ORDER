@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PackageOpen, Truck, AlertTriangle } from "lucide-react";
+import { Package, Truck, AlertCircle } from "lucide-react";
 import { shopifyFetch } from "@/lib/shopify";
 import { getSendcloudIssues } from "@/lib/sendcloud";
 
@@ -33,88 +33,109 @@ export default async function Home() {
   const issuesCount = sendcloudData.count;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
-          Benvenuto nel Centro Operativo
+    <div className="space-y-6">
+      {/* Header Polaris */}
+      <div className="pb-4">
+        <h1 className="text-[28px] leading-9 font-semibold text-gray-900">
+          Panoramica Operativa
         </h1>
-        <p className="mt-4 text-lg text-gray-500 dark:text-gray-400">
-          Monitora e gestisci gli ordini in attesa di stampa ed evasione.
+        <p className="mt-1 text-sm text-gray-600">
+          Monitora lo stato degli ordini e delle spedizioni in attesa di lavorazione.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Card B2B */}
-        <Link href="/orders/b2b" className="group block">
-          <div className="relative rounded-2xl border border-gray-200 bg-white/50 dark:bg-gray-900/50 p-8 shadow-sm backdrop-blur-xl transition-all duration-300 hover:shadow-xl hover:border-indigo-500/30 dark:border-gray-800 hover:-translate-y-1 overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity group-hover:opacity-20">
-              <PackageOpen className="w-24 h-24 text-indigo-600" />
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-200 overflow-hidden flex flex-col">
+          <div className="p-5 flex-1">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <Package className="w-5 h-5 text-gray-700" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Ordini B2B</h2>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Store B2B</h2>
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-black bg-gradient-to-br from-indigo-500 to-purple-600 bg-clip-text text-transparent">
+              <span className="text-4xl font-semibold text-gray-900">
                 {b2bCount}
               </span>
-              <span className="text-gray-500 font-medium">da evadere</span>
-            </div>
-            <div className="mt-6 inline-flex items-center text-sm font-semibold text-indigo-600 dark:text-indigo-400">
-              Gestisci ordini <span aria-hidden="true" className="ml-1 transition-transform group-hover:translate-x-1">&rarr;</span>
+              <span className="text-sm font-medium text-gray-500">da evadere</span>
             </div>
           </div>
-        </Link>
+          <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
+            <Link href="/orders/b2b" className="text-sm font-medium text-[#303030] hover:underline flex items-center justify-between">
+              Gestisci ordini B2B
+              <span aria-hidden="true">&rarr;</span>
+            </Link>
+          </div>
+        </div>
 
         {/* Card B2C */}
-        <Link href="/orders/b2c" className="group block">
-          <div className="relative rounded-2xl border border-gray-200 bg-white/50 dark:bg-gray-900/50 p-8 shadow-sm backdrop-blur-xl transition-all duration-300 hover:shadow-xl hover:border-emerald-500/30 dark:border-gray-800 hover:-translate-y-1 overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity group-hover:opacity-20">
-              <Truck className="w-24 h-24 text-emerald-600" />
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-200 overflow-hidden flex flex-col">
+          <div className="p-5 flex-1">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <Truck className="w-5 h-5 text-gray-700" />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Ordini B2C</h2>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Store B2C</h2>
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-black bg-gradient-to-br from-emerald-500 to-teal-600 bg-clip-text text-transparent">
+              <span className="text-4xl font-semibold text-gray-900">
                 {b2cCount}
               </span>
-              <span className="text-gray-500 font-medium">da evadere</span>
-            </div>
-            <div className="mt-6 inline-flex items-center text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              Gestisci ordini <span aria-hidden="true" className="ml-1 transition-transform group-hover:translate-x-1">&rarr;</span>
+              <span className="text-sm font-medium text-gray-500">da evadere</span>
             </div>
           </div>
-        </Link>
+          <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
+            <Link href="/orders/b2c" className="text-sm font-medium text-[#303030] hover:underline flex items-center justify-between">
+              Gestisci ordini B2C
+              <span aria-hidden="true">&rarr;</span>
+            </Link>
+          </div>
+        </div>
 
-        {/* Card Spedizioni Sendcloud */}
-        <Link href={issuesCount > 0 ? "/spedizioni" : "#"} className="group block h-full">
-          <div className={`relative h-full rounded-2xl border bg-white/50 dark:bg-gray-900/50 p-8 shadow-sm backdrop-blur-xl transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden ${
-            issuesCount > 0 
-              ? "border-red-200 dark:border-red-900/50 hover:border-red-500/30" 
-              : "border-gray-200 dark:border-gray-800 hover:border-gray-300"
-          }`}>
-            <div className="absolute top-0 right-0 p-4 opacity-10 transition-opacity group-hover:opacity-20">
-              <AlertTriangle className={`w-24 h-24 ${issuesCount > 0 ? 'text-red-600' : 'text-gray-400'}`} />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Spedizioni con problemi</h2>
-            <div className="flex items-baseline gap-2">
-              {issuesCount > 0 ? (
-                <>
-                  <span className="text-5xl font-black bg-gradient-to-br from-red-500 to-orange-600 bg-clip-text text-transparent">
-                    {issuesCount}
-                  </span>
-                  <span className="text-gray-500 font-medium">problemi rilevati</span>
-                </>
-              ) : (
-                <span className="text-xl font-semibold text-gray-500 dark:text-gray-400 mt-4">
-                  Nessun problema rilevato
-                </span>
-              )}
+        {/* Card Spedizioni */}
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-200 overflow-hidden flex flex-col">
+          <div className="p-5 flex-1">
+            <div className="flex items-center gap-2 mb-4">
+              <div className={`p-2 rounded-lg ${issuesCount > 0 ? 'bg-[#fed3d1]' : 'bg-gray-100'}`}>
+                <AlertCircle className={`w-5 h-5 ${issuesCount > 0 ? 'text-[#8e1f1c]' : 'text-gray-700'}`} />
+              </div>
+              <h2 className="text-base font-semibold text-gray-900">Spedizioni Sendcloud</h2>
             </div>
             
-            {issuesCount > 0 && (
-              <div className="mt-6 inline-flex items-center text-sm font-semibold text-red-600 dark:text-red-400">
-                Visualizza dettagli <span aria-hidden="true" className="ml-1 transition-transform group-hover:translate-x-1">&rarr;</span>
+            {issuesCount > 0 ? (
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-semibold text-[#8e1f1c]">
+                  {issuesCount}
+                </span>
+                <span className="text-sm font-medium text-gray-500">problemi rilevati</span>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-[#e4f1ed] text-[#0b5c46]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0b5c46] mr-1.5"></span>
+                  Nessun problema
+                </span>
               </div>
             )}
           </div>
-        </Link>
+          
+          {issuesCount > 0 ? (
+             <div className="bg-[#fff4f4] px-5 py-3 border-t border-[#fed3d1]">
+              <Link href="/spedizioni" className="text-sm font-medium text-[#8e1f1c] hover:underline flex items-center justify-between">
+                Verifica spedizioni
+                <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="bg-gray-50 px-5 py-3 border-t border-gray-200">
+              <Link href="/spedizioni" className="text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline flex items-center justify-between">
+                Vai a Spedizioni
+                <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

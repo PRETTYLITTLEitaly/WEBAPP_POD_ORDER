@@ -13,7 +13,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
 
   const query = `#graphql
     query getOrders {
-      orders(first: 100, query: "status:open", sortKey: CREATED_AT, reverse: true) {
+      orders(first: 250, sortKey: CREATED_AT, reverse: true) {
         nodes {
           id
           name
@@ -27,8 +27,16 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
             firstName
             lastName
           }
+          fulfillments {
+            trackingInfo {
+              number
+              url
+            }
+          }
           lineItems(first: 20) {
             nodes {
+              title
+              customAttributes { key value }
               product {
                 pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } } }
                 custom_url: metafield(namespace: "custom", key: "pod_svg_url") { value }
@@ -47,18 +55,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
   let orders: any[] = [];
   try {
     const res = await shopifyFetch({ store: store as "b2b" | "b2c", query });
-    const allOrders = res.data?.orders?.nodes || [];
-    
-    // Filtriamo per i POD come richiesto nel repo originale
-    orders = allOrders.filter((order: any) => {
-      const isZepto = order.tags?.includes("product-personalizer");
-      const hasPodProduct = (order.lineItems?.nodes || []).some((item: any) => {
-        const p = item.product;
-        const v = item.variant;
-        return (p?.pod_svg?.reference?.url || p?.custom_url?.value || v?.pod_svg?.reference?.url || v?.custom_url?.value);
-      });
-      return isZepto || hasPodProduct;
-    });
+    orders = res.data?.orders?.nodes || [];
   } catch (error) {
     console.error(error);
   }

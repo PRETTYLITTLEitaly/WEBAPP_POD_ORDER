@@ -4,25 +4,58 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export async function loginAction(formData: FormData) {
-  const password = formData.get("password") as string;
-  const adminPassword = process.env.ADMIN_TOOL_PASSWORD;
+  const email = (formData.get("email") as string || "").trim().toLowerCase();
+  const password = (formData.get("password") as string || "").trim();
 
-  if (!adminPassword) {
-    return { error: "Errore di configurazione: ADMIN_TOOL_PASSWORD non impostata nel server." };
+  if (!email || !password) {
+    return { error: "Compila tutti i campi (Email e Password)." };
   }
 
-  if (password === adminPassword) {
+  const adminEmail = (process.env.ADMIN_TOOL_EMAIL || "admin@prettylittleitaly.it").trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_TOOL_PASSWORD || "admin";
+
+  let isMatch = false;
+  let userRole: "admin" | "operatore" = "operatore";
+  let userEmail = email;
+
+  // 1. Controllo credenziali Admin Master
+  if (email === adminEmail && password === adminPassword) {
+    isMatch = true;
+    userRole = "admin";
+  } else {
+    // 2. Controllo utenti registrati dal client/database
+    const customUserJson = formData.get("customUserJson") as string;
+    if (customUserJson) {
+      try {
+        const u = JSON.parse(customUserJson);
+        if (u && u.email.toLowerCase() === email && u.password === password) {
+          isMatch = true;
+          userRole = u.role || "operatore";
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (isMatch) {
     const cookieStore = await cookies();
-    cookieStore.set("admin_session", "authenticated", {
+    const sessionData = JSON.stringify({ email: userEmail, role: userRole });
+
+    cookieStore.set("admin_session", sessionData, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 1 giorno
+      maxAge: 60 * 60 * 24 * 7, // 7 giorni
       path: "/",
     });
     
-    redirect("/admin/shopify-connect");
+    redirect("/orders/b2b");
   } else {
-    return { error: "Password errata" };
+    return { error: "Email o password errate." };
   }
+}
+
+export async function logoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.delete("admin_session");
+  redirect("/admin/login");
 }

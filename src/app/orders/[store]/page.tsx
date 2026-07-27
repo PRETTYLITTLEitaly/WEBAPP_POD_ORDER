@@ -13,7 +13,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
 
   const query = `#graphql
     query getOrders {
-      orders(first: 50, query: "status:open fulfillment_status:unfulfilled", sortKey: CREATED_AT, reverse: true) {
+      orders(first: 100, query: "status:open", sortKey: CREATED_AT, reverse: true) {
         nodes {
           id
           name
@@ -44,7 +44,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
     }
   `;
 
-  let orders = [];
+  let orders: any[] = [];
   try {
     const res = await shopifyFetch({ store: store as "b2b" | "b2c", query });
     const allOrders = res.data?.orders?.nodes || [];

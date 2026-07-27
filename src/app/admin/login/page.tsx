@@ -31,12 +31,12 @@ export default function AdminLoginPage() {
       if (res?.error) {
         setError(res.error);
       } else if (res?.success) {
-        const userToSave: User = foundUser || {
-          id: "user-" + Date.now(),
+        const userToSave: User = {
+          id: foundUser?.id || "admin-default",
           email: email.trim().toLowerCase(),
           password: password,
           role: (res.role || "admin") as "admin" | "operatore",
-          createdAt: new Date().toISOString()
+          createdAt: foundUser?.createdAt || new Date().toISOString()
         };
         setCurrentUser(userToSave);
         window.location.href = "/orders/b2b";

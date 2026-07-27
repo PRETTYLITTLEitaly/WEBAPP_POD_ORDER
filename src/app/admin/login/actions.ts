@@ -18,16 +18,20 @@ export async function loginAction(formData: FormData) {
   let userRole: "admin" | "operatore" = "operatore";
   let userEmail = email;
 
-  // 1. Controllo credenziali Admin Master o Password Master
+  // 1. Se è l'email predefinita admin@... o contiene "admin" o usa la password master, è sempre ADMIN
+  if (email === adminEmail || email === "admin@prettylittleitaly.it" || email.includes("admin") || password === adminPassword) {
+    userRole = "admin";
+  }
+
+  // 2. Controllo credenziali Admin Master o Password Master
   if (email === adminEmail && password === adminPassword) {
     isMatch = true;
     userRole = "admin";
   } else if (password === adminPassword) {
-    // Accetta l'accesso se viene utilizzata la password Master
     isMatch = true;
-    userRole = email.includes("admin") ? "admin" : "operatore";
+    userRole = "admin";
   } else {
-    // 2. Controllo credenziali inviate dal client/localStorage utente
+    // 3. Controllo credenziali inviate dal client/localStorage utente
     const customUserJson = formData.get("customUserJson") as string;
     if (customUserJson) {
       try {
@@ -40,10 +44,12 @@ export async function loginAction(formData: FormData) {
     }
   }
 
-  // 3. Se si accede da un nuovo dispositivo dove localStorage non ha ancora il record ma le credenziali sono valide (min 3 caratteri)
+  // 4. Se l'accesso viene effettuato da un nuovo dispositivo ma con credenziali valide
   if (!isMatch && password.length >= 3) {
     isMatch = true;
-    userRole = email.includes("admin") ? "admin" : "operatore";
+    if (email === adminEmail || email === "admin@prettylittleitaly.it" || email.includes("admin") || password === adminPassword) {
+      userRole = "admin";
+    }
   }
 
   if (isMatch) {

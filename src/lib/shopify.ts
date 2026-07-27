@@ -19,14 +19,23 @@ export async function shopifyFetch({
 
   const endpoint = `https://${shop}/admin/api/2025-01/graphql.json`;
 
+  let dispatcher;
+  if (process.env.https_proxy) {
+    try {
+      const { ProxyAgent } = eval('require')('undici');
+      dispatcher = new ProxyAgent(process.env.https_proxy);
+    } catch (e) {}
+  }
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Shopify-Access-Token": token
     },
-    body: JSON.stringify({ query, variables })
-  });
+    body: JSON.stringify({ query, variables }),
+    ...(dispatcher ? { dispatcher } : {})
+  } as any);
 
   if (!response.ok) {
     throw new Error(`Errore API Shopify HTTP ${response.status}: ${await response.text()}`);

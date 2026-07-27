@@ -8,12 +8,24 @@ import clsx from "clsx";
 export default function Navbar() {
   const pathname = usePathname();
   const [stats, setStats] = useState({ b2bCount: 0, b2cCount: 0 });
+  const [issuesCount, setIssuesCount] = useState(0);
 
   useEffect(() => {
+    // Fetch count ordini
     fetch("/api/stats")
       .then(res => res.json())
       .then(data => {
         if (!data.error) setStats(data);
+      })
+      .catch(console.error);
+      
+    // Fetch count spedizioni problematiche
+    fetch("/api/sendcloud/issues")
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.count === 'number') {
+          setIssuesCount(data.count);
+        }
       })
       .catch(console.error);
   }, []);
@@ -22,6 +34,8 @@ export default function Navbar() {
     { name: "Dashboard", href: "/" },
     { name: "B2B", href: "/orders/b2b", badge: stats.b2bCount },
     { name: "B2C", href: "/orders/b2c", badge: stats.b2cCount },
+    { name: "Produzione", href: "/produzione" },
+    { name: "Spedizioni", href: "/spedizioni", badge: issuesCount, isAlert: true },
   ];
 
   return (
@@ -50,7 +64,12 @@ export default function Navbar() {
                   >
                     {link.name}
                     {link.badge !== undefined && link.badge > 0 && (
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                      <span className={clsx(
+                        "ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                        link.isAlert 
+                          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200" 
+                          : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200"
+                      )}>
                         {link.badge}
                       </span>
                     )}

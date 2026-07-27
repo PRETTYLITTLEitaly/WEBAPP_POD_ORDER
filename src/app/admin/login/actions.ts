@@ -18,20 +18,12 @@ export async function loginAction(formData: FormData) {
   let userRole: "admin" | "operatore" = "operatore";
   let userEmail = email;
 
-  // 1. Se è l'email predefinita admin@... o contiene "admin" o usa la password master, è sempre ADMIN
-  if (email === adminEmail || email === "admin@prettylittleitaly.it" || email.includes("admin") || password === adminPassword) {
-    userRole = "admin";
-  }
-
-  // 2. Controllo credenziali Admin Master o Password Master
-  if (email === adminEmail && password === adminPassword) {
+  // 1. Controllo se viene utilizzata la Password Master di sistema ("admin")
+  if (password === adminPassword) {
     isMatch = true;
-    userRole = "admin";
-  } else if (password === adminPassword) {
-    isMatch = true;
-    userRole = "admin";
+    userRole = (email === adminEmail || email === "admin@prettylittleitaly.it" || email.includes("admin")) ? "admin" : "operatore";
   } else {
-    // 3. Controllo credenziali inviate dal client/localStorage utente
+    // 2. Controllo credenziali specifiche salvate per l'utente
     const customUserJson = formData.get("customUserJson") as string;
     if (customUserJson) {
       try {
@@ -44,30 +36,23 @@ export async function loginAction(formData: FormData) {
     }
   }
 
-  // 4. Se l'accesso viene effettuato da un nuovo dispositivo ma con credenziali valide
-  if (!isMatch && password.length >= 3) {
-    isMatch = true;
-    if (email === adminEmail || email === "admin@prettylittleitaly.it" || email.includes("admin") || password === adminPassword) {
-      userRole = "admin";
-    }
-  }
-
-  if (isMatch) {
-    const cookieStore = await cookies();
-    const sessionData = JSON.stringify({ email: userEmail, role: userRole });
-
-    cookieStore.set("admin_session", sessionData, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 giorni
-      path: "/",
-    });
-    
-    return { success: true, role: userRole };
-  } else {
+  // SE LA PASSWORD È ERRATA -> BLOCCA L'ACCESSO IMMEDIATAMENTE!
+  if (!isMatch) {
     return { error: "Email o password errate." };
   }
+
+  const cookieStore = await cookies();
+  const sessionData = JSON.stringify({ email: userEmail, role: userRole });
+
+  cookieStore.set("admin_session", sessionData, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 7, // 7 giorni
+    path: "/",
+  });
+  
+  return { success: true, role: userRole };
 }
 
 export async function logoutAction() {

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const shopifySearchString = queryParts.join(" AND ");
 
-    // 1. Query Prodotti con paginazione e i 7 Metafield (incluso custom.colore_cavo)
+    // 1. Query Prodotti con paginazione e i 7 Metafield
     const productsQuery = `#graphql
       query getProducts($first: Int!, $after: String, $query: String) {
         products(first: $first, after: $after, query: $query, sortKey: TITLE) {
@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    // 4. Query Definizioni Metafield
+    // 4. Query Definizioni Metafield per tipi e valori opzioni
     const metaDefsQuery = `#graphql
       query getMetafieldDefs {
         metafieldDefinitions(first: 100, ownerType: PRODUCT) {
@@ -165,6 +165,9 @@ export async function GET(req: NextRequest) {
             namespace
             key
             name
+            type {
+              name
+            }
             validations {
               name
               value
@@ -238,7 +241,7 @@ export async function GET(req: NextRequest) {
 
     const svgFiles = Array.from(svgFilesMap.values());
 
-    // Opzioni colore dalle definizioni per stick, base e cavo
+    // Opzioni colore dalle definizioni
     let coloreStickChoices: string[] = [];
     let coloreBaseChoices: string[] = [];
     let coloreCavoChoices: string[] = [];
@@ -321,7 +324,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/products/metafields — Aggiorna i 7 metafield di un prodotto su Shopify via GraphQL
+// POST /api/products/metafields — Aggiorna i 7 metafield usando i tipi dinamici definiti su Shopify ed ignorando i campi vuoti
 export async function POST(req: NextRequest) {
   try {
     const { store, productId, metafields } = await req.json();
@@ -330,83 +333,72 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Parametri mancanti." }, { status: 400 });
     }
 
+    // Recuperiamo prima le definizioni reali dei metafield da Shopify per usare l'esatto tipo di dato (es. number_decimal vs single_line_text_field)
+    const metaDefsQuery = `#graphql
+      query getMetafieldDefs {
+        metafieldDefinitions(first: 100, ownerType: PRODUCT) {
+          nodes {
+            namespace
+            key
+            type {
+              name
+            }
+          }
+        }
+      }
+    `;
+
+    const metaDefsRes: any = await shopifyFetch({ store: store || "b2c", query: metaDefsQuery }).catch(() => ({ data: { metafieldDefinitions: { nodes: [] } } }));
+    const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
+
+    const getType = (namespace: string, key: string, fallback: string) => {
+      const found = metaDefs.find((d: any) => d.namespace === namespace && d.key === key);
+      return found?.type?.name || fallback;
+    };
+
     const metafieldsInput: any[] = [];
 
-    // 1. custom.pod_svg_url
-    if (metafields.pod_svg_url !== undefined) {
+    // Helper per inserire metafield solo se la stringa ha un valore non vuoto
+    const addMetafield = (namespace: string, key: string, value: string, defaultType: string) => {
+      const valStr = String(value || "").trim();
+      if (!valStr) return; // Omettiamo i valori vuoti per evitare "Value can't be blank"
+
+      const targetType = getType(namespace, key, defaultType);
+
       metafieldsInput.push({
         ownerId: productId,
-        namespace: "custom",
-        key: "pod_svg_url",
-        type: "single_line_text_field",
-        value: String(metafields.pod_svg_url || "")
+        namespace,
+        key,
+        type: targetType,
+        value: valStr
       });
-    }
+    };
+
+    // 1. custom.pod_svg_url
+    addMetafield("custom", "pod_svg_url", metafields.pod_svg_url, "single_line_text_field");
 
     // 2. pod.svg (file_reference)
-    if (metafields.pod_svg_file_id !== undefined && metafields.pod_svg_file_id) {
-      metafieldsInput.push({
-        ownerId: productId,
-        namespace: "pod",
-        key: "svg",
-        type: "file_reference",
-        value: String(metafields.pod_svg_file_id)
-      });
+    if (metafields.pod_svg_file_id && String(metafields.pod_svg_file_id).trim()) {
+      addMetafield("pod", "svg", metafields.pod_svg_file_id, "file_reference");
     }
 
-    // 3. pod.height
-    if (metafields.pod_height !== undefined) {
-      metafieldsInput.push({
-        ownerId: productId,
-        namespace: "pod",
-        key: "height",
-        type: "single_line_text_field",
-        value: String(metafields.pod_height || "")
-      });
-    }
+    // 3. pod.height (dinamico: number_decimal o single_line_text_field)
+    addMetafield("pod", "height", metafields.pod_height, "number_decimal");
 
-    // 4. pod.width
-    if (metafields.pod_width !== undefined) {
-      metafieldsInput.push({
-        ownerId: productId,
-        namespace: "pod",
-        key: "width",
-        type: "single_line_text_field",
-        value: String(metafields.pod_width || "")
-      });
-    }
+    // 4. pod.width (dinamico: number_decimal o single_line_text_field)
+    addMetafield("pod", "width", metafields.pod_width, "number_decimal");
 
     // 5. custom.colore_stick
-    if (metafields.colore_stick !== undefined) {
-      metafieldsInput.push({
-        ownerId: productId,
-        namespace: "custom",
-        key: "colore_stick",
-        type: "single_line_text_field",
-        value: String(metafields.colore_stick || "")
-      });
-    }
+    addMetafield("custom", "colore_stick", metafields.colore_stick, "single_line_text_field");
 
     // 6. custom.colore_base
-    if (metafields.colore_base !== undefined) {
-      metafieldsInput.push({
-        ownerId: productId,
-        namespace: "custom",
-        key: "colore_base",
-        type: "single_line_text_field",
-        value: String(metafields.colore_base || "")
-      });
-    }
+    addMetafield("custom", "colore_base", metafields.colore_base, "single_line_text_field");
 
     // 7. custom.colore_cavo
-    if (metafields.colore_cavo !== undefined) {
-      metafieldsInput.push({
-        ownerId: productId,
-        namespace: "custom",
-        key: "colore_cavo",
-        type: "single_line_text_field",
-        value: String(metafields.colore_cavo || "")
-      });
+    addMetafield("custom", "colore_cavo", metafields.colore_cavo, "single_line_text_field");
+
+    if (metafieldsInput.length === 0) {
+      return NextResponse.json({ success: true, message: "Nessun metafield da aggiornare." });
     }
 
     const mutation = `#graphql

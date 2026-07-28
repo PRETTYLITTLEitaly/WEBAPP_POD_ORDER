@@ -19,7 +19,10 @@ import {
   ExternalLink,
   Store,
   Folder,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Eye,
+  X,
+  Zap
 } from "lucide-react";
 
 interface ProductItem {
@@ -39,6 +42,7 @@ interface ProductItem {
     pod_width: string;
     colore_stick: string;
     colore_base: string;
+    colore_cavo: string;
   };
   status: "complete" | "partial" | "missing";
 }
@@ -58,7 +62,7 @@ interface CollectionItem {
 
 const DEFAULT_COLOR_OPTIONS = [
   "Nero", "Bianco", "Trasparente", "Naturale", "Legno", "Oro", "Argento", 
-  "Rosso", "Blu", "Azzurro", "Verde", "Rosa", "Giallo", "Tiffany", "Bordeaux", "Foresta"
+  "Rosso", "Blu", "Azzurro", "Verde", "Rosa", "Giallo", "Tiffany", "Bordeaux", "Foresta", "Tessuto Nero", "Tessuto Rosso"
 ];
 
 export default function ProductMetafieldsPage() {
@@ -71,10 +75,14 @@ export default function ProductMetafieldsPage() {
 
   const [coloreStickList, setColoreStickList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
   const [coloreBaseList, setColoreBaseList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
+  const [coloreCavoList, setColoreCavoList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
   
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   
+  // Modal Ingrandimento Foto Occhio
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
+
   // Filtri Shopify
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCollection, setSelectedCollection] = useState("");
@@ -107,6 +115,9 @@ export default function ProductMetafieldsPage() {
         if (data.coloreBaseChoices?.length > 0) {
           setColoreBaseList(Array.from(new Set([...data.coloreBaseChoices, ...DEFAULT_COLOR_OPTIONS])));
         }
+        if (data.coloreCavoChoices?.length > 0) {
+          setColoreCavoList(Array.from(new Set([...data.coloreCavoChoices, ...DEFAULT_COLOR_OPTIONS])));
+        }
 
         // Inizializziamo lo stato dei form
         const initialFormState: { [id: string]: ProductItem["metafields"] } = {};
@@ -130,7 +141,7 @@ export default function ProductMetafieldsPage() {
   const handleInputChange = (productId: string, field: keyof ProductItem["metafields"], value: string) => {
     setEditedMetafields(prev => {
       const currentForm = prev[productId] || {
-        pod_svg_url: "", pod_svg_file_id: "", pod_svg_file_url: "", pod_height: "", pod_width: "", colore_stick: "", colore_base: ""
+        pod_svg_url: "", pod_svg_file_id: "", pod_svg_file_url: "", pod_height: "", pod_width: "", colore_stick: "", colore_base: "", colore_cavo: ""
       };
 
       const updated = {
@@ -138,11 +149,9 @@ export default function ProductMetafieldsPage() {
         [field]: value
       };
 
-      // Se viene aggiornato pod_svg_url con un link, popoliamo automaticamente anche pod_svg_file_id se vuoto
       if (field === "pod_svg_url" && value && !updated.pod_svg_file_id) {
         updated.pod_svg_file_id = value;
       }
-      // Se viene aggiornato pod_svg_file_id con un file o link, aggiorniamo anche pod_svg_url
       if (field === "pod_svg_file_id" && value) {
         const fileObj = shopifyFiles.find(f => f.id === value);
         if (fileObj && fileObj.url) {
@@ -208,7 +217,7 @@ export default function ProductMetafieldsPage() {
             Configuratore Metafield Prodotti & Grafiche SVG
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Imposta rapidamente i 6 metafield di produzione per tutti i prodotti Shopify.
+            Imposta i 7 metafield di produzione per i prodotti Shopify.
           </p>
         </div>
 
@@ -363,7 +372,7 @@ export default function ProductMetafieldsPage() {
 
       </div>
 
-      {/* LISTA SCHEDE PRODOTTI - LAYOUT COMPATTO CON IMMAGINE A SINISTRA */}
+      {/* LISTA SCHEDE PRODOTTI */}
       {loading ? (
         <div className="p-16 text-center text-gray-400 font-medium animate-pulse">
           Recupero prodotti, file SVG e collezioni da Shopify in corso...
@@ -383,23 +392,37 @@ export default function ProductMetafieldsPage() {
                 key={product.id}
                 className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row hover:border-gray-300 transition-all"
               >
-                {/* IMMAGINE PRODOTTO A TUTTA ALTEZZA SULLA ESTREMA SINISTRA */}
-                <div className="w-full md:w-36 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 flex items-center justify-center p-3 shrink-0">
-                  {product.imageUrl ? (
-                    <img 
-                      src={product.imageUrl} 
-                      alt={product.imageAlt}
-                      className="w-full max-h-36 object-contain"
-                    />
-                  ) : (
-                    <Package className="w-10 h-10 text-gray-300" />
+                {/* IMMAGINE PRODOTTO CON TASTO OCCHIO SOTTO */}
+                <div className="w-full md:w-40 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col items-center justify-between p-3 shrink-0">
+                  <div className="flex-1 flex items-center justify-center w-full">
+                    {product.imageUrl ? (
+                      <img 
+                        src={product.imageUrl} 
+                        alt={product.imageAlt}
+                        className="w-full max-h-36 object-contain"
+                      />
+                    ) : (
+                      <Package className="w-10 h-10 text-gray-300" />
+                    )}
+                  </div>
+
+                  {/* TASTO OCCHIO INGRANDISCI FOTO */}
+                  {product.imageUrl && (
+                    <button
+                      onClick={() => setZoomedImage({ url: product.imageUrl!, title: product.title })}
+                      className="mt-2 w-full py-1.5 bg-white hover:bg-gray-100 border border-gray-300 rounded-xl text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                      title="Ingrandisci foto prodotto"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Ingrandisci</span>
+                    </button>
                   )}
                 </div>
 
-                {/* AREA CONTENUTO DESTRO (Header + Metafield Compatti) */}
+                {/* AREA CONTENUTO DESTRO */}
                 <div className="flex-1 p-5 space-y-4">
                   
-                  {/* INTESTAZIONE SCHEDA CON RECAP COMPLETO COLLEZIONI E TAG */}
+                  {/* INTESTAZIONE SCHEDA */}
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-gray-100">
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -415,11 +438,10 @@ export default function ProductMetafieldsPage() {
                         </a>
                       </div>
 
-                      {/* RECAP DETTAGLIATO COLLEZIONI & TAG */}
+                      {/* RECAP COLLEZIONI & TAG */}
                       <div className="flex items-center gap-2 flex-wrap text-xs">
                         <span className="text-gray-400 font-mono text-[11px]">Handle: {product.handle}</span>
 
-                        {/* Collezioni */}
                         {product.collections && product.collections.length > 0 && (
                           <div className="flex items-center gap-1 flex-wrap">
                             {product.collections.map(col => (
@@ -431,14 +453,12 @@ export default function ProductMetafieldsPage() {
                           </div>
                         )}
 
-                        {/* Tipo Prodotto */}
                         {product.productType && (
                           <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-semibold text-[10px] border border-blue-100">
                             📦 {product.productType}
                           </span>
                         )}
 
-                        {/* Tag */}
                         {product.tags && product.tags.length > 0 && (
                           <div className="flex items-center gap-1 flex-wrap">
                             {product.tags.map(tag => (
@@ -451,7 +471,7 @@ export default function ProductMetafieldsPage() {
                       </div>
                     </div>
 
-                    {/* Badge Stato & Bottone Salva */}
+                    {/* Badge & Bottone Salva */}
                     <div className="flex items-center gap-2 shrink-0">
                       {product.status === "complete" ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-100 text-green-800">
@@ -481,8 +501,8 @@ export default function ProductMetafieldsPage() {
                     </div>
                   </div>
 
-                  {/* FORM GRIGLIA METAFIELD COMPATTA (3 COLONNE x 2 RIGHE) */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* FORM GRIGLIA I 7 METAFIELD (INCLUSO COLORE CAVO) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     
                     {/* 1. custom.pod_svg_url */}
                     <div className="space-y-1">
@@ -502,7 +522,7 @@ export default function ProductMetafieldsPage() {
                       />
                     </div>
 
-                    {/* 2. pod.svg (File Reference Shopify o URL) */}
+                    {/* 2. pod.svg */}
                     <div className="space-y-1">
                       <label className="text-[11px] font-bold text-gray-700 flex items-center justify-between">
                         <span className="flex items-center gap-1">
@@ -617,6 +637,29 @@ export default function ProductMetafieldsPage() {
                       </select>
                     </div>
 
+                    {/* 7. custom.colore_cavo */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                          Colore Cavo
+                        </span>
+                        <code className="text-gray-400 font-mono text-[9px]">custom.colore_cavo</code>
+                      </label>
+                      <select
+                        value={form.colore_cavo || ""}
+                        onChange={e => handleInputChange(product.id, "colore_cavo", e.target.value)}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="">-- Seleziona Colore Cavo --</option>
+                        {coloreCavoList.map(color => (
+                          <option key={color} value={color}>
+                            {color}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                   </div>
 
                 </div>
@@ -624,6 +667,37 @@ export default function ProductMetafieldsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* MODAL INGRANDIMENTO FOTO PRODOTTO */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div 
+            className="bg-white rounded-3xl p-4 max-w-2xl w-full shadow-2xl relative space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 px-2">
+              <h3 className="font-bold text-gray-900 text-base">{zoomedImage.title}</h3>
+              <button 
+                onClick={() => setZoomedImage(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="w-full h-[450px] bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center p-4">
+              <img 
+                src={zoomedImage.url} 
+                alt={zoomedImage.title}
+                className="max-w-full max-h-full object-contain drop-shadow-md"
+              />
+            </div>
+          </div>
         </div>
       )}
 

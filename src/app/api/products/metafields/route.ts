@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const shopifySearchString = queryParts.join(" AND ");
 
-    // 1. Query Prodotti con paginazione e Collezioni per singolo prodotto
+    // 1. Query Prodotti con paginazione e i 7 Metafield (incluso custom.colore_cavo)
     const productsQuery = `#graphql
       query getProducts($first: Int!, $after: String, $query: String) {
         products(first: $first, after: $after, query: $query, sortKey: TITLE) {
@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
             metafield_pod_width: metafield(namespace: "pod", key: "width") { id value }
             metafield_colore_stick: metafield(namespace: "custom", key: "colore_stick") { id value }
             metafield_colore_base: metafield(namespace: "custom", key: "colore_base") { id value }
+            metafield_colore_cavo: metafield(namespace: "custom", key: "colore_cavo") { id value }
           }
         }
       }
@@ -216,7 +217,7 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Mappa dei file SVG (da Shopify Files e dai prodotti)
+    // Mappa dei file SVG
     const svgFilesMap = new Map<string, { id: string; url: string; filename: string }>();
 
     allRawFiles.forEach((f: any) => {
@@ -237,9 +238,10 @@ export async function GET(req: NextRequest) {
 
     const svgFiles = Array.from(svgFilesMap.values());
 
-    // Opzioni colore dalle definizioni
+    // Opzioni colore dalle definizioni per stick, base e cavo
     let coloreStickChoices: string[] = [];
     let coloreBaseChoices: string[] = [];
+    let coloreCavoChoices: string[] = [];
 
     metaDefs.forEach((def: any) => {
       if (def.namespace === "custom" && def.key === "colore_stick") {
@@ -254,6 +256,12 @@ export async function GET(req: NextRequest) {
           try { coloreBaseChoices = JSON.parse(choiceVal.value); } catch (e) {}
         }
       }
+      if (def.namespace === "custom" && def.key === "colore_cavo") {
+        const choiceVal = def.validations?.find((v: any) => v.name === "choices");
+        if (choiceVal?.value) {
+          try { coloreCavoChoices = JSON.parse(choiceVal.value); } catch (e) {}
+        }
+      }
     });
 
     const products = rawProducts.map((p: any) => {
@@ -264,9 +272,10 @@ export async function GET(req: NextRequest) {
       const width = p.metafield_pod_width?.value || "";
       const coloreStick = p.metafield_colore_stick?.value || "";
       const coloreBase = p.metafield_colore_base?.value || "";
+      const coloreCavo = p.metafield_colore_cavo?.value || "";
 
-      const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase);
-      const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase);
+      const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase && coloreCavo);
+      const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase || coloreCavo);
 
       const productCollections = (p.collections?.nodes || []).map((c: any) => c.title);
 
@@ -286,7 +295,8 @@ export async function GET(req: NextRequest) {
           pod_height: height,
           pod_width: width,
           colore_stick: coloreStick,
-          colore_base: coloreBase
+          colore_base: coloreBase,
+          colore_cavo: coloreCavo
         },
         status: isComplete ? "complete" : isPartial ? "partial" : "missing"
       };
@@ -302,7 +312,8 @@ export async function GET(req: NextRequest) {
       tags: Array.from(allTagsSet).sort(),
       productTypes: Array.from(allTypesSet).sort(),
       coloreStickChoices,
-      coloreBaseChoices
+      coloreBaseChoices,
+      coloreCavoChoices
     });
   } catch (error: any) {
     console.error("Errore recupero metafield prodotti:", error);
@@ -310,7 +321,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/products/metafields — Aggiorna i metafield di un prodotto su Shopify via GraphQL
+// POST /api/products/metafields — Aggiorna i 7 metafield di un prodotto su Shopify via GraphQL
 export async function POST(req: NextRequest) {
   try {
     const { store, productId, metafields } = await req.json();
@@ -384,6 +395,17 @@ export async function POST(req: NextRequest) {
         key: "colore_base",
         type: "single_line_text_field",
         value: String(metafields.colore_base || "")
+      });
+    }
+
+    // 7. custom.colore_cavo
+    if (metafields.colore_cavo !== undefined) {
+      metafieldsInput.push({
+        ownerId: productId,
+        namespace: "custom",
+        key: "colore_cavo",
+        type: "single_line_text_field",
+        value: String(metafields.colore_cavo || "")
       });
     }
 

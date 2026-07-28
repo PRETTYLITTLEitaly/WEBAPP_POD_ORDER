@@ -200,9 +200,11 @@ export default function TextEditorModal({
         const res = await fetch("/api/fonts");
         const data = await res.json();
         if (data.success && Array.isArray(data.fonts) && data.fonts.length > 0) {
-          const customList = data.fonts.map((f: any) => ({
+           const customList = data.fonts.map((f: any) => ({
             name: f.name,
-            family: `'${f.name}', sans-serif`
+            family: `'${f.name}', sans-serif`,
+            url: f.url,
+            dataUri: f.dataUri
           }));
 
           setAvailableFonts(customList);
@@ -372,11 +374,36 @@ export default function TextEditorModal({
 
   if (!open) return null;
 
+  const fontStyles = availableFonts
+    .filter((f: any) => f.url || f.dataUri)
+    .map((f: any) => {
+      const spacedName = f.name.replace(/([a-z])([A-Z])/g, '$1 $2');
+      const fontSrc = f.dataUri || f.url;
+      return `
+        @font-face {
+          font-family: '${f.name}';
+          src: url('${fontSrc}');
+          font-weight: normal;
+          font-style: normal;
+          font-display: block;
+        }
+        @font-face {
+          font-family: '${spacedName}';
+          src: url('${fontSrc}');
+          font-weight: normal;
+          font-style: normal;
+          font-display: block;
+        }
+      `;
+    })
+    .join("\n");
+
   return (
     <div 
       className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-gray-900/80 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
+      <style dangerouslySetInnerHTML={{ __html: fontStyles }} />
       <div 
         className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-gray-100"
         onClick={e => e.stopPropagation()}

@@ -118,8 +118,8 @@ export default function FontLibraryPage() {
     <div className="p-8 space-y-6 max-w-5xl">
       
       {/* Dynamic @font-face CSS Injection */}
-      <style jsx global>{`
-        ${fonts.map(font => {
+      <style dangerouslySetInnerHTML={{
+        __html: fonts.map(font => {
           const spacedName = font.name.replace(/([a-z])([A-Z])/g, '$1 $2');
           const fontSrc = font.dataUri || font.url;
           return `
@@ -138,8 +138,8 @@ export default function FontLibraryPage() {
               font-display: block;
             }
           `;
-        }).join("\n")}
-      `}</style>
+        }).join("\n")
+      }} />
 
       {/* Header */}
       <div className="flex items-center justify-between">

@@ -2,6 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { shopifyFetch } from "@/lib/shopify";
 import { generatePodPdf } from "@/lib/pod.server";
 
+function escapeXml(unsafe: string): string {
+  return (unsafe || "").replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
+  });
+}
+
+function generateSvgFromText(text: string, font: string, color: string, fontSizePx: number = 32): string {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const lineHeight = Math.round(fontSizePx * 1.3);
+  const svgHeight = Math.max(120, lines.length * lineHeight + 40);
+  const svgWidth = 500;
+
+  const fontName = font || "Outfit";
+  const hexColor = color && color.startsWith("#") ? color : "#000000";
+
+  const textNodes = lines.map((line, idx) => {
+    const yPos = 50 + idx * lineHeight;
+    return `<text x="50%" y="${yPos}" text-anchor="middle" font-family="'${fontName}', cursive, sans-serif" font-size="${fontSizePx}px" fill="${hexColor}" font-weight="600">${escapeXml(line)}</text>`;
+  }).join("\n");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&amp;family=Outfit:wght@600&amp;family=Montserrat:wght@600&amp;display=swap');
+    </style>
+    ${textNodes}
+  </svg>`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { orderIds, store, binWidthMm, margins, customItems, previewMode } = await req.json();
@@ -99,17 +134,45 @@ export async function POST(req: NextRequest) {
           if (attrHeight) heightVal = attrHeight;
         }
 
-        const allMediaAttrs = item.customAttributes?.filter((a: any) => 
-          ["Immagine", "Grafica", "Grafica Personalizzata", "_pplr_original", "_pplr_pdf", "_pplr_preview", "Preview URL", "_design_Vedi ora"].includes(a.key)
-        ) || [];
-        
-        const bestMedia = allMediaAttrs.find((a: any) => 
-          !a.key.toLowerCase().includes("preview") && 
-          !a.key.toLowerCase().includes("design") && 
-          !a.key.toLowerCase().includes("vedi")
-        ) || allMediaAttrs[0];
+        // Estrazione dati di personalizzazione da customAttributes
+        let customText = "";
+        let fontName = "Outfit";
+        let fontColor = "#000000";
+        let fontSizePx = 32;
 
-        const zeptoAttrUrl = bestMedia?.value;
+        const attrs = item.customAttributes || [];
+        attrs.forEach((a: any) => {
+          const rawKey = a.key || "";
+          const k = rawKey.toLowerCase().trim();
+          const v = String(a.value || "").trim();
+
+          const isSystemKey = rawKey.startsWith("_") || k.includes("font") || k.includes("align") || k.includes("scegli") || k.includes("modello") || k.includes("stick") || k.includes("colore") || k.includes("vedi");
+
+          if (!isSystemKey && !v.startsWith("http")) {
+            const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
+            if (v && (!isSimpleOption || !customText)) {
+              if (!customText || v.length > customText.length) customText = v;
+            }
+          }
+          if (k.includes("font") && !rawKey.startsWith("_")) fontName = v;
+          if (k.includes("font size") || k.includes("_font_size")) {
+            const p = parseFloat(v);
+            if (!isNaN(p) && p > 0) fontSizePx = Math.round(p);
+          }
+          if (k.includes("colore") || k.includes("color")) {
+            if (v.startsWith("#")) fontColor = v;
+            else if (v.toLowerCase().includes("celeste") || v.toLowerCase().includes("azzurro")) fontColor = "#38bdf8";
+            else if (v.toLowerCase().includes("tiffany")) fontColor = "#0d9488";
+          }
+        });
+
+        // Trova eventuale file grafico isolato (senza mockup container del profumatore)
+        const isolatedDesignAttr = attrs.find((a: any) => 
+          a.key.startsWith("_design") || a.key.includes("_pplr_original") || a.key.includes("_pplr_pdf") || (a.key.toLowerCase().includes("immagine") && String(a.value).startsWith("http"))
+        );
+        const mockupAttr = attrs.find((a: any) => a.key.includes("Vedi ora") || a.key.includes("preview"));
+
+        const zeptoAttrUrl = isolatedDesignAttr?.value || mockupAttr?.value;
 
         if ((!widthVal || !heightVal) && (isZeptoOrder || zeptoAttrUrl)) {
           widthVal = orderWidth || "80";
@@ -124,9 +187,19 @@ export async function POST(req: NextRequest) {
         if (widthVal && heightVal) {
           const svgMeta = metafields.find((m: any) => m.key === "svg");
           const svgTextUrl = metafields.find((m: any) => m.key === "pod_svg_url" || m.key === "pod_url")?.value;
-          let svgUrl = editedImageMeta || (isZeptoOrder && zeptoAttrUrl 
-            ? zeptoAttrUrl 
-            : (svgTextUrl || svgMeta?.reference?.url || svgMeta?.reference?.image?.url || zeptoAttrUrl));
+          
+          let svgUrl = editedImageMeta;
+
+          // Se l'ordine ha testo personalizzato e non ha una grafica modificata salvata, genera l'SVG trasparente del solo testo!
+          if (!svgUrl && customText) {
+            svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;
+          }
+
+          if (!svgUrl) {
+            svgUrl = isZeptoOrder && zeptoAttrUrl 
+              ? zeptoAttrUrl 
+              : (svgTextUrl || svgMeta?.reference?.url || svgMeta?.reference?.image?.url || zeptoAttrUrl);
+          }
 
           if (svgUrl) {
             if (svgUrl.startsWith("//")) svgUrl = "https:" + svgUrl;
@@ -135,30 +208,47 @@ export async function POST(req: NextRequest) {
 
             if (!cacheItem) {
               try {
-                const mediaRes = await fetch(svgUrl);
-                if (mediaRes.ok) {
-                  const contentType = (mediaRes.headers.get("content-type") || "").toLowerCase();
-                  const isSvg = contentType.includes("svg") || /\.svg(\?.*)?$/i.test(svgUrl);
-                  
-                  if (isSvg) {
-                    const text = await mediaRes.text();
-                    cacheItem = {
-                      content: text,
-                      isImage: false,
-                      mimeType: "image/svg+xml"
-                    };
-                  } else {
-                    const buffer = await mediaRes.arrayBuffer();
-                    const b64 = Buffer.from(buffer).toString("base64");
-                    const mime = contentType.split(";")[0].trim() || "image/png";
-                    cacheItem = {
-                      content: b64,
-                      isImage: true,
-                      mimeType: mime
-                    };
+                if (svgUrl.startsWith("data:image/svg+xml")) {
+                  const svgRaw = decodeURIComponent(svgUrl.replace(/^data:image\/svg\+xml;utf8,/, ""));
+                  cacheItem = {
+                    content: svgRaw,
+                    isImage: false,
+                    mimeType: "image/svg+xml"
+                  };
+                } else if (svgUrl.startsWith("data:")) {
+                  const parts = svgUrl.split(",");
+                  const mime = parts[0].split(";")[0].replace("data:", "");
+                  cacheItem = {
+                    content: parts[1],
+                    isImage: true,
+                    mimeType: mime
+                  };
+                } else {
+                  const mediaRes = await fetch(svgUrl);
+                  if (mediaRes.ok) {
+                    const contentType = (mediaRes.headers.get("content-type") || "").toLowerCase();
+                    const isSvg = contentType.includes("svg") || /\.svg(\?.*)?$/i.test(svgUrl);
+                    
+                    if (isSvg) {
+                      const text = await mediaRes.text();
+                      cacheItem = {
+                        content: text,
+                        isImage: false,
+                        mimeType: "image/svg+xml"
+                      };
+                    } else {
+                      const buffer = await mediaRes.arrayBuffer();
+                      const b64 = Buffer.from(buffer).toString("base64");
+                      const mime = contentType.split(";")[0].trim() || "image/png";
+                      cacheItem = {
+                        content: b64,
+                        isImage: true,
+                        mimeType: mime
+                      };
+                    }
                   }
-                  svgCache.set(svgUrl, cacheItem);
                 }
+                if (cacheItem) svgCache.set(svgUrl, cacheItem);
               } catch (e: any) {
                 console.error("Fetch error:", e.message);
               }
@@ -183,14 +273,13 @@ export async function POST(req: NextRequest) {
 
               for (let i = 0; i < item.quantity; i++) {
                 itemsToPack.push({
-                  id: `${item.id}-${i}`,
-                  orderName: order.name || `#${order.id.split('/').pop()}`,
+                  id: `${order.id}_${item.id}_${i}`,
+                  orderName: order.name,
+                  itemTitle: item.title,
                   widthMm: parseFloat(widthVal),
                   heightMm: parseFloat(heightVal),
                   svgContent: cleanSvgContent,
-                  imageContent: cacheItem.isImage ? cacheItem.content : null,
                   previewUrl: previewUrl,
-                  svgUrl: svgUrl,
                   isImage: cacheItem.isImage
                 });
               }
@@ -201,32 +290,36 @@ export async function POST(req: NextRequest) {
     }
 
     if (itemsToPack.length === 0) {
-      return NextResponse.json({ success: false, error: "Nessun prodotto valido trovato (mancano file o misure)." }, { status: 400 });
+      return NextResponse.json({ 
+        success: false, 
+        error: "Nessun elemento personalizzato (SVG/Grafica) trovato per gli ordini selezionati." 
+      }, { status: 400 });
     }
+
+    // Genera il PDF finale di stampa DTF
+    const pdfBuffer = await generatePodPdf({
+      items: itemsToPack,
+      binWidthMm: binWidthMm || 300,
+      margins: margins || { top: 5, bottom: 5, sides: 3 }
+    });
 
     if (previewMode) {
-      return NextResponse.json({ success: true, items: itemsToPack });
+      return NextResponse.json({
+        success: true,
+        itemsCount: itemsToPack.length,
+        items: itemsToPack
+      });
     }
 
-    // Se l'utente ha modificato manualmente la disposizione tramite il Layout Editor
-    if (Array.isArray(customItems) && customItems.length > 0) {
-      for (const item of itemsToPack) {
-        const custom = customItems.find((c: any) => c.id === item.id);
-        if (custom) {
-          item.customX = custom.x;
-          item.customY = custom.y;
-          item.rotated = !!custom.rotated;
-        }
+    return new Response(pdfBuffer, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="stampa_dtf_batch_${Date.now()}.pdf"`
       }
-    }
+    });
 
-    const pdfWidth = typeof binWidthMm === "number" && binWidthMm > 0 ? binWidthMm : 300;
-    const pdfBuffer = await generatePodPdf(itemsToPack, pdfWidth, margins);
-    const pdfBase64 = Buffer.from(pdfBuffer).toString("base64");
-
-    return NextResponse.json({ success: true, base64: pdfBase64 });
   } catch (error: any) {
-    console.error("PDF Generate Error:", error);
+    console.error("Errore generazione PDF Batch:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

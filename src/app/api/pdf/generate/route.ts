@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { shopifyFetch } from "@/lib/shopify";
 import { generatePodPdf } from "@/lib/pod.server";
+import { editedImageMemoryCache } from "@/app/api/orders/save-graphic/route";
 
 function escapeXml(unsafe: string): string {
   return (unsafe || "").replace(/[<>&'"]/g, (c) => {
@@ -108,7 +109,7 @@ export async function POST(req: NextRequest) {
       if (!order) continue;
       
       const isZeptoOrder = (order.tags || []).some((t: string) => t.toLowerCase().includes("personalizer"));
-      const editedImageMeta = order.edited_image?.value;
+      const editedImageMeta = editedImageMemoryCache.get(order.id) || order.edited_image?.value;
       const orderWidth = order.order_width?.value;
       const orderHeight = order.order_height?.value;
 
@@ -196,7 +197,12 @@ export async function POST(req: NextRequest) {
           if (!cacheItem) {
             try {
               if (svgUrl.startsWith("data:image/svg+xml")) {
-                const svgRaw = decodeURIComponent(svgUrl.replace(/^data:image\/svg\+xml;utf8,/, ""));
+                let svgRaw = svgUrl.replace(/^data:image\/svg\+xml;(utf8|base64),/, "");
+                if (svgUrl.includes("utf8,")) {
+                  try { svgRaw = decodeURIComponent(svgRaw); } catch (e) {}
+                } else if (svgUrl.includes("base64,")) {
+                  try { svgRaw = Buffer.from(svgRaw, "base64").toString("utf-8"); } catch (e) {}
+                }
                 cacheItem = {
                   content: svgRaw,
                   isImage: false,
@@ -208,7 +214,7 @@ export async function POST(req: NextRequest) {
                 cacheItem = {
                   content: parts[1],
                   isImage: true,
-                  mimeType: mime
+                  mimeType: mime || "image/png"
                 };
               } else {
                 const mediaRes = await fetch(svgUrl);

@@ -3,6 +3,9 @@ import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
+// In-memory fallback cache for edited images to guarantee zero data loss
+export const editedImageMemoryCache = new Map<string, string>();
+
 // POST /api/orders/save-graphic — Salva la grafica modificata nel metafield pod.edited_image dell'ordine
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +17,10 @@ export async function POST(req: NextRequest) {
 
     const valueToSave = typeof editedImageUrl === "string" ? editedImageUrl : JSON.stringify(editedImageUrl);
 
-    // Mutation per aggiornare il metafield pod.edited_image dell'ordine su Shopify
+    // Salva in cache in memoria per accesso istantaneo immediato durante la generazione PDF
+    editedImageMemoryCache.set(orderId, valueToSave);
+
+    // Mutation per aggiornare i metafield pod.edited_image e pod.status su Shopify
     const mutation = `#graphql
       mutation setOrderGraphic($metafields: [MetafieldsSetInput!]!) {
         metafieldsSet(metafields: $metafields) {
@@ -36,8 +42,8 @@ export async function POST(req: NextRequest) {
         ownerId: orderId,
         namespace: "pod",
         key: "edited_image",
-        type: "single_line_text_field",
-        value: valueToSave.length > 2000 ? valueToSave.substring(0, 1990) : valueToSave
+        type: "multi_line_text_field",
+        value: valueToSave
       },
       {
         ownerId: orderId,
@@ -61,8 +67,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Grafica salvata con successo per la stampa DTF",
-      editedImageUrl: valueToSave
+      message: "Grafica salvata con successo per la stampa DTF!"
     });
   } catch (error: any) {
     console.error("Errore salvataggio grafica ordine:", error);

@@ -9,9 +9,24 @@ const LABEL_GAP_MM = 5; // Spazio di 5mm esatti dal bordo della grafica per tagl
 const LABEL_HEIGHT_MM = 10; // 5mm di spazio + altezza testo
 
 // Bin Packing Algorithm con supporto posizionamento manuale e margini di padding interno
-export async function generatePodPdf(items, binWidthMm = 300, margins = { top: 5, bottom: 5, sides: 3 }) {
+export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsInput = { top: 5, bottom: 5, sides: 3 }) {
   return new Promise((resolve, reject) => {
     try {
+      let items = itemsInput;
+      let binWidthMm = binWidthMmInput;
+      let margins = marginsInput;
+
+      // Handle both object argument { items, binWidthMm, margins } and array argument
+      if (itemsInput && !Array.isArray(itemsInput) && typeof itemsInput === "object") {
+        items = itemsInput.items || [];
+        binWidthMm = itemsInput.binWidthMm ?? 300;
+        margins = itemsInput.margins ?? { top: 5, bottom: 5, sides: 3 };
+      }
+
+      if (!Array.isArray(items)) {
+        items = [];
+      }
+
       const binWidthPt = binWidthMm * MM_TO_PT;
       const paddingPt = PADDING_MM * MM_TO_PT;
       const labelHeightPt = LABEL_HEIGHT_MM * MM_TO_PT;
@@ -25,7 +40,7 @@ export async function generatePodPdf(items, binWidthMm = 300, margins = { top: 5
       let totalHeightPt = marginTopPt;
 
       // Se gli elementi hanno già coordinate manuali valide (custom placement)
-      const hasCustomPositions = items.every(item => typeof item.customX === "number" && typeof item.customY === "number");
+      const hasCustomPositions = items.length > 0 && items.every(item => typeof item.customX === "number" && typeof item.customY === "number");
 
       if (hasCustomPositions) {
         for (const item of items) {

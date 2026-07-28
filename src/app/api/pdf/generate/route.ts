@@ -305,11 +305,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return new Response(pdfBuffer, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="stampa_dtf_batch_${Date.now()}.pdf"`
-      }
+    const base64Pdf = (pdfBuffer as Buffer).toString("base64");
+
+    return NextResponse.json({
+      success: true,
+      base64: base64Pdf,
+      filename: `stampa_dtf_batch_${Date.now()}.pdf`
     });
 
   } catch (error: any) {

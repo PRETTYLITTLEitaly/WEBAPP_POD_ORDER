@@ -93,7 +93,7 @@ export default function ProductMetafieldsPage() {
   const [selectedCollection, setSelectedCollection] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [selectedType, setSelectedType] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "missing" | "complete">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "missing" | "partial" | "complete">("all");
   
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -331,12 +331,13 @@ export default function ProductMetafieldsPage() {
   };
 
   const filteredProducts = products.filter(p => {
-    if (filterStatus === "missing" && p.status === "complete") return false;
+    if (filterStatus === "missing" && p.status !== "missing") return false;
+    if (filterStatus === "partial" && p.status !== "partial") return false;
     if (filterStatus === "complete" && p.status !== "complete") return false;
     return true;
   });
 
-  return (
+    return (
     <div className="space-y-6">
       
       {/* Header Page */}
@@ -467,21 +468,30 @@ export default function ProductMetafieldsPage() {
                 filterStatus === "all" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
               }`}
             >
-              Tutti i Prodotti ({products.length})
+              Tutti ({products.length})
             </button>
             <button
               onClick={() => setFilterStatus("missing")}
               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
-                filterStatus === "missing" ? "bg-white text-amber-800 shadow-sm" : "text-gray-500 hover:text-amber-700"
+                filterStatus === "missing" ? "bg-white text-red-800 shadow-sm font-bold" : "text-gray-500 hover:text-red-700"
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5 text-red-500" />
+              Nessun Metafield ({products.filter(p => p.status === "missing").length})
+            </button>
+            <button
+              onClick={() => setFilterStatus("partial")}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                filterStatus === "partial" ? "bg-white text-amber-800 shadow-sm font-bold" : "text-gray-500 hover:text-amber-700"
               }`}
             >
               <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-              Metafield Incompleti ({products.filter(p => p.status !== "complete").length})
+              Parziali ({products.filter(p => p.status === "partial").length})
             </button>
             <button
               onClick={() => setFilterStatus("complete")}
               className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
-                filterStatus === "complete" ? "bg-white text-green-800 shadow-sm" : "text-gray-500 hover:text-green-700"
+                filterStatus === "complete" ? "bg-white text-green-800 shadow-sm font-bold" : "text-gray-500 hover:text-green-700"
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />

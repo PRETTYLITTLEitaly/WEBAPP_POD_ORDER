@@ -3,7 +3,7 @@ import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/products/metafields — Paginazione per TUTTI i 600+ prodotti, collezioni e file SVG reali da Shopify
+// GET /api/products/metafields — Paginazione per TUTTI i 600+ prodotti, collezioni (con flag Automatica vs Manuale) e file SVG reali
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const shopifySearchString = queryParts.join(" AND ");
 
-    // 1. Query Prodotti con paginazione e i 7 Metafield
+    // 1. Query Prodotti con paginazione, i 7 Metafield e info ruleSet Collezioni
     const productsQuery = `#graphql
       query getProducts($first: Int!, $after: String, $query: String) {
         products(first: $first, after: $after, query: $query, sortKey: TITLE) {
@@ -44,6 +44,11 @@ export async function GET(req: NextRequest) {
               nodes {
                 id
                 title
+                ruleSet {
+                  rules {
+                    column
+                  }
+                }
               }
             }
             featuredImage {
@@ -143,7 +148,7 @@ export async function GET(req: NextRequest) {
       afterFileCursor = fData?.pageInfo?.endCursor || null;
     }
 
-    // 3. Query Collezioni Shopify
+    // 3. Query Collezioni Shopify con flag ruleSet per distinguere Automatiche da Manuali
     const collectionsQuery = `#graphql
       query getCollections {
         collections(first: 250) {
@@ -152,6 +157,11 @@ export async function GET(req: NextRequest) {
             title
             handle
             productsCount
+            ruleSet {
+              rules {
+                column
+              }
+            }
           }
         }
       }
@@ -183,8 +193,16 @@ export async function GET(req: NextRequest) {
     ]);
 
     let rawProducts = allRawProducts;
-    const collections = collectionsRes.data?.collections?.nodes || [];
+    const collectionsRaw = collectionsRes.data?.collections?.nodes || [];
     const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
+
+    const collections = collectionsRaw.map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      handle: c.handle,
+      productsCount: c.productsCount,
+      isAutomated: Boolean(c.ruleSet !== null && (c.ruleSet?.rules?.length || 0) > 0)
+    }));
 
     if (selectedCollection.trim()) {
       try {
@@ -218,7 +236,6 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Mappa per filtrare ed estrarre SOLAMENTE file vettoriali .SVG
     const svgFilesMap = new Map<string, { id: string; url: string; filename: string }>();
 
     allRawFiles.forEach((f: any) => {
@@ -284,7 +301,8 @@ export async function GET(req: NextRequest) {
 
       const productCollections = (p.collections?.nodes || []).map((c: any) => ({
         id: c.id,
-        title: c.title
+        title: c.title,
+        isAutomated: Boolean(c.ruleSet !== null && (c.ruleSet?.rules?.length || 0) > 0)
       }));
 
       return {
@@ -338,7 +356,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "ID Prodotto mancante." }, { status: 400 });
     }
 
-    // 1. Se sono stati inviati dei Tag aggiornati
     if (Array.isArray(tags)) {
       const productUpdateMutation = `#graphql
         mutation updateProductTags($input: ProductInput!) {
@@ -355,7 +372,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. Se è stata richiesta l'aggiunta a delle Collezioni
     if (Array.isArray(addCollectionIds) && addCollectionIds.length > 0) {
       for (const colId of addCollectionIds) {
         const colAddMutation = `#graphql
@@ -373,7 +389,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Se è stata richiesta la rimozione da delle Collezioni
     if (Array.isArray(removeCollectionIds) && removeCollectionIds.length > 0) {
       for (const colId of removeCollectionIds) {
         const colRemoveMutation = `#graphql
@@ -391,7 +406,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. Aggiornamento dei 7 Metafield
     if (metafields) {
       const metaDefsQuery = `#graphql
         query getMetafieldDefs {

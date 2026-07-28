@@ -24,13 +24,15 @@ import {
   Zap,
   Wand2,
   Plus,
-  Image as ImageIcon,
-  Grid
+  ImageIcon,
+  Grid,
+  Sparkles
 } from "lucide-react";
 
 interface CollectionRef {
   id: string;
   title: string;
+  isAutomated?: boolean;
 }
 
 interface ProductItem {
@@ -66,6 +68,7 @@ interface CollectionItem {
   title: string;
   handle: string;
   productsCount?: number;
+  isAutomated?: boolean;
 }
 
 const DEFAULT_COLOR_OPTIONS = [
@@ -193,7 +196,6 @@ export default function ProductMetafieldsPage() {
     });
   };
 
-  // BACCHETTA MAGICA: Rileva automaticamente l'SVG più simile al titolo/handle del prodotto
   const handleAutoMatchSvg = (productId: string, productTitle: string, productHandle: string) => {
     if (shopifyFiles.length === 0) {
       setMessage({ type: "error", text: "Nessun file SVG disponibile in memoria per l'abbinamento." });
@@ -294,7 +296,7 @@ export default function ProductMetafieldsPage() {
       if (current.some(c => c.id === collectionItem.id)) return prev;
       return {
         ...prev,
-        [productId]: [...current, { id: collectionItem.id, title: collectionItem.title }]
+        [productId]: [...current, { id: collectionItem.id, title: collectionItem.title, isAutomated: collectionItem.isAutomated }]
       };
     });
     setAddingCollectionForProduct(null);
@@ -365,7 +367,7 @@ export default function ProductMetafieldsPage() {
             Configuratore Metafield Prodotti & Grafiche SVG
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Gestisci i 7 metafield di produzione con anteprime grafiche SVG in tempo reale, Bacchetta Magica, Tag e Collezioni.
+            Gestisci i 7 metafield di produzione con anteprime grafiche SVG in tempo reale, Bacchetta Magica, Tag e Collezioni (Manuali & Automatiche).
           </p>
         </div>
 
@@ -425,7 +427,7 @@ export default function ProductMetafieldsPage() {
             />
           </div>
 
-          {/* Filtro Collezione Shopify */}
+          {/* Filtro Collezione Shopify con indicazione Automatiche vs Manuali */}
           <div className="relative">
             <select
               value={selectedCollection}
@@ -435,7 +437,7 @@ export default function ProductMetafieldsPage() {
               <option value="">-- Filtra per Collezione --</option>
               {collections.map(col => (
                 <option key={col.id} value={col.id}>
-                  📁 {col.title} ({col.productsCount ?? "N"} prodotti)
+                  {col.isAutomated ? "⚡ [Automatica]" : "📁 [Manuale]"} {col.title} ({col.productsCount ?? "N"} prodotti)
                 </option>
               ))}
             </select>
@@ -535,7 +537,7 @@ export default function ProductMetafieldsPage() {
       {/* LISTA SCHEDE PRODOTTI */}
       {loading ? (
         <div className="p-16 text-center text-gray-400 font-medium animate-pulse">
-          Recupero prodotti, file SVG e collezioni da Shopify in corso...
+          Recupero prodotti, collezioni e file SVG da Shopify in corso...
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="bg-white p-12 text-center text-gray-500 rounded-xl border border-gray-200">
@@ -549,7 +551,6 @@ export default function ProductMetafieldsPage() {
             const currentCols = editedCollections[product.id] || [];
             const isSaving = savingId === product.id;
 
-            // Determina la grafica SVG selezionata per l'anteprima visuale in tempo reale
             const selectedFileObj = shopifyFiles.find(f => f.id === form.pod_svg_file_id);
             const activeSvgUrl = selectedFileObj?.url || form.pod_svg_url || form.pod_svg_file_url || "";
             const activeSvgFilename = selectedFileObj?.filename || (activeSvgUrl ? activeSvgUrl.split("?")[0].split("/").pop() : "");
@@ -604,27 +605,44 @@ export default function ProductMetafieldsPage() {
                         </a>
                       </div>
 
-                      {/* GESTIONE COLLEZIONI & TAG */}
+                      {/* GESTIONE COLLEZIONI & TAG CON DISTINZIONE AUTOMATICHE VS MANUALI */}
                       <div className="flex items-center gap-2 flex-wrap text-xs">
                         <span className="text-gray-400 font-mono text-[11px]">Handle: {product.handle}</span>
 
                         {/* COLLEZIONI */}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {currentCols.map(col => (
-                            <span 
-                              key={col.id} 
-                              className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-semibold text-[10px] flex items-center gap-1 border border-purple-100 group"
-                            >
-                              <Folder className="w-3 h-3 text-purple-500" />
-                              {col.title}
-                              <button
-                                onClick={() => handleRemoveCollection(product.id, col.id)}
-                                className="text-purple-400 hover:text-red-600 ml-1 transition-colors"
-                                title="Rimuovi da questa collezione"
+                            col.isAutomated ? (
+                              /* BADGE COLLEZIONE AUTOMATICA (ARANCIONE / AMBRA) - NON ELIMINABILE MANUALMENTE */
+                              <span 
+                                key={col.id} 
+                                className="bg-amber-50 text-amber-900 px-2 py-0.5 rounded-md font-bold text-[10px] flex items-center gap-1 border border-amber-200 shadow-2xs"
+                                title="Collezione Automatica Shopify: i prodotti vengono inseriti/rimossi automaticamente in base alle regole ed ai tag del negozio"
                               >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </span>
+                                <Sparkles className="w-3 h-3 text-amber-600" />
+                                {col.title}
+                                <span className="text-[8px] bg-amber-200/80 text-amber-900 px-1 py-0.2 rounded font-mono uppercase">
+                                  Auto
+                                </span>
+                              </span>
+                            ) : (
+                              /* BADGE COLLEZIONE MANUALE (VIOLA) - ELIMINABILE CON X */
+                              <span 
+                                key={col.id} 
+                                className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-semibold text-[10px] flex items-center gap-1 border border-purple-100 group"
+                                title="Collezione Manuale"
+                              >
+                                <Folder className="w-3 h-3 text-purple-500" />
+                                {col.title}
+                                <button
+                                  onClick={() => handleRemoveCollection(product.id, col.id)}
+                                  className="text-purple-400 hover:text-red-600 ml-1 transition-colors"
+                                  title="Rimuovi da questa collezione manuale"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            )
                           ))}
 
                           {addingCollectionForProduct === product.id ? (
@@ -637,8 +655,8 @@ export default function ProductMetafieldsPage() {
                                 defaultValue=""
                                 className="px-2 py-0.5 border border-purple-300 rounded text-[10px] font-semibold bg-white"
                               >
-                                <option value="" disabled>-- Seleziona Collezione --</option>
-                                {collections.filter(c => !currentCols.some(cc => cc.id === c.id)).map(c => (
+                                <option value="" disabled>-- Seleziona Collezione Manuale --</option>
+                                {collections.filter(c => !c.isAutomated && !currentCols.some(cc => cc.id === c.id)).map(c => (
                                   <option key={c.id} value={c.id}>
                                     📁 {c.title}
                                   </option>
@@ -740,7 +758,7 @@ export default function ProductMetafieldsPage() {
                     </div>
                   </div>
 
-                  {/* FORM GRIGLIA I 7 METAFIELD (CON ANTEPRIMA GRAFICA VISUALE E GALLERIA MODALE) */}
+                  {/* FORM GRIGLIA I 7 METAFIELD */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     
                     {/* 1. custom.pod_svg_url */}
@@ -761,7 +779,7 @@ export default function ProductMetafieldsPage() {
                       />
                     </div>
 
-                    {/* 2. pod.svg (SELETTORE CON ANTEPRIMA VISUALE E GALLERIA MODALE) */}
+                    {/* 2. pod.svg */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
@@ -770,7 +788,6 @@ export default function ProductMetafieldsPage() {
                         </label>
 
                         <div className="flex items-center gap-1">
-                          {/* PULSANTE BACCHETTA MAGICA */}
                           <button
                             onClick={() => handleAutoMatchSvg(product.id, product.title, product.handle)}
                             className="text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 transition-all"
@@ -780,7 +797,6 @@ export default function ProductMetafieldsPage() {
                             <span>Magia</span>
                           </button>
 
-                          {/* PULSANTE GALLERIA ANTEPRIME */}
                           <button
                             onClick={() => {
                               setSvgGalleryModalProductId(product.id);
@@ -984,7 +1000,6 @@ export default function ProductMetafieldsPage() {
               </button>
             </div>
 
-            {/* Ricerca veloce dentro la galleria */}
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
               <input 
@@ -996,7 +1011,6 @@ export default function ProductMetafieldsPage() {
               />
             </div>
 
-            {/* Griglia Anteprime Visuali SVG */}
             <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-1">
               {filteredGalleryFiles.map(file => (
                 <div 

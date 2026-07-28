@@ -29,9 +29,8 @@ export async function connectShopifyAction(formData: FormData) {
     path: "/",
   });
 
-  // Costruisci il redirect_uri dinamico come richiesto
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  // Costruisci il redirect_uri approvato per Shopify OAuth
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.prettylittle.it";
   const redirectUri = `${appUrl}/admin/shopify-connect/callback`;
 
   // Costruisci l'URL di autorizzazione

@@ -446,6 +446,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Errore salvataggio metafield:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    let errorMsg = error.message || "Errore sconosciuto.";
+    if (errorMsg.includes("ACCESS_DENIED") || errorMsg.includes("write_products")) {
+      errorMsg = "Permessi Shopify insufficienti: Attiva l'ambito 'write_products' (Modifica prodotti) nella tua App Personalizzata su Shopify Admin (Impostazioni > App e canali di vendita > Sviluppo App > Configurazione API Admin).";
+    }
+    return NextResponse.json({ success: false, error: errorMsg }, { status: 400 });
   }
 }

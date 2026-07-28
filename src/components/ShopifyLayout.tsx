@@ -20,7 +20,8 @@ import {
   ChevronDown,
   User as UserIcon,
   Layers,
-  Sparkles
+  Sparkles,
+  Sliders
 } from "lucide-react";
 import { getCurrentUser, setCurrentUser, User } from "@/lib/userStore";
 import { logoutAction } from "@/app/admin/login/actions";
@@ -32,7 +33,6 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
   const [user, setUser] = useState<User | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const [globalSearch, setGlobalSearch] = useState("");
 
   useEffect(() => {
     setUser(getCurrentUser());
@@ -54,7 +54,6 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
       .catch(console.error);
   }, [pathname]);
 
-  // Se siamo nella pagina di login, renderizziamo solo il contenuto senza layout Shopify
   if (pathname === "/admin/login") {
     return <>{children}</>;
   }
@@ -78,11 +77,12 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
       ]
     },
     {
-      title: "Configurazione",
+      title: "Impostazioni App",
       items: [
         { name: "Impostazioni Bobina", href: "/settings", icon: Settings },
         { name: "Libreria Font", href: "/settings/fonts", icon: Type },
-        { name: "Utenti & Accessi", href: "/settings/users", icon: Users },
+        { name: "Gestione Utenti", href: "/settings/users", icon: Users },
+        { name: "Account Utente", href: "/settings/account", icon: UserIcon },
       ]
     }
   ];
@@ -119,7 +119,7 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
 
-        {/* NOTIFICHE E PROFILO IN ALTO A DESTRA STILE SHOPIFY */}
+        {/* NOTIFICHE E PROFILO IN ALTO A DESTRA */}
         <div className="flex items-center gap-3">
           
           {/* Campanello Notifiche */}
@@ -193,7 +193,10 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
 
                 {group.items.map(item => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+                  // Evitiamo che /settings venga evidenziata quando la rotte è /settings/products
+                  const isActive = item.href === "/settings" 
+                    ? pathname === "/settings" 
+                    : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
 
                   return (
                     <Link

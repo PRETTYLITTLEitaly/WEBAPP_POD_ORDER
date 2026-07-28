@@ -35,7 +35,9 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
           }
           lineItems(first: 20) {
             nodes {
+              id
               title
+              quantity
               customAttributes { key value }
               product {
                 pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } } }

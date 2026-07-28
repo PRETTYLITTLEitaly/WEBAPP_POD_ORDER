@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { shopifyFetch } from "@/lib/shopify";
 import PDFDocument from "pdfkit";
+// @ts-ignore
 import SVGtoPDF from "svg-to-pdfkit";
 import fs from "fs";
 import path from "path";

@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import { 
   Package, 
   Search, 
-  Filter, 
   CheckCircle2, 
   AlertTriangle, 
   XCircle, 
@@ -22,8 +21,15 @@ import {
   Tag as TagIcon,
   Eye,
   X,
-  Zap
+  Zap,
+  Wand2,
+  Plus
 } from "lucide-react";
+
+interface CollectionRef {
+  id: string;
+  title: string;
+}
 
 interface ProductItem {
   id: string;
@@ -31,7 +37,7 @@ interface ProductItem {
   handle: string;
   productType: string;
   tags: string[];
-  collections?: string[];
+  collections: CollectionRef[];
   imageUrl: string | null;
   imageAlt: string;
   metafields: {
@@ -80,7 +86,6 @@ export default function ProductMetafieldsPage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   
-  // Modal Ingrandimento Foto Occhio
   const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
 
   // Filtri Shopify
@@ -94,6 +99,14 @@ export default function ProductMetafieldsPage() {
 
   // Form local state per ogni prodotto
   const [editedMetafields, setEditedMetafields] = useState<{ [productId: string]: ProductItem["metafields"] }>({});
+  const [editedTags, setEditedTags] = useState<{ [productId: string]: string[] }>({});
+  const [editedCollections, setEditedCollections] = useState<{ [productId: string]: CollectionRef[] }>({});
+
+  // Stato per l'aggiunta di Tag e Collezioni
+  const [addingTagForProduct, setAddingTagForProduct] = useState<string | null>(null);
+  const [newTagInput, setNewTagInput] = useState("");
+
+  const [addingCollectionForProduct, setAddingCollectionForProduct] = useState<string | null>(null);
 
   const fetchProductsData = async () => {
     setLoading(true);
@@ -119,12 +132,19 @@ export default function ProductMetafieldsPage() {
           setColoreCavoList(Array.from(new Set([...data.coloreCavoChoices, ...DEFAULT_COLOR_OPTIONS])));
         }
 
-        // Inizializziamo lo stato dei form
         const initialFormState: { [id: string]: ProductItem["metafields"] } = {};
+        const initialTagsState: { [id: string]: string[] } = {};
+        const initialCollectionsState: { [id: string]: CollectionRef[] } = {};
+
         (data.products || []).forEach((p: ProductItem) => {
           initialFormState[p.id] = { ...p.metafields };
+          initialTagsState[p.id] = [...(p.tags || [])];
+          initialCollectionsState[p.id] = [...(p.collections || [])];
         });
+
         setEditedMetafields(initialFormState);
+        setEditedTags(initialTagsState);
+        setEditedCollections(initialCollectionsState);
       }
     } catch (e: any) {
       console.error("Errore fetch metafields:", e);
@@ -168,11 +188,118 @@ export default function ProductMetafieldsPage() {
     });
   };
 
-  const handleSaveProductMetafields = async (productId: string) => {
-    setSavingId(productId);
+  // BACCHETTA MAGICA: Rileva automaticamente l'SVG più simile al titolo/handle del prodotto
+  const handleAutoMatchSvg = (productId: string, productTitle: string, productHandle: string) => {
+    if (shopifyFiles.length === 0) {
+      setMessage({ type: "error", text: "Nessun file SVG disponibile in memoria per l'abbinamento." });
+      return;
+    }
+
+    const cleanTitle = (productTitle + " " + productHandle).toLowerCase()
+      .replace(/[^a-z0-9]/g, " ")
+      .split(" ")
+      .filter(w => w.length > 2);
+
+    let bestFile: ShopifyFile | null = null;
+    let maxScore = 0;
+
+    shopifyFiles.forEach(file => {
+      const fn = file.filename.toLowerCase();
+      let score = 0;
+
+      cleanTitle.forEach(word => {
+        if (fn.includes(word)) {
+          score += word.length * 3;
+        }
+      });
+
+      if (score > maxScore) {
+        maxScore = score;
+        bestFile = file;
+      }
+    });
+
+    if (bestFile && maxScore > 0) {
+      const matched = bestFile as ShopifyFile;
+      setEditedMetafields(prev => ({
+        ...prev,
+        [productId]: {
+          ...(prev[productId] || {}),
+          pod_svg_file_id: matched.id,
+          pod_svg_url: matched.url
+        } as any
+      }));
+      setMessage({ 
+        type: "success", 
+        text: `🪄 Bacchetta Magica: Abbinato l'SVG "${matched.filename}" col punteggio di affinità (${maxScore})!` 
+      });
+    } else {
+      setMessage({ 
+        type: "error", 
+        text: `🪄 Bacchetta Magica: Nessun file SVG con nome simile a "${productTitle}" trovato. Selezionalo manualmente dal menu.` 
+      });
+    }
+  };
+
+  // RIMUOVI TAG DAL PRODOTTO
+  const handleRemoveTag = (productId: string, tagToRemove: string) => {
+    setEditedTags(prev => ({
+      ...prev,
+      [productId]: (prev[productId] || []).filter(t => t !== tagToRemove)
+    }));
+  };
+
+  // AGGIUNGI TAG AL PRODOTTO
+  const handleAddTag = (productId: string, tagToAdd: string) => {
+    const cleanTag = tagToAdd.trim();
+    if (!cleanTag) return;
+    setEditedTags(prev => {
+      const current = prev[productId] || [];
+      if (current.includes(cleanTag)) return prev;
+      return {
+        ...prev,
+        [productId]: [...current, cleanTag]
+      };
+    });
+    setNewTagInput("");
+    setAddingTagForProduct(null);
+  };
+
+  // RIMUOVI COLLEZIONE DAL PRODOTTO
+  const handleRemoveCollection = (productId: string, collectionIdToRemove: string) => {
+    setEditedCollections(prev => ({
+      ...prev,
+      [productId]: (prev[productId] || []).filter(c => c.id !== collectionIdToRemove)
+    }));
+  };
+
+  // AGGIUNGI COLLEZIONE AL PRODOTTO
+  const handleAddCollection = (productId: string, collectionItem: CollectionItem) => {
+    setEditedCollections(prev => {
+      const current = prev[productId] || [];
+      if (current.some(c => c.id === collectionItem.id)) return prev;
+      return {
+        ...prev,
+        [productId]: [...current, { id: collectionItem.id, title: collectionItem.title }]
+      };
+    });
+    setAddingCollectionForProduct(null);
+  };
+
+  // SALVATAGGIO COMPLETO SU SHOPIFY (Metafield + Tag + Collezioni)
+  const handleSaveProduct = async (product: ProductItem) => {
+    setSavingId(product.id);
     setMessage(null);
 
-    const currentMetafields = editedMetafields[productId];
+    const currentMetafields = editedMetafields[product.id];
+    const currentTags = editedTags[product.id];
+    const currentCollections = editedCollections[product.id] || [];
+
+    const originalColIds = new Set((product.collections || []).map(c => c.id));
+    const currentColIds = new Set(currentCollections.map(c => c.id));
+
+    const addCollectionIds = Array.from(currentColIds).filter(id => !originalColIds.has(id));
+    const removeCollectionIds = Array.from(originalColIds).filter(id => !currentColIds.has(id));
 
     try {
       const res = await fetch("/api/products/metafields", {
@@ -180,15 +307,18 @@ export default function ProductMetafieldsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           store,
-          productId,
-          metafields: currentMetafields
+          productId: product.id,
+          metafields: currentMetafields,
+          tags: currentTags,
+          addCollectionIds,
+          removeCollectionIds
         })
       });
 
       const data = await res.json();
 
       if (data.success) {
-        setMessage({ type: "success", text: "Metafield salvati con successo su Shopify!" });
+        setMessage({ type: "success", text: "Prodotto, Tag e Metafield salvati con successo su Shopify!" });
         fetchProductsData();
       } else {
         setMessage({ type: "error", text: data.error || "Errore durante il salvataggio." });
@@ -209,7 +339,7 @@ export default function ProductMetafieldsPage() {
   return (
     <div className="space-y-6">
       
-      {/* Header */}
+      {/* Header Page */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -217,7 +347,7 @@ export default function ProductMetafieldsPage() {
             Configuratore Metafield Prodotti & Grafiche SVG
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Imposta i 7 metafield di produzione per i prodotti Shopify.
+            Gestisci i 7 metafield di produzione, la grafica SVG con Bacchetta Magica, Tag e Collezioni per i prodotti Shopify.
           </p>
         </div>
 
@@ -359,14 +489,17 @@ export default function ProductMetafieldsPage() {
             </button>
           </div>
 
-          <button
-            onClick={fetchProductsData}
-            className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0 flex items-center gap-1 text-xs font-medium"
-            title="Ricarica Prodotti"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            <span>Aggiorna Dati</span>
-          </button>
+          <div className="flex items-center gap-2 text-xs font-semibold text-gray-600">
+            <span>📄 {shopifyFiles.length} file SVG trovati su Shopify</span>
+            <button
+              onClick={fetchProductsData}
+              className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0 flex items-center gap-1 text-xs font-medium"
+              title="Ricarica Prodotti"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              <span>Aggiorna Dati</span>
+            </button>
+          </div>
 
         </div>
 
@@ -385,6 +518,8 @@ export default function ProductMetafieldsPage() {
         <div className="space-y-4">
           {filteredProducts.map(product => {
             const form = editedMetafields[product.id] || product.metafields;
+            const currentTags = editedTags[product.id] || [];
+            const currentCols = editedCollections[product.id] || [];
             const isSaving = savingId === product.id;
 
             return (
@@ -393,7 +528,7 @@ export default function ProductMetafieldsPage() {
                 className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row hover:border-gray-300 transition-all"
               >
                 {/* IMMAGINE PRODOTTO CON TASTO OCCHIO SOTTO */}
-                <div className="w-full md:w-40 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col items-center justify-between p-3 shrink-0">
+                <div className="w-full md:w-44 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col items-center justify-between p-3 shrink-0">
                   <div className="flex-1 flex items-center justify-center w-full">
                     {product.imageUrl ? (
                       <img 
@@ -406,7 +541,6 @@ export default function ProductMetafieldsPage() {
                     )}
                   </div>
 
-                  {/* TASTO OCCHIO INGRANDISCI FOTO */}
                   {product.imageUrl && (
                     <button
                       onClick={() => setZoomedImage({ url: product.imageUrl!, title: product.title })}
@@ -424,7 +558,7 @@ export default function ProductMetafieldsPage() {
                   
                   {/* INTESTAZIONE SCHEDA */}
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-gray-100">
-                    <div className="space-y-1.5">
+                    <div className="space-y-2 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-bold text-gray-900 text-base">{product.title}</h3>
                         <a 
@@ -438,40 +572,115 @@ export default function ProductMetafieldsPage() {
                         </a>
                       </div>
 
-                      {/* RECAP COLLEZIONI & TAG */}
+                      {/* GESTIONE DINAMICA COLLEZIONI (CON BOTTONE RIMOZIONE X ED AGGIUNTA) */}
                       <div className="flex items-center gap-2 flex-wrap text-xs">
                         <span className="text-gray-400 font-mono text-[11px]">Handle: {product.handle}</span>
 
-                        {product.collections && product.collections.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {product.collections.map(col => (
-                              <span key={col} className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-semibold text-[10px] flex items-center gap-1 border border-purple-100">
-                                <Folder className="w-3 h-3 text-purple-500" />
-                                {col}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        {/* GESTIONE COLLEZIONI */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {currentCols.map(col => (
+                            <span 
+                              key={col.id} 
+                              className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-semibold text-[10px] flex items-center gap-1 border border-purple-100 group"
+                            >
+                              <Folder className="w-3 h-3 text-purple-500" />
+                              {col.title}
+                              <button
+                                onClick={() => handleRemoveCollection(product.id, col.id)}
+                                className="text-purple-400 hover:text-red-600 ml-1 transition-colors"
+                                title="Rimuovi da questa collezione"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
 
-                        {product.productType && (
-                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-semibold text-[10px] border border-blue-100">
-                            📦 {product.productType}
-                          </span>
-                        )}
+                          {/* Pulsante Aggiungi Collezione */}
+                          {addingCollectionForProduct === product.id ? (
+                            <div className="flex items-center gap-1">
+                              <select
+                                onChange={e => {
+                                  const selected = collections.find(c => c.id === e.target.value);
+                                  if (selected) handleAddCollection(product.id, selected);
+                                }}
+                                defaultValue=""
+                                className="px-2 py-0.5 border border-purple-300 rounded text-[10px] font-semibold bg-white"
+                              >
+                                <option value="" disabled>-- Seleziona Collezione --</option>
+                                {collections.filter(c => !currentCols.some(cc => cc.id === c.id)).map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    📁 {c.title}
+                                  </option>
+                                ))}
+                              </select>
+                              <button onClick={() => setAddingCollectionForProduct(null)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setAddingCollectionForProduct(product.id)}
+                              className="bg-gray-100 hover:bg-purple-100 text-gray-600 hover:text-purple-800 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border border-gray-200 transition-all"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Collezione
+                            </button>
+                          )}
+                        </div>
 
-                        {product.tags && product.tags.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {product.tags.map(tag => (
-                              <span key={tag} className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-semibold text-[10px] border border-indigo-100">
-                                🏷️ {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                        {/* GESTIONE TAG */}
+                        <div className="flex items-center gap-1.5 flex-wrap border-l border-gray-200 pl-2">
+                          {currentTags.map(tag => (
+                            <span 
+                              key={tag} 
+                              className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-semibold text-[10px] flex items-center gap-1 border border-indigo-100 group"
+                            >
+                              🏷️ {tag}
+                              <button
+                                onClick={() => handleRemoveTag(product.id, tag)}
+                                className="text-indigo-400 hover:text-red-600 ml-1 transition-colors"
+                                title="Elimina tag"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+
+                          {/* Pulsante Aggiungi Tag */}
+                          {addingTagForProduct === product.id ? (
+                            <div className="flex items-center gap-1">
+                              <input 
+                                type="text"
+                                value={newTagInput}
+                                onChange={e => setNewTagInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter") handleAddTag(product.id, newTagInput); }}
+                                placeholder="Nuovo tag..."
+                                className="px-2 py-0.5 border border-indigo-300 rounded text-[10px] font-semibold w-24 bg-white"
+                              />
+                              <button 
+                                onClick={() => handleAddTag(product.id, newTagInput)}
+                                className="text-xs text-indigo-600 font-bold hover:underline"
+                              >
+                                OK
+                              </button>
+                              <button onClick={() => setAddingTagForProduct(null)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setAddingTagForProduct(product.id)}
+                              className="bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-800 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 border border-gray-200 transition-all"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Tag
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Badge & Bottone Salva */}
+                    {/* Badge & Salva */}
                     <div className="flex items-center gap-2 shrink-0">
                       {product.status === "complete" ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-100 text-green-800">
@@ -491,17 +700,17 @@ export default function ProductMetafieldsPage() {
                       )}
 
                       <button
-                        onClick={() => handleSaveProductMetafields(product.id)}
+                        onClick={() => handleSaveProduct(product)}
                         disabled={isSaving}
                         className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
                       >
                         <Save className={`w-3.5 h-3.5 ${isSaving ? "animate-spin" : ""}`} />
-                        <span>{isSaving ? "Salvataggio..." : "Salva Metafield"}</span>
+                        <span>{isSaving ? "Salvataggio..." : "Salva Prodotto"}</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* FORM GRIGLIA I 7 METAFIELD (INCLUSO COLORE CAVO) */}
+                  {/* FORM GRIGLIA I 7 METAFIELD (CON BACCHETTA MAGICA E MENU SVG PULITO) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     
                     {/* 1. custom.pod_svg_url */}
@@ -522,22 +731,32 @@ export default function ProductMetafieldsPage() {
                       />
                     </div>
 
-                    {/* 2. pod.svg */}
+                    {/* 2. pod.svg (SELETTORE FILE SVG CON BACCHETTA MAGICA AUTO-MATCH) */}
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-gray-700 flex items-center justify-between">
-                        <span className="flex items-center gap-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
                           <FileCode className="w-3 h-3 text-indigo-600" />
                           File Reference SVG
-                        </span>
-                        <code className="text-gray-400 font-mono text-[9px]">pod.svg</code>
-                      </label>
+                        </label>
+
+                        {/* PULSANTE BACCHETTA MAGICA */}
+                        <button
+                          onClick={() => handleAutoMatchSvg(product.id, product.title, product.handle)}
+                          className="text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1 transition-all"
+                          title="Auto-abbina l'SVG con nome più simile al prodotto"
+                        >
+                          <Wand2 className="w-3 h-3 text-amber-600" />
+                          <span>Bacchetta Magica</span>
+                        </button>
+                      </div>
+
                       {shopifyFiles.length > 0 ? (
                         <select
                           value={form.pod_svg_file_id || ""}
                           onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
                           className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                         >
-                          <option value="">-- Seleziona File SVG ({shopifyFiles.length} trovati) --</option>
+                          <option value="">-- Seleziona File SVG ({shopifyFiles.length} file .SVG trovati) --</option>
                           {shopifyFiles.map(file => (
                             <option key={file.id} value={file.id}>
                               📄 {file.filename}

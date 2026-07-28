@@ -3,7 +3,7 @@ import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/products/metafields — Paginazione automatica per recuperare TUTTI i 600+ prodotti, collezioni e file da Shopify
+// GET /api/products/metafields — Paginazione per TUTTI i 600+ prodotti, collezioni e file SVG reali da Shopify
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
               altText
             }
             metafield_pod_svg_url: metafield(namespace: "custom", key: "pod_svg_url") { id value }
-            metafield_pod_svg: metafield(namespace: "pod", key: "svg") { id value reference { ... on GenericFile { id url } } }
+            metafield_pod_svg: metafield(namespace: "pod", key: "svg") { id value reference { ... on GenericFile { id url } ... on MediaImage { id image { url } } } }
             metafield_pod_height: metafield(namespace: "pod", key: "height") { id value }
             metafield_pod_width: metafield(namespace: "pod", key: "width") { id value }
             metafield_colore_stick: metafield(namespace: "custom", key: "colore_stick") { id value }
@@ -89,10 +89,10 @@ export async function GET(req: NextRequest) {
       afterProductCursor = pData?.pageInfo?.endCursor || null;
     }
 
-    // 2. Query File generici da Shopify
+    // 2. Query specifica per SOLI File .SVG (esclude .otf, .woff2, ecc.)
     const filesQuery = `#graphql
       query getFiles($first: Int!, $after: String) {
-        files(first: $first, after: $after) {
+        files(first: $first, after: $after, query: "filename:*.svg OR filename:*.SVG") {
           pageInfo {
             hasNextPage
             endCursor
@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
     let afterFileCursor: string | null = null;
     let filePageCount = 0;
 
-    while (hasNextFilePage && filePageCount < 3) {
+    while (hasNextFilePage && filePageCount < 4) {
       filePageCount++;
       const fRes: any = await shopifyFetch({
         store,
@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    // 4. Query Definizioni Metafield per tipi e valori opzioni
+    // 4. Query Definizioni Metafield
     const metaDefsQuery = `#graphql
       query getMetafieldDefs {
         metafieldDefinitions(first: 100, ownerType: PRODUCT) {
@@ -186,7 +186,6 @@ export async function GET(req: NextRequest) {
     const collections = collectionsRes.data?.collections?.nodes || [];
     const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
 
-    // Se è stata selezionata una Collezione specifica, filtriamo i prodotti associati
     if (selectedCollection.trim()) {
       try {
         const collectionProductsQuery = `#graphql
@@ -208,7 +207,6 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Estraggo tutti i Tag e Tipi di prodotto unici
     const allTagsSet = new Set<string>();
     const allTypesSet = new Set<string>();
     allRawProducts.forEach((p: any) => {
@@ -220,28 +218,38 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Mappa dei file SVG
+    // Mappa per filtrare ed estrarre SOLAMENTE file vettoriali .SVG
     const svgFilesMap = new Map<string, { id: string; url: string; filename: string }>();
 
     allRawFiles.forEach((f: any) => {
-      if (!f || !f.url) return;
-      const cleanUrl = f.url.split("?")[0];
+      if (!f) return;
+      const url = f.url || f.image?.url;
+      if (!url) return;
+
+      const cleanUrl = url.split("?")[0];
       const filename = cleanUrl.split("/").pop() || f.id;
-      svgFilesMap.set(f.id, { id: f.id, url: f.url, filename });
+
+      if (filename.toLowerCase().endsWith(".svg")) {
+        svgFilesMap.set(f.id, { id: f.id, url, filename });
+      }
     });
 
     allRawProducts.forEach((p: any) => {
       const ref = p.metafield_pod_svg?.reference;
-      if (ref && ref.id && ref.url) {
-        const cleanUrl = ref.url.split("?")[0];
-        const filename = cleanUrl.split("/").pop() || ref.id;
-        svgFilesMap.set(ref.id, { id: ref.id, url: ref.url, filename });
+      if (ref && ref.id) {
+        const url = ref.url || ref.image?.url;
+        if (url) {
+          const cleanUrl = url.split("?")[0];
+          const filename = cleanUrl.split("/").pop() || ref.id;
+          if (filename.toLowerCase().endsWith(".svg")) {
+            svgFilesMap.set(ref.id, { id: ref.id, url, filename });
+          }
+        }
       }
     });
 
     const svgFiles = Array.from(svgFilesMap.values());
 
-    // Opzioni colore dalle definizioni
     let coloreStickChoices: string[] = [];
     let coloreBaseChoices: string[] = [];
     let coloreCavoChoices: string[] = [];
@@ -249,28 +257,22 @@ export async function GET(req: NextRequest) {
     metaDefs.forEach((def: any) => {
       if (def.namespace === "custom" && def.key === "colore_stick") {
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
-        if (choiceVal?.value) {
-          try { coloreStickChoices = JSON.parse(choiceVal.value); } catch (e) {}
-        }
+        if (choiceVal?.value) { try { coloreStickChoices = JSON.parse(choiceVal.value); } catch (e) {} }
       }
       if (def.namespace === "custom" && def.key === "colore_base") {
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
-        if (choiceVal?.value) {
-          try { coloreBaseChoices = JSON.parse(choiceVal.value); } catch (e) {}
-        }
+        if (choiceVal?.value) { try { coloreBaseChoices = JSON.parse(choiceVal.value); } catch (e) {} }
       }
       if (def.namespace === "custom" && def.key === "colore_cavo") {
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
-        if (choiceVal?.value) {
-          try { coloreCavoChoices = JSON.parse(choiceVal.value); } catch (e) {}
-        }
+        if (choiceVal?.value) { try { coloreCavoChoices = JSON.parse(choiceVal.value); } catch (e) {} }
       }
     });
 
     const products = rawProducts.map((p: any) => {
       const svgUrl = p.metafield_pod_svg_url?.value || "";
       const svgFileId = p.metafield_pod_svg?.reference?.id || p.metafield_pod_svg?.value || "";
-      const svgFileUrl = p.metafield_pod_svg?.reference?.url || "";
+      const svgFileUrl = p.metafield_pod_svg?.reference?.url || p.metafield_pod_svg?.reference?.image?.url || "";
       const height = p.metafield_pod_height?.value || "";
       const width = p.metafield_pod_width?.value || "";
       const coloreStick = p.metafield_colore_stick?.value || "";
@@ -280,7 +282,10 @@ export async function GET(req: NextRequest) {
       const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase && coloreCavo);
       const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase || coloreCavo);
 
-      const productCollections = (p.collections?.nodes || []).map((c: any) => c.title);
+      const productCollections = (p.collections?.nodes || []).map((c: any) => ({
+        id: c.id,
+        title: c.title
+      }));
 
       return {
         id: p.id,
@@ -324,123 +329,159 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/products/metafields — Aggiorna i 7 metafield usando i tipi dinamici definiti su Shopify ed ignorando i campi vuoti
+// POST /api/products/metafields — Aggiorna metafield, tag e collezioni del prodotto su Shopify
 export async function POST(req: NextRequest) {
   try {
-    const { store, productId, metafields } = await req.json();
+    const { store, productId, metafields, tags, addCollectionIds, removeCollectionIds } = await req.json();
 
-    if (!productId || !metafields) {
-      return NextResponse.json({ success: false, error: "Parametri mancanti." }, { status: 400 });
+    if (!productId) {
+      return NextResponse.json({ success: false, error: "ID Prodotto mancante." }, { status: 400 });
     }
 
-    // Recuperiamo prima le definizioni reali dei metafield da Shopify per usare l'esatto tipo di dato (es. number_decimal vs single_line_text_field)
-    const metaDefsQuery = `#graphql
-      query getMetafieldDefs {
-        metafieldDefinitions(first: 100, ownerType: PRODUCT) {
-          nodes {
-            namespace
-            key
-            type {
-              name
+    // 1. Se sono stati inviati dei Tag aggiornati
+    if (Array.isArray(tags)) {
+      const productUpdateMutation = `#graphql
+        mutation updateProductTags($input: ProductInput!) {
+          productUpdate(input: $input) {
+            product { id tags }
+            userErrors { field message }
+          }
+        }
+      `;
+      await shopifyFetch({
+        store: store || "b2c",
+        query: productUpdateMutation,
+        variables: { input: { id: productId, tags } }
+      });
+    }
+
+    // 2. Se è stata richiesta l'aggiunta a delle Collezioni
+    if (Array.isArray(addCollectionIds) && addCollectionIds.length > 0) {
+      for (const colId of addCollectionIds) {
+        const colAddMutation = `#graphql
+          mutation addCollectionProducts($id: ID!, $productIds: [ID!]!) {
+            collectionAddProducts(id: $id, productIds: $productIds) {
+              userErrors { field message }
+            }
+          }
+        `;
+        await shopifyFetch({
+          store: store || "b2c",
+          query: colAddMutation,
+          variables: { id: colId, productIds: [productId] }
+        });
+      }
+    }
+
+    // 3. Se è stata richiesta la rimozione da delle Collezioni
+    if (Array.isArray(removeCollectionIds) && removeCollectionIds.length > 0) {
+      for (const colId of removeCollectionIds) {
+        const colRemoveMutation = `#graphql
+          mutation removeCollectionProducts($id: ID!, $productIds: [ID!]!) {
+            collectionRemoveProducts(id: $id, productIds: $productIds) {
+              userErrors { field message }
+            }
+          }
+        `;
+        await shopifyFetch({
+          store: store || "b2c",
+          query: colRemoveMutation,
+          variables: { id: colId, productIds: [productId] }
+        });
+      }
+    }
+
+    // 4. Aggiornamento dei 7 Metafield
+    if (metafields) {
+      const metaDefsQuery = `#graphql
+        query getMetafieldDefs {
+          metafieldDefinitions(first: 100, ownerType: PRODUCT) {
+            nodes {
+              namespace
+              key
+              type {
+                name
+              }
             }
           }
         }
+      `;
+
+      const metaDefsRes: any = await shopifyFetch({ store: store || "b2c", query: metaDefsQuery }).catch(() => ({ data: { metafieldDefinitions: { nodes: [] } } }));
+      const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
+
+      const getType = (namespace: string, key: string, fallback: string) => {
+        const found = metaDefs.find((d: any) => d.namespace === namespace && d.key === key);
+        return found?.type?.name || fallback;
+      };
+
+      const metafieldsInput: any[] = [];
+
+      const addMetafield = (namespace: string, key: string, value: string, defaultType: string) => {
+        const valStr = String(value || "").trim();
+        if (!valStr) return;
+
+        const targetType = getType(namespace, key, defaultType);
+
+        metafieldsInput.push({
+          ownerId: productId,
+          namespace,
+          key,
+          type: targetType,
+          value: valStr
+        });
+      };
+
+      addMetafield("custom", "pod_svg_url", metafields.pod_svg_url, "single_line_text_field");
+      if (metafields.pod_svg_file_id && String(metafields.pod_svg_file_id).trim()) {
+        addMetafield("pod", "svg", metafields.pod_svg_file_id, "file_reference");
       }
-    `;
+      addMetafield("pod", "height", metafields.pod_height, "number_decimal");
+      addMetafield("pod", "width", metafields.pod_width, "number_decimal");
+      addMetafield("custom", "colore_stick", metafields.colore_stick, "single_line_text_field");
+      addMetafield("custom", "colore_base", metafields.colore_base, "single_line_text_field");
+      addMetafield("custom", "colore_cavo", metafields.colore_cavo, "single_line_text_field");
 
-    const metaDefsRes: any = await shopifyFetch({ store: store || "b2c", query: metaDefsQuery }).catch(() => ({ data: { metafieldDefinitions: { nodes: [] } } }));
-    const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
-
-    const getType = (namespace: string, key: string, fallback: string) => {
-      const found = metaDefs.find((d: any) => d.namespace === namespace && d.key === key);
-      return found?.type?.name || fallback;
-    };
-
-    const metafieldsInput: any[] = [];
-
-    // Helper per inserire metafield solo se la stringa ha un valore non vuoto
-    const addMetafield = (namespace: string, key: string, value: string, defaultType: string) => {
-      const valStr = String(value || "").trim();
-      if (!valStr) return; // Omettiamo i valori vuoti per evitare "Value can't be blank"
-
-      const targetType = getType(namespace, key, defaultType);
-
-      metafieldsInput.push({
-        ownerId: productId,
-        namespace,
-        key,
-        type: targetType,
-        value: valStr
-      });
-    };
-
-    // 1. custom.pod_svg_url
-    addMetafield("custom", "pod_svg_url", metafields.pod_svg_url, "single_line_text_field");
-
-    // 2. pod.svg (file_reference)
-    if (metafields.pod_svg_file_id && String(metafields.pod_svg_file_id).trim()) {
-      addMetafield("pod", "svg", metafields.pod_svg_file_id, "file_reference");
-    }
-
-    // 3. pod.height (dinamico: number_decimal o single_line_text_field)
-    addMetafield("pod", "height", metafields.pod_height, "number_decimal");
-
-    // 4. pod.width (dinamico: number_decimal o single_line_text_field)
-    addMetafield("pod", "width", metafields.pod_width, "number_decimal");
-
-    // 5. custom.colore_stick
-    addMetafield("custom", "colore_stick", metafields.colore_stick, "single_line_text_field");
-
-    // 6. custom.colore_base
-    addMetafield("custom", "colore_base", metafields.colore_base, "single_line_text_field");
-
-    // 7. custom.colore_cavo
-    addMetafield("custom", "colore_cavo", metafields.colore_cavo, "single_line_text_field");
-
-    if (metafieldsInput.length === 0) {
-      return NextResponse.json({ success: true, message: "Nessun metafield da aggiornare." });
-    }
-
-    const mutation = `#graphql
-      mutation setMetafields($metafields: [MetafieldsSetInput!]!) {
-        metafieldsSet(metafields: $metafields) {
-          metafields {
-            id
-            namespace
-            key
-            value
+      if (metafieldsInput.length > 0) {
+        const mutation = `#graphql
+          mutation setMetafields($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+              metafields {
+                id
+                namespace
+                key
+                value
+              }
+              userErrors {
+                field
+                message
+              }
+            }
           }
-          userErrors {
-            field
-            message
-          }
+        `;
+
+        const res = await shopifyFetch({
+          store: store || "b2c",
+          query: mutation,
+          variables: { metafields: metafieldsInput }
+        });
+
+        const userErrors = res.data?.metafieldsSet?.userErrors || [];
+        if (userErrors.length > 0) {
+          return NextResponse.json({
+            success: false,
+            error: userErrors.map((e: any) => e.message).join(", ")
+          }, { status: 400 });
         }
       }
-    `;
-
-    const res = await shopifyFetch({
-      store: store || "b2c",
-      query: mutation,
-      variables: { metafields: metafieldsInput }
-    });
-
-    const userErrors = res.data?.metafieldsSet?.userErrors || [];
-    if (userErrors.length > 0) {
-      return NextResponse.json({
-        success: false,
-        error: userErrors.map((e: any) => e.message).join(", ")
-      }, { status: 400 });
     }
 
-    return NextResponse.json({
-      success: true,
-      metafields: res.data?.metafieldsSet?.metafields
-    });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Errore salvataggio metafield:", error);
+    console.error("Errore salvataggio prodotto/metafield:", error);
     let errorMsg = error.message || "Errore sconosciuto.";
     if (errorMsg.includes("ACCESS_DENIED") || errorMsg.includes("write_products")) {
-      errorMsg = "Permessi Shopify insufficienti: Attiva l'ambito 'write_products' (Modifica prodotti) nella tua App Personalizzata su Shopify Admin (Impostazioni > App e canali di vendita > Sviluppo App > Configurazione API Admin).";
+      errorMsg = "Permessi Shopify insufficienti: Attiva 'write_products' nella tua App Personalizzata.";
     }
     return NextResponse.json({ success: false, error: errorMsg }, { status: 400 });
   }

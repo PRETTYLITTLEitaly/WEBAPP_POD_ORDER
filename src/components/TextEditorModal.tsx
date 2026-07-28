@@ -205,14 +205,7 @@ export default function TextEditorModal({
             family: `'${f.name}', sans-serif`
           }));
 
-          const mergedMap = new Map();
-          [...customList, ...DEFAULT_FONTS].forEach(f => {
-            if (!mergedMap.has(f.name.toLowerCase())) {
-              mergedMap.set(f.name.toLowerCase(), f);
-            }
-          });
-
-          setAvailableFonts(Array.from(mergedMap.values()));
+          setAvailableFonts(customList);
         }
       } catch (e) {
         console.error("Errore fetch font:", e);

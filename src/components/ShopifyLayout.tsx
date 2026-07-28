@@ -238,9 +238,11 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
 
         </aside>
 
-        {/* 3. AREA DI CONTENUTO PRINCIPALE */}
-        <main className="flex-1 overflow-y-auto bg-[#f1f2f4]">
-          {children}
+        {/* 3. AREA DI CONTENUTO PRINCIPALE CON PADDING POLARIS SHOPIFY */}
+        <main className="flex-1 overflow-y-auto bg-[#f1f2f4] p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto space-y-6">
+            {children}
+          </div>
         </main>
 
       </div>

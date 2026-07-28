@@ -207,7 +207,7 @@ export default function ProductMetafieldsPage() {
   });
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl">
+    <div className="space-y-6">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

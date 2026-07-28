@@ -107,14 +107,10 @@ export async function POST(req: NextRequest) {
     for (const order of ordersDetails) {
       if (!order) continue;
       
-      const isZeptoOrder = order.tags?.includes("product-personalizer");
+      const isZeptoOrder = (order.tags || []).some((t: string) => t.toLowerCase().includes("personalizer"));
       const editedImageMeta = order.edited_image?.value;
       const orderWidth = order.order_width?.value;
       const orderHeight = order.order_height?.value;
-      
-      if (isZeptoOrder && order.status?.value !== "approved") {
-        throw new Error(`L'ordine ${order.name} non è ancora stato approvato (Product Personalizer).`);
-      }
 
       for (const item of order.lineItems.nodes) {
         const metafields = [
@@ -166,123 +162,115 @@ export async function POST(req: NextRequest) {
           }
         });
 
-        // Trova eventuale file grafico isolato (senza mockup container del profumatore)
+        // Trova qualsiasi file grafico associato (con o senza prefisso)
         const isolatedDesignAttr = attrs.find((a: any) => 
           a.key.startsWith("_design") || a.key.includes("_pplr_original") || a.key.includes("_pplr_pdf") || (a.key.toLowerCase().includes("immagine") && String(a.value).startsWith("http"))
         );
-        const mockupAttr = attrs.find((a: any) => a.key.includes("Vedi ora") || a.key.includes("preview"));
+        const mockupAttr = attrs.find((a: any) => a.key.includes("Vedi ora") || a.key.includes("preview") || String(a.value).startsWith("http"));
 
         const zeptoAttrUrl = isolatedDesignAttr?.value || mockupAttr?.value;
 
-        if ((!widthVal || !heightVal) && (isZeptoOrder || zeptoAttrUrl)) {
-          widthVal = orderWidth || "80";
-          heightVal = orderHeight || "100";
-        }
+        // Imposta dimensioni standard per stampa DTF se non specificate nei metafield
+        if (!widthVal) widthVal = orderWidth || "80";
+        if (!heightVal) heightVal = orderHeight || "100";
+
+        const svgMeta = metafields.find((m: any) => m.key === "svg");
+        const svgTextUrl = metafields.find((m: any) => m.key === "pod_svg_url" || m.key === "pod_url")?.value;
         
-        if (orderWidth && orderHeight) {
-          widthVal = orderWidth;
-          heightVal = orderHeight;
+        let svgUrl = editedImageMeta;
+
+        // Se l'ordine ha testo personalizzato e non ha una grafica modificata salvata, genera l'SVG trasparente del solo testo!
+        if (!svgUrl && customText) {
+          svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;
         }
 
-        if (widthVal && heightVal) {
-          const svgMeta = metafields.find((m: any) => m.key === "svg");
-          const svgTextUrl = metafields.find((m: any) => m.key === "pod_svg_url" || m.key === "pod_url")?.value;
+        if (!svgUrl) {
+          svgUrl = zeptoAttrUrl || svgTextUrl || svgMeta?.reference?.url || svgMeta?.reference?.image?.url;
+        }
+
+        if (svgUrl) {
+          if (svgUrl.startsWith("//")) svgUrl = "https:" + svgUrl;
           
-          let svgUrl = editedImageMeta;
+          let cacheItem = svgCache.get(svgUrl);
 
-          // Se l'ordine ha testo personalizzato e non ha una grafica modificata salvata, genera l'SVG trasparente del solo testo!
-          if (!svgUrl && customText) {
-            svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;
-          }
-
-          if (!svgUrl) {
-            svgUrl = isZeptoOrder && zeptoAttrUrl 
-              ? zeptoAttrUrl 
-              : (svgTextUrl || svgMeta?.reference?.url || svgMeta?.reference?.image?.url || zeptoAttrUrl);
-          }
-
-          if (svgUrl) {
-            if (svgUrl.startsWith("//")) svgUrl = "https:" + svgUrl;
-            
-            let cacheItem = svgCache.get(svgUrl);
-
-            if (!cacheItem) {
-              try {
-                if (svgUrl.startsWith("data:image/svg+xml")) {
-                  const svgRaw = decodeURIComponent(svgUrl.replace(/^data:image\/svg\+xml;utf8,/, ""));
-                  cacheItem = {
-                    content: svgRaw,
-                    isImage: false,
-                    mimeType: "image/svg+xml"
-                  };
-                } else if (svgUrl.startsWith("data:")) {
-                  const parts = svgUrl.split(",");
-                  const mime = parts[0].split(";")[0].replace("data:", "");
-                  cacheItem = {
-                    content: parts[1],
-                    isImage: true,
-                    mimeType: mime
-                  };
-                } else {
-                  const mediaRes = await fetch(svgUrl);
-                  if (mediaRes.ok) {
-                    const contentType = (mediaRes.headers.get("content-type") || "").toLowerCase();
-                    const isSvg = contentType.includes("svg") || /\.svg(\?.*)?$/i.test(svgUrl);
-                    
-                    if (isSvg) {
-                      const text = await mediaRes.text();
-                      cacheItem = {
-                        content: text,
-                        isImage: false,
-                        mimeType: "image/svg+xml"
-                      };
-                    } else {
-                      const buffer = await mediaRes.arrayBuffer();
-                      const b64 = Buffer.from(buffer).toString("base64");
-                      const mime = contentType.split(";")[0].trim() || "image/png";
-                      cacheItem = {
-                        content: b64,
-                        isImage: true,
-                        mimeType: mime
-                      };
-                    }
+          if (!cacheItem) {
+            try {
+              if (svgUrl.startsWith("data:image/svg+xml")) {
+                const svgRaw = decodeURIComponent(svgUrl.replace(/^data:image\/svg\+xml;utf8,/, ""));
+                cacheItem = {
+                  content: svgRaw,
+                  isImage: false,
+                  mimeType: "image/svg+xml"
+                };
+              } else if (svgUrl.startsWith("data:")) {
+                const parts = svgUrl.split(",");
+                const mime = parts[0].split(";")[0].replace("data:", "");
+                cacheItem = {
+                  content: parts[1],
+                  isImage: true,
+                  mimeType: mime
+                };
+              } else {
+                const mediaRes = await fetch(svgUrl);
+                if (mediaRes.ok) {
+                  const contentType = (mediaRes.headers.get("content-type") || "").toLowerCase();
+                  const isSvg = contentType.includes("svg") || /\.svg(\?.*)?$/i.test(svgUrl);
+                  
+                  if (isSvg) {
+                    const text = await mediaRes.text();
+                    cacheItem = {
+                      content: text,
+                      isImage: false,
+                      mimeType: "image/svg+xml"
+                    };
+                  } else {
+                    const buffer = await mediaRes.arrayBuffer();
+                    const b64 = Buffer.from(buffer).toString("base64");
+                    const mime = contentType.split(";")[0].trim() || "image/png";
+                    cacheItem = {
+                      content: b64,
+                      isImage: true,
+                      mimeType: mime
+                    };
                   }
                 }
-                if (cacheItem) svgCache.set(svgUrl, cacheItem);
-              } catch (e: any) {
-                console.error("Fetch error:", e.message);
               }
+              if (cacheItem) svgCache.set(svgUrl, cacheItem);
+            } catch (e: any) {
+              console.error("Fetch error:", e.message);
+            }
+          }
+
+          if (cacheItem && cacheItem.content) {
+            let cleanSvgContent = null;
+            if (!cacheItem.isImage) {
+              cleanSvgContent = cacheItem.content
+                .replace(/<\?xml[\s\S]*?\?>/i, "")
+                .replace(/<!DOCTYPE[\s\S]*?>/i, "")
+                .trim();
             }
 
-            if (cacheItem && cacheItem.content) {
-              let cleanSvgContent = null;
-              if (!cacheItem.isImage) {
-                cleanSvgContent = cacheItem.content
-                  .replace(/<\?xml[\s\S]*?\?>/i, "")
-                  .replace(/<!DOCTYPE[\s\S]*?>/i, "")
-                  .trim();
-              }
+            let previewUrl = "";
+            if (cacheItem.isImage) {
+              previewUrl = `data:${cacheItem.mimeType};base64,${cacheItem.content}`;
+            } else {
+              const base64Svg = Buffer.from(cacheItem.content).toString("base64");
+              previewUrl = `data:image/svg+xml;base64,${base64Svg}`;
+            }
 
-              let previewUrl = "";
-              if (cacheItem.isImage) {
-                previewUrl = `data:${cacheItem.mimeType};base64,${cacheItem.content}`;
-              } else {
-                const base64Svg = Buffer.from(cacheItem.content).toString("base64");
-                previewUrl = `data:image/svg+xml;base64,${base64Svg}`;
-              }
+            const itemQty = item.quantity || 1;
 
-              for (let i = 0; i < item.quantity; i++) {
-                itemsToPack.push({
-                  id: `${order.id}_${item.id}_${i}`,
-                  orderName: order.name,
-                  itemTitle: item.title,
-                  widthMm: parseFloat(widthVal),
-                  heightMm: parseFloat(heightVal),
-                  svgContent: cleanSvgContent,
-                  previewUrl: previewUrl,
-                  isImage: cacheItem.isImage
-                });
-              }
+            for (let i = 0; i < itemQty; i++) {
+              itemsToPack.push({
+                id: `${order.id}_${item.id}_${i}`,
+                orderName: order.name,
+                itemTitle: item.title,
+                widthMm: parseFloat(widthVal),
+                heightMm: parseFloat(heightVal),
+                svgContent: cleanSvgContent,
+                previewUrl: previewUrl,
+                isImage: cacheItem.isImage
+              });
             }
           }
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { 
   X, 
   Pencil, 
@@ -19,7 +19,8 @@ import {
   Image as ImageIcon,
   Check,
   RefreshCw,
-  Scissors
+  Scissors,
+  Package
 } from "lucide-react";
 
 interface TextEditorModalProps {
@@ -36,6 +37,7 @@ interface TextEditorModalProps {
   backgroundUrl?: string;
   svgUrl?: string;
   customAttributes?: { key: string; value: string }[];
+  lineItems?: any[];
   onSave?: (updatedData: {
     text: string;
     font: string;
@@ -87,10 +89,12 @@ export default function TextEditorModal({
   backgroundUrl = "",
   svgUrl = "",
   customAttributes = [],
+  lineItems = [],
   onSave
 }: TextEditorModalProps) {
   const [activeTab, setActiveTab] = useState<"text" | "image">("text");
-  
+  const [selectedItemIdx, setSelectedItemIdx] = useState(0);
+
   // Text Editor States
   const [text, setText] = useState(initialText);
   const [font, setFont] = useState(initialFont);
@@ -125,6 +129,7 @@ export default function TextEditorModal({
     setIsRemoveBgApplied(false);
     setIsVectorized(false);
     setVectorSvgContent(null);
+    setSelectedItemIdx(0);
 
     if ((backgroundUrl || svgUrl) && !initialText) {
       setActiveTab("image");
@@ -132,6 +137,60 @@ export default function TextEditorModal({
       setActiveTab("text");
     }
   }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, svgUrl, open]);
+
+  // Gestisci cambio di articolo selezionato in ordini multi-prodotto
+  const handleSelectLineItem = (idx: number) => {
+    setSelectedItemIdx(idx);
+    const targetItem = lineItems[idx];
+    if (!targetItem) return;
+
+    const attrs = targetItem.customAttributes || [];
+    let foundText = "";
+    let foundFont = "Get Show";
+    let foundColor = "#38bdf8";
+    let foundFontSize = 32;
+    let foundImage = "";
+
+    attrs.forEach((a: any) => {
+      const rawKey = a.key || "";
+      const k = rawKey.toLowerCase().trim();
+      const v = String(a.value || "").trim();
+
+      const isSystemKey = rawKey.startsWith("_") || k.includes("font") || k.includes("align") || k.includes("scegli") || k.includes("modello") || k.includes("stick") || k.includes("colore") || k.includes("vedi");
+
+      if (!isSystemKey && !v.startsWith("http")) {
+        const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
+        if (v && (!isSimpleOption || !foundText)) {
+          if (!foundText || v.length > foundText.length) foundText = v;
+        }
+      }
+      if (k.includes("font") && !rawKey.startsWith("_")) foundFont = v;
+      if (k.includes("font size") || k.includes("_font_size")) {
+        const p = parseFloat(v);
+        if (!isNaN(p) && p > 0) foundFontSize = Math.round(p);
+      }
+      if (k.includes("colore") || k.includes("color")) {
+        if (v.startsWith("#")) foundColor = v;
+        else if (v.toLowerCase().includes("celeste") || v.toLowerCase().includes("azzurro")) foundColor = "#38bdf8";
+        else if (v.toLowerCase().includes("tiffany")) foundColor = "#0d9488";
+      }
+      if (v.startsWith("http")) {
+        if (k.includes("vedi") || k.includes("preview") || k.includes("immagine") || k.includes("_pplr")) {
+          foundImage = v;
+        } else if (!foundImage) {
+          foundImage = v;
+        }
+      }
+    });
+
+    setText(foundText);
+    setFont(foundFont);
+    setColor(foundColor);
+    setFontSize(foundFontSize);
+    setCurrentImageUrl(foundImage || backgroundUrl || svgUrl);
+    setProcessedImageUrl(null);
+    setVectorSvgContent(null);
+  };
 
   // Carica i font custom
   useEffect(() => {
@@ -162,7 +221,7 @@ export default function TextEditorModal({
     fetchFonts();
   }, [open]);
 
-  // STRUMENTO 1: REMOVE BG (Rimuovi Sfondo Bianco/Chiaro)
+  // STRUMENTO 1: REMOVE BG
   const handleRemoveBackground = () => {
     if (!currentImageUrl) return;
     setIsProcessingImage(true);
@@ -189,7 +248,7 @@ export default function TextEditorModal({
         const g = data[i + 1];
         const b = data[i + 2];
         if (r >= bgThreshold && g >= bgThreshold && b >= bgThreshold) {
-          data[i + 3] = 0; // Trasparente
+          data[i + 3] = 0;
         }
       }
 
@@ -201,12 +260,12 @@ export default function TextEditorModal({
     };
 
     img.onerror = () => {
-      alert("Impossibile caricare l'immagine per la rimozione dello sfondo (CORS o URL non valido).");
+      alert("Impossibile caricare l'immagine per la rimozione dello sfondo.");
       setIsProcessingImage(false);
     };
   };
 
-  // STRUMENTO 2: VETTORIALIZZA HD AD ALTA DEFINIZIONE MANTENENDO TUTTI I COLORI INVARIATI
+  // STRUMENTO 2: VETTORIALIZZA HD MULTI-COLORE
   const handleVectorizeImage = () => {
     const targetSource = processedImageUrl || currentImageUrl;
     if (!targetSource) return;
@@ -217,7 +276,6 @@ export default function TextEditorModal({
     img.src = targetSource;
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      // Risoluzione nativa 1:1 HD ad alta definizione
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
       canvas.width = w;
@@ -233,10 +291,7 @@ export default function TextEditorModal({
       const imgData = ctx.getImageData(0, 0, w, h);
       const data = imgData.data;
 
-      // Raggruppa i pixel per colore originale (mantenendo tutti i colori intatti!)
       const colorLayers = new Map<string, string[]>();
-
-      // Se l'immagine è grande, imposta uno step ottimale per mantenere la nitidezza senza appesantire il file
       const step = w > 1200 || h > 1200 ? 2 : 1;
 
       for (let y = 0; y < h; y += step) {
@@ -248,7 +303,6 @@ export default function TextEditorModal({
           const a = data[idx + 3];
 
           if (a > 30) {
-            // Quantizzazione impercettibile (step 4) per unire le sfumature di antialiasing preservando i colori esatti
             const qR = Math.round(r / 4) * 4;
             const qG = Math.round(g / 4) * 4;
             const qB = Math.round(b / 4) * 4;
@@ -378,6 +432,27 @@ export default function TextEditorModal({
           </button>
         </div>
 
+        {/* CONTROLLO MULTI-ARTICOLI (SE L'ORDINE CONTIENE PIÙ PRODOTTI) */}
+        {lineItems.length > 1 && (
+          <div className="bg-amber-50 px-6 py-2.5 border-b border-amber-200 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-amber-900">
+              <Package className="w-4 h-4 text-amber-600" />
+              <span>Ordine Multi-Articolo ({lineItems.length} prodotti differenti):</span>
+            </div>
+            <select
+              value={selectedItemIdx}
+              onChange={e => handleSelectLineItem(parseInt(e.target.value, 10))}
+              className="px-3 py-1 bg-white border border-amber-300 rounded-lg text-xs font-bold text-gray-800 shadow-xs focus:ring-2 focus:ring-amber-500"
+            >
+              {lineItems.map((item, idx) => (
+                <option key={idx} value={idx}>
+                  Articolo #{idx + 1}: {item.title || "Articolo"} (Qtà: {item.quantity || 1})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* CORPO EDITOR */}
         <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-gray-50">
           
@@ -386,7 +461,7 @@ export default function TextEditorModal({
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1.5 text-amber-700">
                 <Sparkles className="w-4 h-4 text-amber-500" />
-                Anteprima Vettoriale Live Alta Definizione (HD)
+                Anteprima Grafica Finale per Stampa DTF
               </span>
               <span className="font-mono text-gray-500 text-[11px]">
                 {isVectorized ? "SVG Vettoriale Multi-Colore HD" : isRemoveBgApplied ? "PNG Sfondo Rimosso" : "Originale"}

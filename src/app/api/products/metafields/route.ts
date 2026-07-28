@@ -3,7 +3,7 @@ import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/products/metafields — Recupera lista prodotti con filtri (Collezione, Tag, Tipo), Immagini, Metafield e Tutti i File SVG
+// GET /api/products/metafields — Paginazione automatica per recuperare TUTTI i 600+ prodotti, file SVG e collezioni da Shopify
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -13,7 +13,6 @@ export async function GET(req: NextRequest) {
     const selectedTag = searchParams.get("tag") || "";
     const selectedType = searchParams.get("product_type") || "";
 
-    // Costruiamo la stringa di ricerca flessibile per l'API Shopify
     const queryParts: string[] = [];
     if (searchQuery.trim()) {
       queryParts.push(`title:*${searchQuery.trim()}*`);
@@ -27,10 +26,14 @@ export async function GET(req: NextRequest) {
 
     const shopifySearchString = queryParts.join(" AND ");
 
-    // 1. Query Prodotti con i 6 Metafield
+    // 1. Query Prodotti con paginazione
     const productsQuery = `#graphql
-      query getProducts($query: String, $collectionId: ID) {
-        products(first: 100, query: $query, sortKey: TITLE) {
+      query getProducts($first: Int!, $after: String, $query: String) {
+        products(first: $first, after: $after, query: $query, sortKey: TITLE) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
           nodes {
             id
             title
@@ -52,10 +55,42 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    // 2. Query File generici da Shopify (SENZA query restrittive per catturare TUTTI gli SVG)
+    // Loop di paginazione per recuperare TUTTI i prodotti dallo store
+    let allRawProducts: any[] = [];
+    let hasNextProductPage = true;
+    let afterProductCursor: string | null = null;
+    let productPageCount = 0;
+
+    while (hasNextProductPage && productPageCount < 8) {
+      productPageCount++;
+
+      const vars: any = { first: 250, after: afterProductCursor };
+      if (shopifySearchString.trim()) {
+        vars.query = shopifySearchString.trim();
+      }
+
+      const pRes = await shopifyFetch({
+        store,
+        query: productsQuery,
+        variables: vars
+      });
+
+      const pData = pRes.data?.products;
+      const nodes = pData?.nodes || [];
+      allRawProducts.push(...nodes);
+
+      hasNextProductPage = Boolean(pData?.pageInfo?.hasNextPage);
+      afterProductCursor = pData?.pageInfo?.endCursor || null;
+    }
+
+    // 2. Query File generici da Shopify con paginazione
     const filesQuery = `#graphql
-      query getFiles {
-        files(first: 250) {
+      query getFiles($first: Int!, $after: String) {
+        files(first: $first, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
           nodes {
             id
             createdAt
@@ -76,10 +111,36 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    // 3. Query Collezioni Shopify per il filtro
+    let allRawFiles: any[] = [];
+    let hasNextFilePage = true;
+    let afterFileCursor: string | null = null;
+    let filePageCount = 0;
+
+    while (hasNextFilePage && filePageCount < 5) {
+      filePageCount++;
+      const fRes: any = await shopifyFetch({
+        store,
+        query: filesQuery,
+        variables: {
+          first: 250,
+          after: afterFileCursor
+        }
+      }).catch(() => null);
+
+      if (!fRes) break;
+
+      const fData: any = fRes.data?.files;
+      const nodes = fData?.nodes || [];
+      allRawFiles.push(...nodes);
+
+      hasNextFilePage = Boolean(fData?.pageInfo?.hasNextPage);
+      afterFileCursor = fData?.pageInfo?.endCursor || null;
+    }
+
+    // 3. Query Collezioni Shopify
     const collectionsQuery = `#graphql
       query getCollections {
-        collections(first: 150) {
+        collections(first: 250) {
           nodes {
             id
             title
@@ -107,26 +168,22 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    const [productsRes, filesRes, collectionsRes, metaDefsRes] = await Promise.all([
-      shopifyFetch({ store, query: productsQuery, variables: { query: shopifySearchString || undefined } }),
-      shopifyFetch({ store, query: filesQuery }).catch(() => ({ data: { files: { nodes: [] } } })),
+    const [collectionsRes, metaDefsRes] = await Promise.all([
       shopifyFetch({ store, query: collectionsQuery }).catch(() => ({ data: { collections: { nodes: [] } } })),
       shopifyFetch({ store, query: metaDefsQuery }).catch(() => ({ data: { metafieldDefinitions: { nodes: [] } } }))
     ]);
 
-    let rawProducts = productsRes.data?.products?.nodes || [];
-    const rawFiles = filesRes.data?.files?.nodes || [];
+    let rawProducts = allRawProducts;
     const collections = collectionsRes.data?.collections?.nodes || [];
     const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
 
     // Se è stata selezionata una Collezione specifica, filtriamo i prodotti associati
     if (selectedCollection.trim()) {
-      // Se l'utente ha selezionato una collezione, facciamo una query specifica per quella collezione
       try {
         const collectionProductsQuery = `#graphql
           query getCollectionProducts($id: ID!) {
             collection(id: $id) {
-              products(first: 100) {
+              products(first: 250) {
                 nodes {
                   id
                 }
@@ -142,10 +199,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Estraggo tutti i Tag e Tipi di prodotto unici per i filtri della UI
+    // Estraggo tutti i Tag e Tipi di prodotto unici
     const allTagsSet = new Set<string>();
     const allTypesSet = new Set<string>();
-    rawProducts.forEach((p: any) => {
+    allRawProducts.forEach((p: any) => {
       if (Array.isArray(p.tags)) {
         p.tags.forEach((t: string) => allTagsSet.add(t));
       }
@@ -155,7 +212,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Filtriamo i file SVG da Shopify Files
-    const svgFiles = rawFiles
+    const svgFiles = allRawFiles
       .filter((f: any) => {
         if (!f) return false;
         const filename = (f.filename || f.url || "").toLowerCase();
@@ -223,11 +280,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       products,
+      totalCount: products.length,
       files: svgFiles,
-      allFilesCount: rawFiles.length,
+      allFilesCount: allRawFiles.length,
       collections,
-      tags: Array.from(allTagsSet),
-      productTypes: Array.from(allTypesSet),
+      tags: Array.from(allTagsSet).sort(),
+      productTypes: Array.from(allTypesSet).sort(),
       coloreStickChoices,
       coloreBaseChoices
     });

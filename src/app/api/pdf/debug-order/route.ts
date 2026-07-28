@@ -179,16 +179,17 @@ export async function GET(req: NextRequest) {
         width: 300,
         height: 300,
         preserveAspectRatio: "xMidYMid meet",
-        fontCallback: function(family, bold, italic) {
-          const cleanFamily = family.replace(/['"]/g, "").trim();
+        fontCallback: function(family: any, bold: any, italic: any) {
+          const cleanFamily = String(family || "").replace(/['"]/g, "").trim();
           debugLogs.push(`fontCallback requested: "${family}" -> cleaned: "${cleanFamily}"`);
           
-          if (doc._fonts && doc._fonts[cleanFamily]) {
+          const docAny = doc as any;
+          if (docAny._fonts && docAny._fonts[cleanFamily]) {
             debugLogs.push(`Found exact font match: "${cleanFamily}"`);
             return cleanFamily;
           }
-          if (doc._fonts) {
-            const match = Object.keys(doc._fonts).find(f => f.toLowerCase() === cleanFamily.toLowerCase());
+          if (docAny._fonts) {
+            const match = Object.keys(docAny._fonts).find(f => f.toLowerCase() === cleanFamily.toLowerCase());
             if (match) {
               debugLogs.push(`Found case-insensitive font match: "${match}"`);
               return match;
@@ -200,8 +201,8 @@ export async function GET(req: NextRequest) {
           if (cleanLower.includes('courier')) return 'Courier';
           if (cleanLower.includes('times')) return 'Times-Roman';
           
-          if (doc._fonts && Object.keys(doc._fonts).length > 0) {
-            const fb = Object.keys(doc._fonts)[0];
+          if (docAny._fonts && Object.keys(docAny._fonts).length > 0) {
+            const fb = Object.keys(docAny._fonts)[0];
             debugLogs.push(`Fallback to first custom font: "${fb}"`);
             return fb;
           }

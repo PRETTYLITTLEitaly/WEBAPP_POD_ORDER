@@ -1,46 +1,107 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 export const dynamic = "force-dynamic";
 
-const FONTS_DIR = path.join(process.cwd(), "public", "fonts");
+const PUBLIC_FONTS_DIR = path.join(process.cwd(), "public", "fonts");
+const TMP_FONTS_DIR = path.join(os.tmpdir(), "pod_fonts");
 
-function ensureFontsDir() {
-  if (!fs.existsSync(FONTS_DIR)) {
-    fs.mkdirSync(FONTS_DIR, { recursive: true });
+function getWritableFontsDir(): string {
+  try {
+    if (!fs.existsSync(PUBLIC_FONTS_DIR)) {
+      fs.mkdirSync(PUBLIC_FONTS_DIR, { recursive: true });
+    }
+    // Test write permission
+    const testFile = path.join(PUBLIC_FONTS_DIR, ".write_test");
+    fs.writeFileSync(testFile, "test");
+    fs.unlinkSync(testFile);
+    return PUBLIC_FONTS_DIR;
+  } catch (e) {
+    // Read-only environment (e.g. Vercel Serverless) -> Fallback to /tmp
+    if (!fs.existsSync(TMP_FONTS_DIR)) {
+      fs.mkdirSync(TMP_FONTS_DIR, { recursive: true });
+    }
+    return TMP_FONTS_DIR;
   }
 }
 
-// GET /api/fonts — Ritorna l'elenco di tutti i font presenti nella cartella public/fonts
-export async function GET() {
+// GET /api/fonts — Ritorna l'elenco dei font oppure serve direttamente il file font richiesto
+export async function GET(req: NextRequest) {
   try {
-    ensureFontsDir();
-    const files = fs.readdirSync(FONTS_DIR);
-    
-    const fonts = files
-      .filter(f => f.toLowerCase().endsWith(".ttf") || f.toLowerCase().endsWith(".otf"))
-      .map(filename => {
-        const filePath = path.join(FONTS_DIR, filename);
-        const stats = fs.statSync(filePath);
-        const ext = path.extname(filename).toLowerCase();
-        const fontName = path.basename(filename, ext);
+    const { searchParams } = new URL(req.url);
+    const requestedFile = searchParams.get("file");
 
-        const fileBuffer = fs.readFileSync(filePath);
-        const b64 = fileBuffer.toString("base64");
-        const mime = ext === ".otf" ? "font/otf" : "font/ttf";
+    const fontsDir = getWritableFontsDir();
 
-        return {
-          id: filename,
-          name: fontName,
-          filename: filename,
-          url: `/fonts/${filename}`,
-          dataUri: `data:${mime};base64,${b64}`,
-          format: ext.replace(".", "").toUpperCase(),
-          sizeBytes: stats.size,
-          updatedAt: stats.mtime
-        };
+    // Se è richiesto il download o il rendering diretto di un file font
+    if (requestedFile) {
+      const cleanFileName = path.basename(requestedFile);
+      let targetPath = path.join(PUBLIC_FONTS_DIR, cleanFileName);
+      if (!fs.existsSync(targetPath)) {
+        targetPath = path.join(TMP_FONTS_DIR, cleanFileName);
+      }
+
+      if (!fs.existsSync(targetPath)) {
+        return NextResponse.json({ success: false, error: "File font non trovato." }, { status: 404 });
+      }
+
+      const ext = path.extname(cleanFileName).toLowerCase();
+      const mime = ext === ".otf" ? "font/otf" : "font/ttf";
+      const fileBuffer = fs.readFileSync(targetPath);
+
+      return new Response(fileBuffer, {
+        headers: {
+          "Content-Type": mime,
+          "Cache-Control": "public, max-age=31536000, immutable"
+        }
       });
+    }
+
+    // Altrimenti ritorna l'elenco completo di tutti i font (da public e da /tmp)
+    const fontFilesMap = new Map<string, { filePath: string; filename: string }>();
+
+    if (fs.existsSync(PUBLIC_FONTS_DIR)) {
+      try {
+        fs.readdirSync(PUBLIC_FONTS_DIR).forEach(f => {
+          if (f.toLowerCase().endsWith(".ttf") || f.toLowerCase().endsWith(".otf")) {
+            fontFilesMap.set(f, { filePath: path.join(PUBLIC_FONTS_DIR, f), filename: f });
+          }
+        });
+      } catch (e) {}
+    }
+
+    if (fs.existsSync(TMP_FONTS_DIR)) {
+      try {
+        fs.readdirSync(TMP_FONTS_DIR).forEach(f => {
+          if (f.toLowerCase().endsWith(".ttf") || f.toLowerCase().endsWith(".otf")) {
+            fontFilesMap.set(f, { filePath: path.join(TMP_FONTS_DIR, f), filename: f });
+          }
+        });
+      } catch (e) {}
+    }
+
+    const fonts = Array.from(fontFilesMap.values()).map(({ filePath, filename }) => {
+      const stats = fs.statSync(filePath);
+      const ext = path.extname(filename).toLowerCase();
+      const fontName = path.basename(filename, ext);
+
+      const fileBuffer = fs.readFileSync(filePath);
+      const b64 = fileBuffer.toString("base64");
+      const mime = ext === ".otf" ? "font/otf" : "font/ttf";
+
+      return {
+        id: filename,
+        name: fontName,
+        filename: filename,
+        url: `/api/fonts?file=${encodeURIComponent(filename)}`,
+        dataUri: `data:${mime};base64,${b64}`,
+        format: ext.replace(".", "").toUpperCase(),
+        sizeBytes: stats.size,
+        updatedAt: stats.mtime
+      };
+    });
 
     return NextResponse.json({ success: true, fonts });
   } catch (error: any) {
@@ -49,11 +110,9 @@ export async function GET() {
   }
 }
 
-// POST /api/fonts — Upload di un nuovo file font (.ttf o .otf)
+// POST /api/fonts — Upload di un nuovo file font (.ttf o .otf) con supporto /tmp per Vercel
 export async function POST(req: NextRequest) {
   try {
-    ensureFontsDir();
-
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
@@ -71,10 +130,11 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Sanitizza nome file (es. "My Font_Name.ttf" -> "My_Font_Name.ttf")
     const safeBaseName = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, "_");
     const filename = `${safeBaseName}${ext}`;
-    const targetPath = path.join(FONTS_DIR, filename);
+
+    const targetDir = getWritableFontsDir();
+    const targetPath = path.join(targetDir, filename);
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -82,6 +142,8 @@ export async function POST(req: NextRequest) {
     fs.writeFileSync(targetPath, buffer);
 
     const stats = fs.statSync(targetPath);
+    const mime = ext === ".otf" ? "font/otf" : "font/ttf";
+    const b64 = buffer.toString("base64");
 
     return NextResponse.json({
       success: true,
@@ -89,7 +151,8 @@ export async function POST(req: NextRequest) {
         id: filename,
         name: safeBaseName,
         filename: filename,
-        url: `/fonts/${filename}`,
+        url: `/api/fonts?file=${encodeURIComponent(filename)}`,
+        dataUri: `data:${mime};base64,${b64}`,
         format: ext.replace(".", "").toUpperCase(),
         sizeBytes: stats.size,
         updatedAt: stats.mtime
@@ -104,21 +167,37 @@ export async function POST(req: NextRequest) {
 // DELETE /api/fonts — Elimina un font salvato
 export async function DELETE(req: NextRequest) {
   try {
-    ensureFontsDir();
-    const { filename } = await req.json();
+    const { searchParams } = new URL(req.url);
+    const filename = searchParams.get("filename");
 
     if (!filename) {
-      return NextResponse.json({ success: false, error: "Parametro filename mancante." }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Nome file mancante." }, { status: 400 });
     }
 
-    const safeFilename = path.basename(filename);
-    const filePath = path.join(FONTS_DIR, safeFilename);
+    const cleanFileName = path.basename(filename);
+    let deleted = false;
 
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    const publicPath = path.join(PUBLIC_FONTS_DIR, cleanFileName);
+    if (fs.existsSync(publicPath)) {
+      try {
+        fs.unlinkSync(publicPath);
+        deleted = true;
+      } catch (e) {}
     }
 
-    return NextResponse.json({ success: true, message: `Font ${safeFilename} eliminato con successo.` });
+    const tmpPath = path.join(TMP_FONTS_DIR, cleanFileName);
+    if (fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+        deleted = true;
+      } catch (e) {}
+    }
+
+    if (!deleted) {
+      return NextResponse.json({ success: false, error: "File font non trovato o non eliminabile." }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Errore eliminazione font:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

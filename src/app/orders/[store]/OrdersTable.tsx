@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Pencil, Sliders, CheckSquare, Eye } from "lucide-react";
 import { getPresets, PrintPreset } from "@/lib/presetStore";
+import TextEditorModal from "@/components/TextEditorModal";
 
 interface SavedView {
   id: string;
@@ -59,6 +60,26 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
   const [editorItems, setEditorItems] = useState<any[]>([]);
   const [isEditorLoading, setIsEditorLoading] = useState(false);
 
+  const [textEditorModal, setTextEditorModal] = useState<{
+    open: boolean;
+    title: string;
+    initialText: string;
+    initialFont: string;
+    initialColor: string;
+    initialFontSize: number;
+    backgroundUrl: string;
+    svgUrl: string;
+  }>({
+    open: false,
+    title: "",
+    initialText: "",
+    initialFont: "Outfit",
+    initialColor: "#000000",
+    initialFontSize: 36,
+    backgroundUrl: "",
+    svgUrl: ""
+  });
+
   const handleOpenPplrModal = (order: any) => {
     const lineItemsNodes = order.lineItems?.nodes || [];
     const parsedItems = lineItemsNodes.map((item: any) => {
@@ -78,6 +99,50 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       open: true,
       orderName: order.name,
       items: parsedItems
+    });
+  };
+
+  const handleOpenTextEditor = (order: any) => {
+    const lineItemsNodes = order.lineItems?.nodes || [];
+    let foundText = "";
+    let foundFont = "Outfit";
+    let foundColor = "#000000";
+    let foundImage = "";
+    let foundSvg = "";
+
+    lineItemsNodes.forEach((item: any) => {
+      const attrs = item.customAttributes || [];
+      attrs.forEach((attr: any) => {
+        const k = (attr.key || "").toLowerCase();
+        const v = String(attr.value || "");
+        if (k.includes("testo") || k.includes("text") || k.includes("frase") || k.includes("nome") || k.includes("dedica")) {
+          if (!v.startsWith("http")) foundText = v;
+        }
+        if (k.includes("font") || k.includes("carattere") || k.includes("scritta")) {
+          if (!v.startsWith("http")) foundFont = v;
+        }
+        if (k.includes("colore") || k.includes("color")) {
+          if (v.startsWith("#")) foundColor = v;
+          else if (v.toLowerCase().includes("bianco")) foundColor = "#ffffff";
+          else if (v.toLowerCase().includes("oro")) foundColor = "#d97706";
+          else if (v.toLowerCase().includes("rosso")) foundColor = "#dc2626";
+        }
+        if (v.startsWith("http")) {
+          if (v.endsWith(".svg")) foundSvg = v;
+          else foundImage = v;
+        }
+      });
+    });
+
+    setTextEditorModal({
+      open: true,
+      title: `Modifica Interattiva Testo & Stampa — Ordine ${order.name}`,
+      initialText: foundText || "Testo Personalizzato",
+      initialFont: foundFont || "Outfit",
+      initialColor: foundColor || "#000000",
+      initialFontSize: 36,
+      backgroundUrl: foundImage,
+      svgUrl: foundSvg
     });
   };
 
@@ -613,9 +678,17 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <div className="p-1.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-200 shadow-sm" title="Personalizzato (Pencil)">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenTextEditor(order);
+                            }}
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg border border-amber-200 shadow-sm transition-all cursor-pointer hover:scale-110 active:scale-95"
+                            title="Apri Editor Interattivo Testo & Font (Matita Gialla)"
+                          >
                             <Pencil className="w-4 h-4" />
-                          </div>
+                          </button>
                         </div>
                       )}
                     </td>
@@ -1032,6 +1105,19 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           </div>
         </div>
       )}
+
+      {/* Modal Popup Editor Interattivo Testo & Font (Matita Gialla) */}
+      <TextEditorModal
+        open={textEditorModal.open}
+        onClose={() => setTextEditorModal(prev => ({ ...prev, open: false }))}
+        title={textEditorModal.title}
+        initialText={textEditorModal.initialText}
+        initialFont={textEditorModal.initialFont}
+        initialColor={textEditorModal.initialColor}
+        initialFontSize={textEditorModal.initialFontSize}
+        backgroundUrl={textEditorModal.backgroundUrl}
+        svgUrl={textEditorModal.svgUrl}
+      />
     </div>
   );
 }

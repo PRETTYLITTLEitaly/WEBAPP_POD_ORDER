@@ -105,42 +105,79 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
   const handleOpenTextEditor = (order: any) => {
     const lineItemsNodes = order.lineItems?.nodes || [];
     let foundText = "";
-    let foundFont = "Outfit";
-    let foundColor = "#000000";
+    let foundFont = "Get Show";
+    let foundColor = "#38bdf8";
+    let foundFontSize = 32;
     let foundImage = "";
     let foundSvg = "";
+    let customAttributesList: any[] = [];
 
     lineItemsNodes.forEach((item: any) => {
       const attrs = item.customAttributes || [];
+      customAttributesList.push(...attrs);
+
       attrs.forEach((attr: any) => {
-        const k = (attr.key || "").toLowerCase();
-        const v = String(attr.value || "");
-        if (k.includes("testo") || k.includes("text") || k.includes("frase") || k.includes("nome") || k.includes("dedica")) {
-          if (!v.startsWith("http")) foundText = v;
+        const k = (attr.key || "").toLowerCase().trim();
+        const v = String(attr.value || "").trim();
+
+        // 1. Testo ("Il tuo testo", "Nome Brano", "Testo", "Dedica")
+        if (!v.startsWith("http")) {
+          if (k.includes("il tuo testo") || k.includes("testo") || k.includes("frase") || k.includes("nome") || k.includes("dedica") || k === "5") {
+            if (v && !foundText) foundText = v;
+          }
+
+          // 2. Font ("Scegli il font", "Font", "Carattere")
+          if (k.includes("scegli il font") || k.includes("font") || k.includes("carattere")) {
+            if (v) foundFont = v;
+          }
+
+          // 3. Font Size ("_font size Il tuo testo", "_font size", "font_size")
+          if (k.includes("font size") || k.includes("_font_size") || k.includes("fontsize")) {
+            const parsedSize = parseFloat(v);
+            if (!isNaN(parsedSize) && parsedSize > 0) {
+              foundFontSize = Math.round(parsedSize);
+            }
+          }
+
+          // 4. Colore ("Scegli il colore", "Colore testo", "Celeste", "Azzurro", "Bianco", "#...")
+          if (k.includes("scegli il colore") || k.includes("colore") || k.includes("color")) {
+            if (v.startsWith("#")) {
+              foundColor = v;
+            } else {
+              const lowerColor = v.toLowerCase();
+              if (lowerColor.includes("celeste") || lowerColor.includes("azzurro")) foundColor = "#38bdf8";
+              else if (lowerColor.includes("tiffany")) foundColor = "#0d9488";
+              else if (lowerColor.includes("bianco")) foundColor = "#ffffff";
+              else if (lowerColor.includes("nero")) foundColor = "#000000";
+              else if (lowerColor.includes("oro") || lowerColor.includes("giallo")) foundColor = "#d97706";
+              else if (lowerColor.includes("rosso")) foundColor = "#dc2626";
+              else if (lowerColor.includes("rosa")) foundColor = "#ec4899";
+              else if (lowerColor.includes("verde")) foundColor = "#16a34a";
+              else if (lowerColor.includes("blu")) foundColor = "#2563eb";
+            }
+          }
         }
-        if (k.includes("font") || k.includes("carattere") || k.includes("scritta")) {
-          if (!v.startsWith("http")) foundFont = v;
-        }
-        if (k.includes("colore") || k.includes("color")) {
-          if (v.startsWith("#")) foundColor = v;
-          else if (v.toLowerCase().includes("bianco")) foundColor = "#ffffff";
-          else if (v.toLowerCase().includes("oro")) foundColor = "#d97706";
-          else if (v.toLowerCase().includes("rosso")) foundColor = "#dc2626";
-        }
+
+        // 5. URL Immagine / Anteprima / Vedi ora
         if (v.startsWith("http")) {
-          if (v.endsWith(".svg")) foundSvg = v;
-          else foundImage = v;
+          if (k.includes("vedi") || k.includes("preview") || k.includes("immagine") || k.includes("_pplr")) {
+            foundImage = v;
+          } else if (v.endsWith(".svg")) {
+            foundSvg = v;
+          } else if (!foundImage) {
+            foundImage = v;
+          }
         }
       });
     });
 
     setTextEditorModal({
       open: true,
-      title: `Modifica Interattiva Testo & Stampa — Ordine ${order.name}`,
-      initialText: foundText || "Testo Personalizzato",
-      initialFont: foundFont || "Outfit",
-      initialColor: foundColor || "#000000",
-      initialFontSize: 36,
+      title: `Modifica Interattiva Testo & Grafica — Ordine ${order.name}`,
+      initialText: foundText || "Giulia & Riccardo 26.09.2026",
+      initialFont: foundFont || "Get Show",
+      initialColor: foundColor || "#38bdf8",
+      initialFontSize: foundFontSize || 32,
       backgroundUrl: foundImage,
       svgUrl: foundSvg
     });

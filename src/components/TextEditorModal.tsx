@@ -6,17 +6,14 @@ import {
   Pencil, 
   Type, 
   Palette, 
-  Sliders, 
   Save, 
   AlignLeft, 
   AlignCenter, 
   AlignRight, 
-  Check, 
-  RefreshCw,
   Sparkles,
   Move,
   ZoomIn,
-  ZoomOut
+  List
 } from "lucide-react";
 
 interface TextEditorModalProps {
@@ -30,6 +27,7 @@ interface TextEditorModalProps {
   initialLetterSpacing?: number;
   backgroundUrl?: string;
   svgUrl?: string;
+  customAttributes?: { key: string; value: string }[];
   onSave?: (updatedData: {
     text: string;
     font: string;
@@ -42,8 +40,9 @@ interface TextEditorModalProps {
 }
 
 const DEFAULT_FONTS = [
-  { name: "Outfit", family: "Outfit, sans-serif" },
+  { name: "Get Show", family: "'Get Show', 'Dancing Script', cursive" },
   { name: "Dancing Script", family: "'Dancing Script', cursive" },
+  { name: "Outfit", family: "Outfit, sans-serif" },
   { name: "Great Vibes", family: "'Great Vibes', cursive" },
   { name: "Montserrat", family: "Montserrat, sans-serif" },
   { name: "Playfair Display", family: "'Playfair Display', serif" },
@@ -53,21 +52,30 @@ const DEFAULT_FONTS = [
 ];
 
 const PRESET_COLORS = [
-  "#000000", "#ffffff", "#dc2626", "#d97706", "#059669", "#2563eb", 
-  "#7c3aed", "#db2777", "#475569", "#78350f", "#ca8a04", "#0284c7"
+  { name: "Celeste", hex: "#38bdf8" },
+  { name: "Azzurro", hex: "#0284c7" },
+  { name: "Nero", hex: "#000000" },
+  { name: "Bianco", hex: "#ffffff" },
+  { name: "Tiffany", hex: "#0d9488" },
+  { name: "Oro", hex: "#d97706" },
+  { name: "Rosso", hex: "#dc2626" },
+  { name: "Rosa", hex: "#ec4899" },
+  { name: "Verde", hex: "#16a34a" },
+  { name: "Blu", hex: "#2563eb" }
 ];
 
 export default function TextEditorModal({
   open,
   onClose,
   title = "Editor Interattivo Testo & Grafica Stampa",
-  initialText = "Testo Personalizzato",
-  initialFont = "Outfit",
-  initialColor = "#000000",
+  initialText = "Giulia & Riccardo 26.09.2026",
+  initialFont = "Get Show",
+  initialColor = "#38bdf8",
   initialFontSize = 32,
   initialLetterSpacing = 0,
   backgroundUrl = "",
   svgUrl = "",
+  customAttributes = [],
   onSave
 }: TextEditorModalProps) {
   const [text, setText] = useState(initialText);
@@ -76,20 +84,21 @@ export default function TextEditorModal({
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [letterSpacing, setLetterSpacing] = useState(initialLetterSpacing);
   const [align, setAlign] = useState<"left" | "center" | "right">("center");
-  const [posX, setPosX] = useState(50); // % position
-  const [posY, setPosY] = useState(50); // % position
+  const [posX, setPosX] = useState(50);
+  const [posY, setPosY] = useState(55);
   const [isSaving, setIsSaving] = useState(false);
   const [availableFonts, setAvailableFonts] = useState(DEFAULT_FONTS);
+  const [showAttributes, setShowAttributes] = useState(false);
 
   useEffect(() => {
-    setText(initialText || "Testo Personalizzato");
-    setFont(initialFont || "Outfit");
-    setColor(initialColor || "#000000");
+    setText(initialText || "Giulia & Riccardo 26.09.2026");
+    setFont(initialFont || "Get Show");
+    setColor(initialColor || "#38bdf8");
     setFontSize(initialFontSize || 32);
     setLetterSpacing(initialLetterSpacing || 0);
   }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, open]);
 
-  // Carica eventuali font custom caricati nell'app via /api/fonts
+  // Carica i font installati o disponibili via /api/fonts
   useEffect(() => {
     if (!open) return;
     const fetchFonts = async () => {
@@ -101,10 +110,18 @@ export default function TextEditorModal({
             name: f.name,
             family: `'${f.name}', sans-serif`
           }));
-          setAvailableFonts([...customList, ...DEFAULT_FONTS]);
+
+          const mergedMap = new Map();
+          [...customList, ...DEFAULT_FONTS].forEach(f => {
+            if (!mergedMap.has(f.name.toLowerCase())) {
+              mergedMap.set(f.name.toLowerCase(), f);
+            }
+          });
+
+          setAvailableFonts(Array.from(mergedMap.values()));
         }
       } catch (e) {
-        console.error("Errore recupero font custom:", e);
+        console.error("Errore fetch font:", e);
       }
     };
     fetchFonts();
@@ -140,7 +157,7 @@ export default function TextEditorModal({
         className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-100"
         onClick={e => e.stopPropagation()}
       >
-        {/* INTESTAZIONE MODAL CON MATITA GIALLA/AMBRA */}
+        {/* INTESTAZIONE MODAL CON MATITA GIALLA */}
         <div className="p-4 bg-amber-500 text-white flex items-center justify-between shadow-md">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-amber-600 rounded-xl text-white shadow-inner">
@@ -149,7 +166,7 @@ export default function TextEditorModal({
             <div>
               <h3 className="font-extrabold text-lg tracking-tight">{title}</h3>
               <p className="text-xs text-amber-100 font-medium">
-                Modifica parole, spazi, dimensione font e colori con anteprima in tempo reale.
+                Parametri Product Personalizer rilevati: Font, Testo, Colore, Spazi e Dimensione.
               </p>
             </div>
           </div>
@@ -161,29 +178,28 @@ export default function TextEditorModal({
           </button>
         </div>
 
-        {/* CORPO EDITOR: ANTEPRIMA VISUALE A SX, CONTROLLI A DX */}
+        {/* CORPO EDITOR */}
         <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-gray-50">
           
-          {/* CANVAS DI ANTEPRIMA GRAFICA IN TEMPO REALE (7 COLONNE) */}
+          {/* CANVAS DI ANTEPRIMA GRAFICA (7 COLONNE) */}
           <div className="lg:col-span-7 flex flex-col items-center justify-between space-y-3">
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1.5 text-amber-700">
                 <Sparkles className="w-4 h-4 text-amber-500" />
                 Anteprima Vettoriale Live
               </span>
-              <span className="font-mono text-gray-400 text-[10px]">
-                {fontSize}px | {color} | {font}
+              <span className="font-mono text-gray-500 text-[11px]">
+                Font: <strong>{font}</strong> | {fontSize}px | {color}
               </span>
             </div>
 
-            {/* BOX ANTEPRIMA STAMPA CON CANVAS INTERATTIVO */}
-            <div className="w-full h-[380px] bg-white rounded-2xl border-2 border-dashed border-amber-300 shadow-inner relative overflow-hidden flex items-center justify-center p-4 group">
-              {/* IMMAGINE DI SFONDO / PRODOTTO SE PRESENTE */}
+            {/* BOX ANTEPRIMA STAMPA CON SFONDO DALL'ORDINE E SCRITTA RENDERIZZATA */}
+            <div className="w-full h-[390px] bg-white rounded-2xl border-2 border-dashed border-amber-300 shadow-inner relative overflow-hidden flex items-center justify-center p-4 group">
               {backgroundUrl ? (
                 <img 
                   src={backgroundUrl} 
-                  alt="Sfondo prodotto" 
-                  className="absolute inset-0 w-full h-full object-contain p-2 opacity-40 select-none pointer-events-none"
+                  alt="Anteprima Ordine Personalizzato" 
+                  className="absolute inset-0 w-full h-full object-contain p-2 opacity-50 select-none pointer-events-none"
                 />
               ) : svgUrl ? (
                 <img 
@@ -193,7 +209,7 @@ export default function TextEditorModal({
                 />
               ) : (
                 <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 to-amber-50/30 flex items-center justify-center text-gray-300 text-xs font-mono select-none">
-                  [Area di Stampa DTF]
+                  [Area di Stampa DTF Product Personalizer]
                 </div>
               )}
 
@@ -204,7 +220,7 @@ export default function TextEditorModal({
                   left: `${posX}%`,
                   top: `${posY}%`,
                   transform: "translate(-50%, -50%)",
-                  fontFamily: availableFonts.find(f => f.name === font)?.family || font,
+                  fontFamily: availableFonts.find(f => f.name.toLowerCase() === font.toLowerCase())?.family || `'${font}', cursive, sans-serif`,
                   fontSize: `${fontSize}px`,
                   color: color,
                   letterSpacing: `${letterSpacing}px`,
@@ -219,7 +235,7 @@ export default function TextEditorModal({
               </div>
             </div>
 
-            {/* CONTROLLI DI POSIZIONAMENTO RAPIDO X/Y */}
+            {/* CONTROLLI POSIZIONAMENTO RAPIDO X/Y */}
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-3 text-xs">
               <span className="font-bold text-gray-600 flex items-center gap-1">
                 <Move className="w-3.5 h-3.5 text-amber-600" />
@@ -227,39 +243,15 @@ export default function TextEditorModal({
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => { setPosX(50); setPosY(50); }}
+                  onClick={() => { setPosX(50); setPosY(55); }}
                   className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-200 transition-all text-[11px]"
                 >
                   Centra Tutto
                 </button>
-                <button
-                  onClick={() => setPosY(prev => Math.max(10, prev - 5))}
-                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700"
-                  title="Sposta Su"
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => setPosY(prev => Math.min(90, prev + 5))}
-                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700"
-                  title="Sposta Giù"
-                >
-                  ↓
-                </button>
-                <button
-                  onClick={() => setPosX(prev => Math.max(10, prev - 5))}
-                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700"
-                  title="Sposta Sinistra"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => setPosX(prev => Math.min(90, prev + 5))}
-                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700"
-                  title="Sposta Destra"
-                >
-                  →
-                </button>
+                <button onClick={() => setPosY(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↑</button>
+                <button onClick={() => setPosY(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↓</button>
+                <button onClick={() => setPosX(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">←</button>
+                <button onClick={() => setPosX(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">→</button>
               </div>
             </div>
 
@@ -270,35 +262,39 @@ export default function TextEditorModal({
             
             <div className="space-y-4">
               
-              {/* 1. INPUT CAMPO TESTO (CAMBIA PAROLE O SPAZI) */}
+              {/* 1. INPUT TESTO PERSONALIZZATO */}
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-gray-800 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Type className="w-4 h-4 text-amber-600" />
-                    Testo Personalizzato
+                    Testo dell'Ordine (Il Tuo Testo)
                   </span>
-                  <span className="text-[10px] text-gray-400 font-normal">Modifica parole e spazi</span>
+                  <span className="text-[10px] text-gray-400 font-normal">Modifica parole o spazi</span>
                 </label>
                 <textarea
                   rows={3}
                   value={text}
                   onChange={e => setText(e.target.value)}
-                  placeholder="Scrivi qui il testo..."
+                  placeholder="Scrivi qui il testo dell'ordine..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50/50"
                 />
               </div>
 
-              {/* 2. SELETTORE FONT FAMILY */}
+              {/* 2. SELETTORE FONT (SCEGLI IL FONT) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
-                  <Type className="w-4 h-4 text-amber-600" />
-                  Tipo di Carattere (Font)
+                <label className="text-xs font-extrabold text-gray-800 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Type className="w-4 h-4 text-amber-600" />
+                    Font Rilevato Dall'Ordine
+                  </span>
+                  <span className="text-[10px] text-indigo-600 font-bold">{font}</span>
                 </label>
                 <select
                   value={font}
                   onChange={e => setFont(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                 >
+                  <option value={font}>-- Font dell'ordine: {font} --</option>
                   {availableFonts.map(f => (
                     <option key={f.name} value={f.name}>
                       {f.name}
@@ -307,12 +303,12 @@ export default function TextEditorModal({
                 </select>
               </div>
 
-              {/* 3. DIMENSIONE FONT (SLIDER & INPUT NUMERICO) */}
+              {/* 3. DIMENSIONE FONT (_FONT SIZE IL TUO TESTO) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
                     <ZoomIn className="w-4 h-4 text-amber-600" />
-                    Grandezza Testo (Font Size)
+                    Dimensione Testo (_font size)
                   </label>
                   <span className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                     {fontSize} px
@@ -338,11 +334,11 @@ export default function TextEditorModal({
                 </div>
               </div>
 
-              {/* 4. COLORE DEL FONT */}
+              {/* 4. COLORE DEL FONT (SCEGLI IL COLORE) */}
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
                   <Palette className="w-4 h-4 text-amber-600" />
-                  Colore Testo
+                  Colore Scritta
                 </label>
                 <div className="flex items-center gap-2 flex-wrap">
                   <input 
@@ -350,66 +346,51 @@ export default function TextEditorModal({
                     value={color}
                     onChange={e => setColor(e.target.value)}
                     className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5 bg-white shrink-0"
-                    title="Scegli colore personalizzato"
+                    title="Seleziona colore personalizzato"
                   />
-                  <div className="flex items-center gap-1 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {PRESET_COLORS.map(c => (
                       <button
-                        key={c}
-                        onClick={() => setColor(c)}
+                        key={c.name}
+                        onClick={() => setColor(c.hex)}
                         className={`w-6 h-6 rounded-full border transition-all ${
-                          color === c ? "scale-125 border-amber-600 ring-2 ring-amber-400" : "border-gray-300 hover:scale-110"
+                          color.toLowerCase() === c.hex.toLowerCase() ? "scale-125 border-amber-600 ring-2 ring-amber-400" : "border-gray-300 hover:scale-110"
                         }`}
-                        style={{ backgroundColor: c }}
-                        title={c}
+                        style={{ backgroundColor: c.hex }}
+                        title={`${c.name} (${c.hex})`}
                       />
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* 5. SPAZIATURA LETTERE & ALLINEAMENTO */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-gray-700">Spaziatura Lettere</label>
-                  <input 
-                    type="number"
-                    min={-5}
-                    max={20}
-                    value={letterSpacing}
-                    onChange={e => setLetterSpacing(parseInt(e.target.value, 10) || 0)}
-                    className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono font-bold"
-                  />
-                </div>
+              {/* 5. ATTRIBUTI DETTAGLIATI PRODOTTO PERSONALIZER */}
+              {customAttributes.length > 0 && (
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    onClick={() => setShowAttributes(!showAttributes)}
+                    className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    {showAttributes ? "Nascondi tutti gli attributi dell'ordine" : `Mostra tutti i ${customAttributes.length} attributi dell'ordine`}
+                  </button>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-gray-700">Allineamento</label>
-                  <div className="flex items-center bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-                    <button
-                      onClick={() => setAlign("left")}
-                      className={`flex-1 py-1 flex items-center justify-center rounded ${align === "left" ? "bg-white text-amber-700 shadow-xs" : "text-gray-500"}`}
-                    >
-                      <AlignLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setAlign("center")}
-                      className={`flex-1 py-1 flex items-center justify-center rounded ${align === "center" ? "bg-white text-amber-700 shadow-xs" : "text-gray-500"}`}
-                    >
-                      <AlignCenter className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setAlign("right")}
-                      className={`flex-1 py-1 flex items-center justify-center rounded ${align === "right" ? "bg-white text-amber-700 shadow-xs" : "text-gray-500"}`}
-                    >
-                      <AlignRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {showAttributes && (
+                    <div className="mt-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-[11px] font-mono space-y-1 max-h-36 overflow-y-auto">
+                      {customAttributes.map((attr, idx) => (
+                        <div key={idx} className="flex justify-between gap-2 border-b border-gray-100 pb-0.5">
+                          <span className="font-bold text-gray-700">{attr.key}:</span>
+                          <span className="text-gray-900 truncate max-w-[200px]">{attr.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
             </div>
 
-            {/* BOTTONI DI SALVATAGGIO & ANNULLA */}
+            {/* BOTTONI CONFERMA */}
             <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3 mt-4">
               <button
                 onClick={onClose}

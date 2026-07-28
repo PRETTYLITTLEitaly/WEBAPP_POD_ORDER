@@ -23,7 +23,8 @@ import {
   Package,
   Sun,
   Moon,
-  Pipette
+  Pipette,
+  Upload
 } from "lucide-react";
 
 interface TextEditorModalProps {
@@ -261,6 +262,57 @@ export default function TextEditorModal({
     } catch (err) {
       console.error("Errore campionamento colore dal mockup:", err);
       setIsDropperActive(false);
+    }
+  };
+
+  // SCARICA FILE ORIGINALE CARICATO DAL CLIENTE
+  const downloadOriginalFile = async () => {
+    if (!uploadedImageUrl) return;
+    try {
+      const res = await fetch(uploadedImageUrl);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ext = uploadedImageUrl.split("?")[0].split(".").pop() || "png";
+      a.download = `ordine_${orderId || "unknown"}_originale.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      window.open(uploadedImageUrl, "_blank");
+    }
+  };
+
+  // GESTISCI CARICAMENTO FILE ELABORATO ESTERNAMENTE (PNG, JPG, SVG)
+  const handleUploadedWorkedFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    const isSvg = file.name.toLowerCase().endsWith(".svg");
+
+    if (isSvg) {
+      reader.onload = (event) => {
+        const svgContent = event.target?.result as string;
+        setVectorSvgContent(svgContent);
+        setProcessedImageUrl(null);
+        setIsVectorized(true);
+        setIsRemoveBgApplied(false);
+        setActiveTab("image");
+      };
+      reader.readAsText(file);
+    } else {
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        setProcessedImageUrl(dataUrl);
+        setVectorSvgContent(null);
+        setIsRemoveBgApplied(true);
+        setIsVectorized(false);
+        setActiveTab("image");
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -582,14 +634,43 @@ export default function TextEditorModal({
 
             {/* BOX ANTEPRIMA IMMAGINE ORIGINALE CARICATA (Riferimento) */}
             {uploadedImageUrl && (
-              <div className="w-full h-[180px] bg-white rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col items-center justify-center p-3 group bg-slate-50/50">
-                <span className="absolute top-2 left-2 bg-purple-100 text-purple-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">Immagine Originale (Caricata)</span>
-                <img 
-                  src={uploadedImageUrl} 
-                  alt="Immagine Originale" 
-                  crossOrigin="anonymous"
-                  className="max-w-full max-h-full object-contain select-none"
-                />
+              <div className="space-y-1.5 w-full">
+                <div className="w-full h-[180px] bg-white rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col items-center justify-center p-3 group bg-slate-50/50">
+                  <span className="absolute top-2 left-2 bg-purple-100 text-purple-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">Immagine Originale (Caricata)</span>
+                  <img 
+                    src={uploadedImageUrl} 
+                    alt="Immagine Originale" 
+                    crossOrigin="anonymous"
+                    className="max-w-full max-h-full object-contain select-none"
+                  />
+                </div>
+                
+                {/* TOOLBAR SCARICA E CARICA SOTTO L'IMMAGINE */}
+                <div className="flex items-center gap-2 w-full">
+                  <button
+                    type="button"
+                    onClick={downloadOriginalFile}
+                    className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[10px] font-extrabold rounded-lg flex items-center justify-center gap-1 transition-all"
+                    title="Scarica l'immagine originale in alta qualità"
+                  >
+                    <Upload className="w-3 h-3 rotate-180" />
+                    Scarica Originale
+                  </button>
+                  
+                  <label
+                    className="flex-1 py-1.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 text-[10px] font-extrabold rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer text-center"
+                    title="Carica un file elaborato esternamente (SVG o PNG)"
+                  >
+                    <Upload className="w-3 h-3" />
+                    Carica Elaborato
+                    <input 
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.svg"
+                      onChange={handleUploadedWorkedFile}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               </div>
             )}
 

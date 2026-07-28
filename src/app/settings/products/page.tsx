@@ -26,7 +26,8 @@ import {
   Plus,
   ImageIcon,
   Grid,
-  Sparkles
+  Sparkles,
+  Trash2
 } from "lucide-react";
 
 interface CollectionRef {
@@ -367,7 +368,7 @@ export default function ProductMetafieldsPage() {
             Configuratore Metafield Prodotti & Grafiche SVG
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Gestisci i 7 metafield di produzione con anteprime grafiche SVG in tempo reale, Bacchetta Magica, Tag e Collezioni (Manuali & Automatiche).
+            Gestisci i 7 metafield di produzione con anteprime grafiche SVG, tasto Cestino rapido per svuotare i parametri, Bacchetta Magica, Tag e Collezioni.
           </p>
         </div>
 
@@ -427,7 +428,7 @@ export default function ProductMetafieldsPage() {
             />
           </div>
 
-          {/* Filtro Collezione Shopify con indicazione Automatiche vs Manuali */}
+          {/* Filtro Collezione Shopify */}
           <div className="relative">
             <select
               value={selectedCollection}
@@ -613,11 +614,10 @@ export default function ProductMetafieldsPage() {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {currentCols.map(col => (
                             col.isAutomated ? (
-                              /* BADGE COLLEZIONE AUTOMATICA (ARANCIONE / AMBRA) - NON ELIMINABILE MANUALMENTE */
                               <span 
                                 key={col.id} 
                                 className="bg-amber-50 text-amber-900 px-2 py-0.5 rounded-md font-bold text-[10px] flex items-center gap-1 border border-amber-200 shadow-2xs"
-                                title="Collezione Automatica Shopify: i prodotti vengono inseriti/rimossi automaticamente in base alle regole ed ai tag del negozio"
+                                title="Collezione Automatica Shopify"
                               >
                                 <Sparkles className="w-3 h-3 text-amber-600" />
                                 {col.title}
@@ -626,7 +626,6 @@ export default function ProductMetafieldsPage() {
                                 </span>
                               </span>
                             ) : (
-                              /* BADGE COLLEZIONE MANUALE (VIOLA) - ELIMINABILE CON X */
                               <span 
                                 key={col.id} 
                                 className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-semibold text-[10px] flex items-center gap-1 border border-purple-100 group"
@@ -758,7 +757,7 @@ export default function ProductMetafieldsPage() {
                     </div>
                   </div>
 
-                  {/* FORM GRIGLIA I 7 METAFIELD */}
+                  {/* FORM GRIGLIA I 7 METAFIELD (CON CESTINO RAPIDO SU OGNI CAMPO) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     
                     {/* 1. custom.pod_svg_url */}
@@ -770,13 +769,24 @@ export default function ProductMetafieldsPage() {
                         </span>
                         <code className="text-gray-400 font-mono text-[9px]">custom.pod_svg_url</code>
                       </label>
-                      <input 
-                        type="text"
-                        value={form.pod_svg_url || ""}
-                        onChange={e => handleInputChange(product.id, "pod_svg_url", e.target.value)}
-                        placeholder="https://cdn.shopify.com/.../grafica.svg"
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
-                      />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="text"
+                          value={form.pod_svg_url || ""}
+                          onChange={e => handleInputChange(product.id, "pod_svg_url", e.target.value)}
+                          placeholder="https://cdn.shopify.com/.../grafica.svg"
+                          className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+                        />
+                        {form.pod_svg_url && (
+                          <button
+                            onClick={() => handleInputChange(product.id, "pod_svg_url", "")}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5"
+                            title="Svuota URL SVG"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* 2. pod.svg */}
@@ -811,50 +821,79 @@ export default function ProductMetafieldsPage() {
                         </div>
                       </div>
 
-                      {shopifyFiles.length > 0 ? (
-                        <select
-                          value={form.pod_svg_file_id || ""}
-                          onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                        >
-                          <option value="">-- Seleziona File SVG ({shopifyFiles.length} file .SVG trovati) --</option>
-                          {shopifyFiles.map(file => (
-                            <option key={file.id} value={file.id}>
-                              📄 {file.filename}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input 
-                          type="text"
-                          value={form.pod_svg_file_id || ""}
-                          onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
-                          placeholder="Incolla URL o GID del file SVG..."
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                        />
-                      )}
-
-                      {/* BADGE ANTEPRIMA GRAFICA VISUALE SVG SELEZIONATA */}
-                      {activeSvgUrl && (
-                        <div className="mt-1 flex items-center gap-2 bg-indigo-50/80 p-1.5 rounded-xl border border-indigo-100">
-                          <div 
-                            onClick={() => setZoomedImage({ url: activeSvgUrl, title: `Anteprima Vettoriale: ${product.title}` })}
-                            className="w-10 h-10 bg-white rounded-lg border border-indigo-200 flex items-center justify-center p-1 cursor-pointer hover:scale-105 transition-all shadow-sm shrink-0"
-                            title="Clicca per ingrandire vettoriale"
+                      <div className="relative flex items-center">
+                        {shopifyFiles.length > 0 ? (
+                          <select
+                            value={form.pod_svg_file_id || ""}
+                            onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
+                            className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                           >
-                            <img src={activeSvgUrl} alt="SVG Preview" className="max-w-full max-h-full object-contain" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[10px] font-bold text-indigo-950 truncate">
-                              {activeSvgFilename || "Grafica SVG Selezionata"}
-                            </div>
-                            <button 
+                            <option value="">-- Seleziona File SVG ({shopifyFiles.length} file .SVG) --</option>
+                            {shopifyFiles.map(file => (
+                              <option key={file.id} value={file.id}>
+                                📄 {file.filename}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input 
+                            type="text"
+                            value={form.pod_svg_file_id || ""}
+                            onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
+                            placeholder="Incolla GID o URL del file SVG..."
+                            className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                          />
+                        )}
+
+                        {form.pod_svg_file_id && (
+                          <button
+                            onClick={() => {
+                              handleInputChange(product.id, "pod_svg_file_id", "");
+                              handleInputChange(product.id, "pod_svg_url", "");
+                            }}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5 z-10"
+                            title="Deseleziona file SVG"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* BADGE ANTEPRIMA GRAFICA VISUALE SVG SELEZIONATA CON CESTINO RAPIDO */}
+                      {activeSvgUrl && (
+                        <div className="mt-1 flex items-center justify-between gap-2 bg-indigo-50/80 p-1.5 rounded-xl border border-indigo-100">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div 
                               onClick={() => setZoomedImage({ url: activeSvgUrl, title: `Anteprima Vettoriale: ${product.title}` })}
-                              className="text-[9px] text-indigo-600 font-bold hover:underline flex items-center gap-0.5 mt-0.5"
+                              className="w-10 h-10 bg-white rounded-lg border border-indigo-200 flex items-center justify-center p-1 cursor-pointer hover:scale-105 transition-all shadow-sm shrink-0"
+                              title="Clicca per ingrandire vettoriale"
                             >
-                              <Eye className="w-2.5 h-2.5" /> Ingrandisci Vettoriale
-                            </button>
+                              <img src={activeSvgUrl} alt="SVG Preview" className="max-w-full max-h-full object-contain" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] font-bold text-indigo-950 truncate">
+                                {activeSvgFilename || "Grafica SVG Selezionata"}
+                              </div>
+                              <button 
+                                onClick={() => setZoomedImage({ url: activeSvgUrl, title: `Anteprima Vettoriale: ${product.title}` })}
+                                className="text-[9px] text-indigo-600 font-bold hover:underline flex items-center gap-0.5 mt-0.5"
+                              >
+                                <Eye className="w-2.5 h-2.5" /> Ingrandisci Vettoriale
+                              </button>
+                            </div>
                           </div>
+
+                          {/* TASTO CESTINO / X PER DESELEZIONARE L'SVG IMMEDIATAMENTE */}
+                          <button
+                            onClick={() => {
+                              handleInputChange(product.id, "pod_svg_file_id", "");
+                              handleInputChange(product.id, "pod_svg_url", "");
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                            title="Deseleziona e rimuovi SVG dal prodotto"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -868,13 +907,24 @@ export default function ProductMetafieldsPage() {
                         </span>
                         <code className="text-gray-400 font-mono text-[9px]">pod.height</code>
                       </label>
-                      <input 
-                        type="text"
-                        value={form.pod_height || ""}
-                        onChange={e => handleInputChange(product.id, "pod_height", e.target.value)}
-                        placeholder="Es. 200"
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
-                      />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="text"
+                          value={form.pod_height || ""}
+                          onChange={e => handleInputChange(product.id, "pod_height", e.target.value)}
+                          placeholder="Es. 200"
+                          className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+                        />
+                        {form.pod_height && (
+                          <button
+                            onClick={() => handleInputChange(product.id, "pod_height", "")}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5"
+                            title="Svuota Altezza"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* 4. pod.width */}
@@ -886,13 +936,24 @@ export default function ProductMetafieldsPage() {
                         </span>
                         <code className="text-gray-400 font-mono text-[9px]">pod.width</code>
                       </label>
-                      <input 
-                        type="text"
-                        value={form.pod_width || ""}
-                        onChange={e => handleInputChange(product.id, "pod_width", e.target.value)}
-                        placeholder="Es. 300"
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
-                      />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="text"
+                          value={form.pod_width || ""}
+                          onChange={e => handleInputChange(product.id, "pod_width", e.target.value)}
+                          placeholder="Es. 300"
+                          className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+                        />
+                        {form.pod_width && (
+                          <button
+                            onClick={() => handleInputChange(product.id, "pod_width", "")}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5"
+                            title="Svuota Larghezza"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* 5. custom.colore_stick */}
@@ -904,18 +965,29 @@ export default function ProductMetafieldsPage() {
                         </span>
                         <code className="text-gray-400 font-mono text-[9px]">custom.colore_stick</code>
                       </label>
-                      <select
-                        value={form.colore_stick || ""}
-                        onChange={e => handleInputChange(product.id, "colore_stick", e.target.value)}
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                      >
-                        <option value="">-- Seleziona Colore Stick --</option>
-                        {coloreStickList.map(color => (
-                          <option key={color} value={color}>
-                            {color}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative flex items-center">
+                        <select
+                          value={form.colore_stick || ""}
+                          onChange={e => handleInputChange(product.id, "colore_stick", e.target.value)}
+                          className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        >
+                          <option value="">-- Seleziona Colore Stick --</option>
+                          {coloreStickList.map(color => (
+                            <option key={color} value={color}>
+                              {color}
+                            </option>
+                          ))}
+                        </select>
+                        {form.colore_stick && (
+                          <button
+                            onClick={() => handleInputChange(product.id, "colore_stick", "")}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5 z-10"
+                            title="Reset Colore Stick"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* 6. custom.colore_base */}
@@ -927,18 +999,29 @@ export default function ProductMetafieldsPage() {
                         </span>
                         <code className="text-gray-400 font-mono text-[9px]">custom.colore_base</code>
                       </label>
-                      <select
-                        value={form.colore_base || ""}
-                        onChange={e => handleInputChange(product.id, "colore_base", e.target.value)}
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                      >
-                        <option value="">-- Seleziona Colore Base --</option>
-                        {coloreBaseList.map(color => (
-                          <option key={color} value={color}>
-                            {color}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative flex items-center">
+                        <select
+                          value={form.colore_base || ""}
+                          onChange={e => handleInputChange(product.id, "colore_base", e.target.value)}
+                          className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        >
+                          <option value="">-- Seleziona Colore Base --</option>
+                          {coloreBaseList.map(color => (
+                            <option key={color} value={color}>
+                              {color}
+                            </option>
+                          ))}
+                        </select>
+                        {form.colore_base && (
+                          <button
+                            onClick={() => handleInputChange(product.id, "colore_base", "")}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5 z-10"
+                            title="Reset Colore Base"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* 7. custom.colore_cavo */}
@@ -950,18 +1033,29 @@ export default function ProductMetafieldsPage() {
                         </span>
                         <code className="text-gray-400 font-mono text-[9px]">custom.colore_cavo</code>
                       </label>
-                      <select
-                        value={form.colore_cavo || ""}
-                        onChange={e => handleInputChange(product.id, "colore_cavo", e.target.value)}
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                      >
-                        <option value="">-- Seleziona Colore Cavo --</option>
-                        {coloreCavoList.map(color => (
-                          <option key={color} value={color}>
-                            {color}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative flex items-center">
+                        <select
+                          value={form.colore_cavo || ""}
+                          onChange={e => handleInputChange(product.id, "colore_cavo", e.target.value)}
+                          className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        >
+                          <option value="">-- Seleziona Colore Cavo --</option>
+                          {coloreCavoList.map(color => (
+                            <option key={color} value={color}>
+                              {color}
+                            </option>
+                          ))}
+                        </select>
+                        {form.colore_cavo && (
+                          <button
+                            onClick={() => handleInputChange(product.id, "colore_cavo", "")}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5 z-10"
+                            title="Reset Colore Cavo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                   </div>

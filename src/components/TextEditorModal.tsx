@@ -38,6 +38,7 @@ interface TextEditorModalProps {
   initialFontSize?: number;
   initialLetterSpacing?: number;
   backgroundUrl?: string;
+  uploadedImageUrl?: string;
   svgUrl?: string;
   customAttributes?: { key: string; value: string }[];
   lineItems?: any[];
@@ -90,6 +91,7 @@ export default function TextEditorModal({
   initialFontSize = 32,
   initialLetterSpacing = 0,
   backgroundUrl = "",
+  uploadedImageUrl = "",
   svgUrl = "",
   customAttributes = [],
   lineItems = [],
@@ -109,7 +111,7 @@ export default function TextEditorModal({
   const [posY, setPosY] = useState(55);
   
   // Image Processing & Vectorizer States
-  const [currentImageUrl, setCurrentImageUrl] = useState(backgroundUrl || svgUrl);
+  const [currentImageUrl, setCurrentImageUrl] = useState(uploadedImageUrl || backgroundUrl || svgUrl);
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   const [isRemoveBgApplied, setIsRemoveBgApplied] = useState(false);
   const [isVectorized, setIsVectorized] = useState(false);
@@ -131,19 +133,19 @@ export default function TextEditorModal({
     setColor(initialColor || "#38bdf8");
     setFontSize(initialFontSize || 32);
     setLetterSpacing(initialLetterSpacing || 0);
-    setCurrentImageUrl(backgroundUrl || svgUrl);
+    setCurrentImageUrl(uploadedImageUrl || backgroundUrl || svgUrl);
     setProcessedImageUrl(null);
     setIsRemoveBgApplied(false);
     setIsVectorized(false);
     setVectorSvgContent(null);
     setSelectedItemIdx(0);
 
-    if ((backgroundUrl || svgUrl) && !initialText) {
+    if ((uploadedImageUrl || backgroundUrl || svgUrl) && !initialText) {
       setActiveTab("image");
     } else {
       setActiveTab("text");
     }
-  }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, svgUrl, open]);
+  }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, open]);
 
   // Gestisci cambio di articolo selezionato in ordini multi-prodotto
   const handleSelectLineItem = (idx: number) => {
@@ -157,6 +159,7 @@ export default function TextEditorModal({
     let foundColor = "#38bdf8";
     let foundFontSize = 32;
     let foundImage = "";
+    let foundUploadedImage = "";
 
     attrs.forEach((a: any) => {
       const rawKey = a.key || "";
@@ -182,10 +185,17 @@ export default function TextEditorModal({
         else if (v.toLowerCase().includes("tiffany")) foundColor = "#0d9488";
       }
       if (v.startsWith("http")) {
-        if (k.includes("vedi") || k.includes("preview") || k.includes("immagine") || k.includes("_pplr")) {
+        const isMock = k.includes("vedi") || k.includes("preview") || k.includes("_pplr");
+        if (isMock) {
           foundImage = v;
-        } else if (!foundImage) {
-          foundImage = v;
+        } else if (k.includes("immagine") || k.includes("foto") || k.includes("logo") || k.includes("file") || k.includes("carica")) {
+          foundUploadedImage = v;
+        } else {
+          if (!foundImage) {
+            foundImage = v;
+          } else if (!foundUploadedImage) {
+            foundUploadedImage = v;
+          }
         }
       }
     });
@@ -194,7 +204,7 @@ export default function TextEditorModal({
     setFont(foundFont);
     setColor(foundColor);
     setFontSize(foundFontSize);
-    setCurrentImageUrl(foundImage || backgroundUrl || svgUrl);
+    setCurrentImageUrl(foundUploadedImage || foundImage || backgroundUrl || svgUrl);
     setProcessedImageUrl(null);
     setVectorSvgContent(null);
   };
@@ -525,7 +535,11 @@ export default function TextEditorModal({
             </div>
 
             {/* BOX ANTEPRIMA MOCKUP BOTTIGLIA */}
-            <div className="w-full h-[380px] bg-white rounded-2xl border-2 border-dashed border-indigo-200 shadow-inner relative overflow-hidden flex items-center justify-center p-4 group">
+            <div 
+              style={{ height: uploadedImageUrl ? "240px" : "380px" }}
+              className="w-full bg-white rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col items-center justify-center p-3 group"
+            >
+              <span className="absolute top-2 left-2 bg-indigo-100 text-indigo-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">Mockup Prodotto</span>
               {(backgroundUrl || svgUrl) ? (
                 <img 
                   src={backgroundUrl || svgUrl} 
@@ -565,6 +579,19 @@ export default function TextEditorModal({
                 </div>
               )}
             </div>
+
+            {/* BOX ANTEPRIMA IMMAGINE ORIGINALE CARICATA (Riferimento) */}
+            {uploadedImageUrl && (
+              <div className="w-full h-[180px] bg-white rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col items-center justify-center p-3 group bg-slate-50/50">
+                <span className="absolute top-2 left-2 bg-purple-100 text-purple-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">Immagine Originale (Caricata)</span>
+                <img 
+                  src={uploadedImageUrl} 
+                  alt="Immagine Originale" 
+                  crossOrigin="anonymous"
+                  className="max-w-full max-h-full object-contain select-none"
+                />
+              </div>
+            )}
 
             {/* GUIDA CAMPIONAMENTO COLORE */}
             {isDropperActive && (

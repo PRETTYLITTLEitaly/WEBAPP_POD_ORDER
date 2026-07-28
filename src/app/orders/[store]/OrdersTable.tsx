@@ -84,6 +84,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
     initialColor: string;
     initialFontSize: number;
     backgroundUrl: string;
+    uploadedImageUrl: string;
     svgUrl: string;
     customAttributes?: any[];
     lineItems?: any[];
@@ -96,6 +97,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
     initialColor: "#38bdf8",
     initialFontSize: 32,
     backgroundUrl: "",
+    uploadedImageUrl: "",
     svgUrl: "",
     customAttributes: [],
     lineItems: []
@@ -162,6 +164,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
     let foundColor = "#38bdf8";
     let foundFontSize = 32;
     let foundImage = "";
+    let foundUploadedImage = "";
     let foundSvg = "";
     let customAttributesList: any[] = [];
 
@@ -226,14 +229,21 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           }
         }
 
-        // 5. URL Immagine / Anteprima / Vedi ora
+        // 5. URL Immagine / Anteprima / Vedi ora / Carica file
         if (v.startsWith("http")) {
-          if (k.includes("vedi") || k.includes("preview") || k.includes("immagine") || k.includes("_pplr")) {
+          const isMockup = k.includes("vedi") || k.includes("preview") || k.includes("_pplr");
+          if (isMockup) {
             foundImage = v;
+          } else if (k.includes("immagine") || k.includes("foto") || k.includes("logo") || k.includes("file") || k.includes("carica")) {
+            foundUploadedImage = v;
           } else if (v.endsWith(".svg")) {
             foundSvg = v;
-          } else if (!foundImage) {
-            foundImage = v;
+          } else {
+            if (!foundImage) {
+              foundImage = v;
+            } else if (!foundUploadedImage) {
+              foundUploadedImage = v;
+            }
           }
         }
       });
@@ -248,6 +258,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       initialColor: foundColor || "#38bdf8",
       initialFontSize: foundFontSize || 32,
       backgroundUrl: foundImage,
+      uploadedImageUrl: foundUploadedImage,
       svgUrl: foundSvg,
       customAttributes: customAttributesList,
       lineItems: lineItemsNodes
@@ -1245,6 +1256,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         initialColor={textEditorModal.initialColor}
         initialFontSize={textEditorModal.initialFontSize}
         backgroundUrl={textEditorModal.backgroundUrl}
+        uploadedImageUrl={textEditorModal.uploadedImageUrl}
         svgUrl={textEditorModal.svgUrl}
         customAttributes={textEditorModal.customAttributes}
       />

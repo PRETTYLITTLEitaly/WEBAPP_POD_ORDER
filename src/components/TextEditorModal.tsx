@@ -20,7 +20,10 @@ import {
   Check,
   RefreshCw,
   Scissors,
-  Package
+  Package,
+  Sun,
+  Moon,
+  Pipette
 } from "lucide-react";
 
 interface TextEditorModalProps {
@@ -117,6 +120,10 @@ export default function TextEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [availableFonts, setAvailableFonts] = useState(DEFAULT_FONTS);
   const [showAttributes, setShowAttributes] = useState(false);
+
+  // Custom Visualization States
+  const [canvasBgColor, setCanvasBgColor] = useState("#ffffff");
+  const [isDropperActive, setIsDropperActive] = useState(false);
 
   useEffect(() => {
     setText(initialText);
@@ -215,6 +222,37 @@ export default function TextEditorModal({
     };
     fetchFonts();
   }, [open]);
+
+  // COLOR SAMPLER FROM ORIGINAL IMAGE (CONTAGOCCE)
+  const sampleColorFromImage = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!isDropperActive) return;
+    try {
+      const img = e.currentTarget;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Disegna l'immagine sul canvas
+      ctx.drawImage(img, 0, 0);
+
+      // Trova le coordinate del click rispetto alle dimensioni dell'immagine
+      const rect = img.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * img.naturalWidth;
+      const y = ((e.clientY - rect.top) / rect.height) * img.naturalHeight;
+
+      // Preleva il colore del pixel
+      const pixel = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+      const hex = "#" + ("000000" + ((pixel[0] << 16) | (pixel[1] << 8) | pixel[2]).toString(16)).slice(-6);
+
+      setCanvasBgColor(hex);
+      setIsDropperActive(false);
+    } catch (err) {
+      console.error("Errore campionamento colore dal mockup:", err);
+      setIsDropperActive(false);
+    }
+  };
 
   // STRUMENTO 1: REMOVE BG
   const handleRemoveBackground = () => {
@@ -473,50 +511,39 @@ export default function TextEditorModal({
           </div>
         )}
 
-        {/* CORPO EDITOR */}
+        {/* CORPO EDITOR SPLITATO: SX ANTEPRIMA BOTTIGLIA/PRODOTTO, DX PELLICOLA DTF E CONTROLLI */}
         <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-gray-50">
           
-          {/* CANVAS DI ANTEPRIMA GRAFICA LIVE (7 COLONNE) */}
-          <div className="lg:col-span-7 flex flex-col items-center justify-between space-y-3">
+          {/* COLONNA SINISTRA: ANTEPRIMA PRODOTTO ORIGINALE MOCKUP (5 COLONNE) */}
+          <div className="lg:col-span-5 flex flex-col space-y-3">
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
-              <span className="flex items-center gap-1.5 text-amber-700">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                Anteprima Grafica Finale per Stampa DTF
+              <span className="flex items-center gap-1.5 text-indigo-700">
+                <Package className="w-4 h-4 text-indigo-500" />
+                1. Anteprima Prodotto Originale
               </span>
-              <span className="font-mono text-gray-500 text-[11px]">
-                {isVectorized ? "SVG Vettoriale Multi-Colore HD" : isRemoveBgApplied ? "PNG Sfondo Rimosso" : "Originale"}
-              </span>
+              <span className="text-[10px] text-gray-400 font-normal">Mockup di Riferimento</span>
             </div>
 
-            {/* BOX ANTEPRIMA STAMPA CON CANVAS INTERATTIVO */}
-            <div className="w-full h-[390px] bg-white rounded-2xl border-2 border-dashed border-amber-300 shadow-inner relative overflow-hidden flex items-center justify-center p-4 group">
-              
-              {/* RENDERING IMMAGINE VETTORIALIZZATA O CON SFONDO RIMOSSO */}
-              {vectorSvgContent ? (
-                <div 
-                  className="w-full h-full flex items-center justify-center text-amber-700 p-2 overflow-hidden"
-                  dangerouslySetInnerHTML={{ __html: vectorSvgContent }}
-                />
-              ) : processedImageUrl ? (
+            {/* BOX ANTEPRIMA MOCKUP BOTTIGLIA */}
+            <div className="w-full h-[380px] bg-white rounded-2xl border-2 border-dashed border-indigo-200 shadow-inner relative overflow-hidden flex items-center justify-center p-4 group">
+              {(backgroundUrl || svgUrl) ? (
                 <img 
-                  src={processedImageUrl} 
-                  alt="Immagine senza sfondo" 
-                  className="max-w-full max-h-full object-contain p-2 drop-shadow-md"
-                />
-              ) : currentImageUrl ? (
-                <img 
-                  src={currentImageUrl} 
+                  src={backgroundUrl || svgUrl} 
                   alt="Anteprima Ordine" 
-                  className="max-w-full max-h-full object-contain p-2 opacity-60 pointer-events-none"
+                  crossOrigin="anonymous"
+                  onClick={sampleColorFromImage}
+                  className={`max-w-full max-h-full object-contain p-2 select-none transition-all duration-200 ${
+                    isDropperActive ? "cursor-crosshair border-4 border-indigo-500 rounded-2xl animate-pulse scale-102" : "pointer-events-auto"
+                  }`}
                 />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 to-amber-50/30 flex items-center justify-center text-gray-300 text-xs font-mono select-none">
-                  [Area di Stampa DTF]
+                <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 to-indigo-50/30 flex items-center justify-center text-gray-300 text-xs font-mono select-none">
+                  [Nessun Mockup Prodotto Disponibile]
                 </div>
               )}
 
-              {/* TESTO RENDERTIZZATO LIVE */}
-              {text && (
+              {/* TESTO SOPRA L'ANTEPRIMA DEL PRODOTTO (MOCKUP) */}
+              {text && activeTab === "text" && (
                 <div 
                   style={{
                     position: "absolute",
@@ -524,7 +551,7 @@ export default function TextEditorModal({
                     top: `${posY}%`,
                     transform: "translate(-50%, -50%)",
                     fontFamily: availableFonts.find(f => f.name.toLowerCase() === font.toLowerCase())?.family || `'${font}', cursive, sans-serif`,
-                    fontSize: `${fontSize}px`,
+                    fontSize: `${fontSize * 0.75}px`, // Scaled down overlay
                     color: color,
                     letterSpacing: `${letterSpacing}px`,
                     textAlign: align,
@@ -532,32 +559,148 @@ export default function TextEditorModal({
                     whiteSpace: "pre-wrap",
                     textShadow: color === "#ffffff" ? "0 1px 3px rgba(0,0,0,0.8)" : "none"
                   }}
-                  className="max-w-[90%] font-semibold tracking-wide cursor-move drop-shadow-sm select-none transition-all"
+                  className="max-w-[85%] font-semibold tracking-wide select-none pointer-events-none transition-all"
                 >
                   {text}
                 </div>
               )}
             </div>
 
-            {/* CONTROLLI POSIZIONAMENTO RAPIDO X/Y */}
-            <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-3 text-xs">
-              <span className="font-bold text-gray-600 flex items-center gap-1">
-                <Move className="w-3.5 h-3.5 text-amber-600" />
-                Posizione Live Scritta:
+            {/* GUIDA CAMPIONAMENTO COLORE */}
+            {isDropperActive && (
+              <div className="text-center text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 py-2 px-3 rounded-xl animate-pulse">
+                🎯 Clicca sulla foto del prodotto sopra per catturare il suo colore!
+              </div>
+            )}
+          </div>
+
+          {/* COLONNA DESTRA: AREA PELLICOLA DTF + PANNELLO CONTROLLI (7 COLONNE) */}
+          <div className="lg:col-span-7 flex flex-col space-y-4">
+            
+            {/* INTESTAZIONE CANALE PELLICOLA E TOOLBAR SFONDO */}
+            <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
+              <span className="flex items-center gap-1.5 text-amber-700">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                2. Pellicola di Stampa DTF (Sfondo Trasparente)
               </span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => { setPosX(50); setPosY(55); }} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-200 transition-all text-[11px]">Centra</button>
-                <button onClick={() => setPosY(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↑</button>
-                <button onClick={() => setPosY(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↓</button>
-                <button onClick={() => setPosX(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">←</button>
-                <button onClick={() => setPosX(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">→</button>
+              
+              {/* TOOLBAR CONTROLLO SFONDO ANTEPRIMA */}
+              <div className="flex items-center gap-1.5 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => { setCanvasBgColor("#ffffff"); setIsDropperActive(false); }}
+                  className={`p-1 rounded-md transition-all ${
+                    canvasBgColor === "#ffffff" && !isDropperActive ? "bg-white text-amber-600 shadow-xs" : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="Sfondo Bianco (Sole)"
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCanvasBgColor("#111827"); setIsDropperActive(false); }}
+                  className={`p-1 rounded-md transition-all ${
+                    canvasBgColor === "#111827" && !isDropperActive ? "bg-white text-amber-600 shadow-xs" : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="Sfondo Nero (Luna)"
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDropperActive(!isDropperActive)}
+                  className={`p-1 py-0.5 rounded-md transition-all flex items-center gap-1 ${
+                    isDropperActive ? "bg-indigo-600 text-white shadow-xs" : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="Campionatore Colore (Contagocce)"
+                >
+                  <Pipette className="w-3.5 h-3.5" />
+                  <span className="text-[9px] font-bold">Campiona</span>
+                </button>
+                {canvasBgColor !== "#ffffff" && canvasBgColor !== "#111827" && (
+                  <span 
+                    className="text-[9px] font-mono px-1.5 py-0.5 bg-white rounded border border-gray-300 ml-1 text-gray-700 font-bold"
+                    style={{ borderLeftColor: canvasBgColor, borderLeftWidth: 4 }}
+                  >
+                    {canvasBgColor.toUpperCase()}
+                  </span>
+                )}
               </div>
             </div>
 
-          </div>
+            {/* CANVAS INTERATTIVO PELLICOLA DTF */}
+            <div 
+              style={{ backgroundColor: canvasBgColor }}
+              className="w-full h-[240px] rounded-2xl border-2 border-dashed border-amber-300 shadow-inner relative overflow-hidden flex items-center justify-center p-4 group transition-colors duration-300"
+            >
+              {/* RENDERING IMMAGINE VETTORIALIZZATA O CON SFONDO RIMOSSO */}
+              {activeTab === "image" ? (
+                vectorSvgContent ? (
+                  <div 
+                    className="w-full h-full flex items-center justify-center text-amber-700 p-2 overflow-hidden"
+                    dangerouslySetInnerHTML={{ __html: vectorSvgContent }}
+                  />
+                ) : processedImageUrl ? (
+                  <img 
+                    src={processedImageUrl} 
+                    alt="Immagine senza sfondo" 
+                    className="max-w-full max-h-full object-contain p-2 drop-shadow-md"
+                  />
+                ) : currentImageUrl ? (
+                  <img 
+                    src={currentImageUrl} 
+                    alt="Anteprima Ordine" 
+                    className="max-w-full max-h-full object-contain p-2 opacity-60 pointer-events-none"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-transparent flex items-center justify-center text-gray-300 text-xs font-mono select-none">
+                    [Area di Stampa Grafica]
+                  </div>
+                )
+              ) : (
+                /* SE ABBIAMO ATTIVO IL TESTO, MOSTRIAMO SOLO IL TESTO CENTRATO NELLA PELLICOLA */
+                text ? (
+                  <div 
+                    style={{
+                      fontFamily: availableFonts.find(f => f.name.toLowerCase() === font.toLowerCase())?.family || `'${font}', cursive, sans-serif`,
+                      fontSize: `${fontSize * 0.9}px`,
+                      color: color,
+                      letterSpacing: `${letterSpacing}px`,
+                      textAlign: "center",
+                      lineHeight: "1.2",
+                      whiteSpace: "pre-wrap",
+                    }}
+                    className="font-semibold tracking-wide select-none max-w-[90%] text-center"
+                  >
+                    {text}
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 bg-transparent flex items-center justify-center text-gray-300 text-xs font-mono select-none">
+                    [Area di Stampa Testo]
+                  </div>
+                )
+              )}
+            </div>
 
-          {/* PANNELLO CONTROLLI ED EDITOR (5 COLONNE) */}
-          <div className="lg:col-span-5 space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
+            {/* CONTROLLI DI POSIZIONAMENTO RAPIDO (SOLO SE TESTO ATTIVO E DISPONIBILE) */}
+            {activeTab === "text" && text && (
+              <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-3 text-xs">
+                <span className="font-bold text-gray-600 flex items-center gap-1">
+                  <Move className="w-3.5 h-3.5 text-amber-600" />
+                  Spostamento Scritta su Mockup (Sinistra):
+                </span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setPosX(50); setPosY(55); }} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-200 transition-all text-[11px]">Centra</button>
+                  <button onClick={() => setPosY(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↑</button>
+                  <button onClick={() => setPosY(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↓</button>
+                  <button onClick={() => setPosX(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">←</button>
+                  <button onClick={() => setPosX(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">→</button>
+                </div>
+              </div>
+            )}
+
+            {/* PANNELLO CONTROLLI ED EDITOR (LARGHEZZA INTERA DESTRA) */}
+            <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
             
             {/* SCHEDA 1: TESTO & FONT */}
             {activeTab === "text" && (
@@ -802,8 +945,8 @@ export default function TextEditorModal({
               </button>
             </div>
 
+            </div>
           </div>
-
         </div>
 
       </div>

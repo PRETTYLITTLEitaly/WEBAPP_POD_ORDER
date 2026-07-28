@@ -186,6 +186,15 @@ export async function POST(req: NextRequest) {
         
         let svgUrl = editedImageMeta;
 
+        // Se abbiamo sia il testo personalizzato che un URL immagine mockup salvato (PNG/JPG),
+        // ignoriamo il mockup in favore della generazione vettoriale del testo!
+        if (svgUrl && customText) {
+          const isPngJpg = svgUrl.toLowerCase().endsWith(".png") || svgUrl.toLowerCase().endsWith(".jpg") || svgUrl.toLowerCase().endsWith(".jpeg") || svgUrl.includes("/uploads/");
+          if (isPngJpg) {
+            svgUrl = "";
+          }
+        }
+
         // Se l'ordine ha testo personalizzato e non ha una grafica modificata salvata, genera l'SVG trasparente del solo testo!
         if (!svgUrl && customText) {
           svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;

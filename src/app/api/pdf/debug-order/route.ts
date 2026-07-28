@@ -6,6 +6,7 @@ import SVGtoPDF from "svg-to-pdfkit";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { syncFontsFromShopify } from "@/app/api/fonts/route";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ function generateSvgFromText(text: string, font: string, color: string, fontSize
 
 export async function GET(req: NextRequest) {
   try {
+    await syncFontsFromShopify().catch(() => {});
     const { searchParams } = new URL(req.url);
     const name = searchParams.get("name") || "#15119";
     const store = (searchParams.get("store") as "b2c" | "b2b") || "b2c";

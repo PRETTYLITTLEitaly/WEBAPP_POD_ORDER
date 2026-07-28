@@ -37,7 +37,7 @@ export async function connectShopifyAction(formData: FormData) {
   // Costruisci l'URL di autorizzazione
   const authUrl = new URL(`https://${shop}/admin/oauth/authorize`);
   authUrl.searchParams.set("client_id", clientId);
-  authUrl.searchParams.set("scope", "read_orders,write_orders,read_products,read_fulfillments,write_fulfillments,read_locations,read_customers");
+  authUrl.searchParams.set("scope", "read_all_orders,read_customers,read_files,write_files,read_fulfillments,write_fulfillments,read_locations,read_orders,write_orders,read_products,write_products");
   authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("state", state);
 

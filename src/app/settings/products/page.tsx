@@ -473,18 +473,28 @@ export default function ProductMetafieldsPage() {
                         File Reference SVG (<code className="text-gray-500 font-mono text-[10px]">pod.svg</code>)
                       </span>
                     </label>
-                    <select
-                      value={form.pod_svg_file_id || ""}
-                      onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                    >
-                      <option value="">-- Seleziona File SVG ({shopifyFiles.length} trovati) --</option>
-                      {shopifyFiles.map(file => (
-                        <option key={file.id} value={file.id}>
-                          📄 {file.filename}
-                        </option>
-                      ))}
-                    </select>
+                    {shopifyFiles.length > 0 ? (
+                      <select
+                        value={form.pod_svg_file_id || ""}
+                        onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="">-- Seleziona File SVG ({shopifyFiles.length} trovati) --</option>
+                        {shopifyFiles.map(file => (
+                          <option key={file.id} value={file.id}>
+                            📄 {file.filename}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input 
+                        type="text"
+                        value={form.pod_svg_file_id || ""}
+                        onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
+                        placeholder="gid://shopify/GenericFile/12345678"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                      />
+                    )}
                   </div>
 
                   {/* 3. pod.height */}

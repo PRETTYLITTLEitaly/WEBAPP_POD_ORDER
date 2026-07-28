@@ -55,7 +55,6 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    // Loop di paginazione per recuperare TUTTI i prodotti dallo store
     let allRawProducts: any[] = [];
     let hasNextProductPage = true;
     let afterProductCursor: string | null = null;
@@ -83,7 +82,7 @@ export async function GET(req: NextRequest) {
       afterProductCursor = pData?.pageInfo?.endCursor || null;
     }
 
-    // 2. Query File generici da Shopify con paginazione
+    // 2. Query File generici da Shopify (con campi corretti e senza 'filename' deprecato)
     const filesQuery = `#graphql
       query getFiles($first: Int!, $after: String) {
         files(first: $first, after: $after) {
@@ -97,8 +96,8 @@ export async function GET(req: NextRequest) {
             ... on GenericFile {
               id
               url
-              filename
               mimeType
+              alt
             }
             ... on MediaImage {
               id
@@ -116,7 +115,7 @@ export async function GET(req: NextRequest) {
     let afterFileCursor: string | null = null;
     let filePageCount = 0;
 
-    while (hasNextFilePage && filePageCount < 5) {
+    while (hasNextFilePage && filePageCount < 3) {
       filePageCount++;
       const fRes: any = await shopifyFetch({
         store,
@@ -211,19 +210,28 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Filtriamo i file SVG da Shopify Files
-    const svgFiles = allRawFiles
-      .filter((f: any) => {
-        if (!f) return false;
-        const filename = (f.filename || f.url || "").toLowerCase();
-        const mime = (f.mimeType || "").toLowerCase();
-        return filename.endsWith(".svg") || mime.includes("svg") || f.id?.includes("GenericFile");
-      })
-      .map((f: any) => ({
-        id: f.id,
-        url: f.url,
-        filename: f.filename || f.url?.split("/").pop()?.split("?")[0] || f.id
-      }));
+    // Filtriamo i file da Shopify o raccogliamo i file references già presenti nei prodotti
+    const svgFilesMap = new Map<string, { id: string; url: string; filename: string }>();
+
+    // Aggiungiamo i file ritornati dalla query files
+    allRawFiles.forEach((f: any) => {
+      if (!f || !f.url) return;
+      const cleanUrl = f.url.split("?")[0];
+      const filename = cleanUrl.split("/").pop() || f.id;
+      svgFilesMap.set(f.id, { id: f.id, url: f.url, filename });
+    });
+
+    // Raccogliamo anche tutti i file SVG già referenziati nei prodotti
+    allRawProducts.forEach((p: any) => {
+      const ref = p.metafield_pod_svg?.reference;
+      if (ref && ref.id && ref.url) {
+        const cleanUrl = ref.url.split("?")[0];
+        const filename = cleanUrl.split("/").pop() || ref.id;
+        svgFilesMap.set(ref.id, { id: ref.id, url: ref.url, filename });
+      }
+    });
+
+    const svgFiles = Array.from(svgFilesMap.values());
 
     // Opzioni colore dalle definizioni
     let coloreStickChoices: string[] = [];
@@ -282,7 +290,7 @@ export async function GET(req: NextRequest) {
       products,
       totalCount: products.length,
       files: svgFiles,
-      allFilesCount: allRawFiles.length,
+      allFilesCount: svgFiles.length,
       collections,
       tags: Array.from(allTagsSet).sort(),
       productTypes: Array.from(allTypesSet).sort(),

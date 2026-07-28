@@ -131,14 +131,22 @@ export default function ProductMetafieldsPage() {
         setTagsList(data.tags || []);
         setTypesList(data.productTypes || []);
 
-        if (data.coloreStickChoices?.length > 0) {
-          setColoreStickList(Array.from(new Set([...data.coloreStickChoices, ...DEFAULT_COLOR_OPTIONS])));
+        if (data.coloreStickChoices && Array.isArray(data.coloreStickChoices) && data.coloreStickChoices.length > 0) {
+          setColoreStickList(Array.from(new Set(data.coloreStickChoices)));
+        } else {
+          setColoreStickList(DEFAULT_COLOR_OPTIONS);
         }
-        if (data.coloreBaseChoices?.length > 0) {
-          setColoreBaseList(Array.from(new Set([...data.coloreBaseChoices, ...DEFAULT_COLOR_OPTIONS])));
+
+        if (data.coloreBaseChoices && Array.isArray(data.coloreBaseChoices) && data.coloreBaseChoices.length > 0) {
+          setColoreBaseList(Array.from(new Set(data.coloreBaseChoices)));
+        } else {
+          setColoreBaseList(DEFAULT_COLOR_OPTIONS);
         }
-        if (data.coloreCavoChoices?.length > 0) {
-          setColoreCavoList(Array.from(new Set([...data.coloreCavoChoices, ...DEFAULT_COLOR_OPTIONS])));
+
+        if (data.coloreCavoChoices && Array.isArray(data.coloreCavoChoices) && data.coloreCavoChoices.length > 0) {
+          setColoreCavoList(Array.from(new Set(data.coloreCavoChoices)));
+        } else {
+          setColoreCavoList(DEFAULT_COLOR_OPTIONS);
         }
 
         const initialFormState: { [id: string]: ProductItem["metafields"] } = {};

@@ -23,6 +23,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
             shopMoney { amount currencyCode }
           }
           tags
+          pod_status: metafield(namespace: "pod", key: "status") { id value }
           customer {
             firstName
             lastName

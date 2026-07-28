@@ -41,7 +41,22 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
   const [isSavingView, setIsSavingView] = useState(false);
   const [newViewName, setNewViewName] = useState("");
   
-  const [printedIds, setPrintedIds] = useState<string[]>([]);
+  const getPrintedIdsFromOrders = (ordersList: any[]) => {
+    return (ordersList || [])
+      .filter((order: any) => {
+        const hasTag = (order.tags || []).some((t: string) => t.toLowerCase() === "pod_stampato" || t.toLowerCase() === "stampato");
+        const hasMeta = order.pod_status?.value === "printed";
+        return hasTag || hasMeta;
+      })
+      .map((order: any) => order.id);
+  };
+
+  const [printedIds, setPrintedIds] = useState<string[]>(() => getPrintedIdsFromOrders(initialOrders));
+  const [togglingPrintedId, setTogglingPrintedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPrintedIds(getPrintedIdsFromOrders(initialOrders));
+  }, [initialOrders]);
   
   // Modal & Editor States
   const [showModal, setShowModal] = useState(false);
@@ -85,6 +100,38 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
     customAttributes: [],
     lineItems: []
   });
+
+  const handleTogglePrinted = async (orderId: string) => {
+    setTogglingPrintedId(orderId);
+    const isCurrentlyPrinted = printedIds.includes(orderId);
+    const targetPrinted = !isCurrentlyPrinted;
+
+    try {
+      const res = await fetch("/api/orders/toggle-printed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          store,
+          isPrinted: targetPrinted
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (targetPrinted) {
+          setPrintedIds(prev => Array.from(new Set([...prev, orderId])));
+        } else {
+          setPrintedIds(prev => prev.filter(id => id !== orderId));
+        }
+      } else {
+        alert("Errore aggiornamento stato di stampa: " + data.error);
+      }
+    } catch (e: any) {
+      alert("Errore di rete: " + e.message);
+    } finally {
+      setTogglingPrintedId(null);
+    }
+  };
 
   const handleOpenPplrModal = (order: any) => {
     const lineItemsNodes = order.lineItems?.nodes || [];
@@ -241,15 +288,6 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       setMarginBottomMm(defPreset.marginBottomMm);
       setMarginSidesMm(defPreset.marginSidesMm);
     }
-
-    const savedPrinted = localStorage.getItem(`printedOrders_${store}`);
-    if (savedPrinted) {
-      try {
-        setPrintedIds(JSON.parse(savedPrinted));
-      } catch (e) {
-        console.error("Error parsing printed orders", e);
-      }
-    }
   }, [store]);
 
   useEffect(() => {
@@ -320,10 +358,9 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         return;
       }
 
-      // Save as printed in localStorage
+      // Save as printed locally (it is also tagged on Shopify by the route)
       const newPrinted = Array.from(new Set([...printedIds, ...selected]));
       setPrintedIds(newPrinted);
-      localStorage.setItem(`printedOrders_${store}`, JSON.stringify(newPrinted));
 
       // Save to history
       const selectedNames = selected.map(id => {
@@ -339,8 +376,13 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         selectedNames: selectedNames,
         pdfBase64: data.base64
       };
-      const existingHistory = JSON.parse(localStorage.getItem(`pdfHistory_${store}`) || "[]");
-      localStorage.setItem(`pdfHistory_${store}`, JSON.stringify([historyItem, ...existingHistory]));
+
+      // Salva lo storico in modo persistente su Shopify tramite API
+      await fetch("/api/pdf/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ store, historyItem })
+      }).catch(err => console.error("Failed to save history to Shopify:", err));
 
       setGeneratedPdfBase64(data.base64);
       setGeneratedPdfName(`Stampa_${store}_${historyItem.id}.pdf`);
@@ -766,17 +808,29 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-center">
-                      {printedIds.includes(order.id) ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-[#e4f1ed] text-[#0b5c46]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0b5c46] mr-1.5"></span>
-                          Stampato
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-[#fff8e1] text-[#b28900]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#ffc107] mr-1.5"></span>
-                          Da Stampare
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTogglePrinted(order.id);
+                        }}
+                        disabled={togglingPrintedId === order.id}
+                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer shadow-xs ${
+                          printedIds.includes(order.id)
+                            ? "bg-[#e4f1ed] text-[#0b5c46] hover:bg-[#d5ebe5]"
+                            : "bg-[#fff8e1] text-[#b28900] hover:bg-[#ffefc1]"
+                        }`}
+                        title="Clicca per invertire lo stato di stampa su Shopify"
+                      >
+                        {togglingPrintedId === order.id ? (
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-1.5 shrink-0"></span>
+                        ) : (
+                          <span className={`w-1.5 h-1.5 rounded-full mr-1.5 shrink-0 ${
+                            printedIds.includes(order.id) ? "bg-[#0b5c46]" : "bg-[#ffc107]"
+                          }`}></span>
+                        )}
+                        {printedIds.includes(order.id) ? "Stampato" : "Da Stampare"}
+                      </button>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-900 text-right">
                       € {order.totalPriceSet?.shopMoney?.amount}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,45 @@ function getWritableFontsDir(): string {
   }
 }
 
+async function syncFontsFromShopify() {
+  const fontsDir = getWritableFontsDir();
+  try {
+    const query = `#graphql
+      query getShopFonts {
+        shop {
+          metafields(first: 100, namespace: "pod_custom_font") {
+            nodes {
+              id
+              key
+              value
+            }
+          }
+        }
+      }
+    `;
+    const res = await shopifyFetch({ store: "b2c", query });
+    const nodes = res.data?.shop?.metafields?.nodes || [];
+    
+    for (const node of nodes) {
+      const filename = node.key; // e.g. "Get_Show.otf"
+      const targetPath = path.join(fontsDir, filename);
+      if (!fs.existsSync(targetPath)) {
+        console.log(`Restoring font ${filename} from Shopify Shop Metafield...`);
+        const buffer = Buffer.from(node.value, "base64");
+        fs.writeFileSync(targetPath, buffer);
+      }
+    }
+  } catch (e: any) {
+    console.error("Failed to sync fonts from Shopify:", e.message);
+  }
+}
+
 // GET /api/fonts — Ritorna l'elenco dei font oppure serve direttamente il file font richiesto
 export async function GET(req: NextRequest) {
   try {
+    // Sync fonts from Shopify first to populate local directory (/tmp)
+    await syncFontsFromShopify();
+
     const { searchParams } = new URL(req.url);
     const requestedFile = searchParams.get("file");
 
@@ -145,6 +182,45 @@ export async function POST(req: NextRequest) {
     const mime = ext === ".otf" ? "font/otf" : "font/ttf";
     const b64 = buffer.toString("base64");
 
+    // Save persistently to Shopify Shop Metafield
+    try {
+      const shopRes = await shopifyFetch({
+        store: "b2c",
+        query: `#graphql
+          query getShopId {
+            shop {
+              id
+            }
+          }
+        `
+      });
+      const shopId = shopRes.data?.shop?.id;
+      if (shopId) {
+        const metafieldMutation = `#graphql
+          mutation setShopMetafield($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+              userErrors { field message }
+            }
+          }
+        `;
+        await shopifyFetch({
+          store: "b2c",
+          query: metafieldMutation,
+          variables: {
+            metafields: [{
+              ownerId: shopId,
+              namespace: "pod_custom_font",
+              key: filename,
+              type: "multi_line_text_field",
+              value: b64
+            }]
+          }
+        });
+      }
+    } catch (shopifyErr: any) {
+      console.error("Failed to save font to Shopify Shop Metafield:", shopifyErr.message);
+    }
+
     return NextResponse.json({
       success: true,
       font: {
@@ -195,6 +271,43 @@ export async function DELETE(req: NextRequest) {
 
     if (!deleted) {
       return NextResponse.json({ success: false, error: "File font non trovato o non eliminabile." }, { status: 404 });
+    }
+
+    // Delete persistently from Shopify Shop Metafield
+    try {
+      const shopRes = await shopifyFetch({
+        store: "b2c",
+        query: `#graphql
+          query getShopFonts {
+            shop {
+              metafields(first: 100, namespace: "pod_custom_font") {
+                nodes {
+                  id
+                  key
+                }
+              }
+            }
+          }
+        `
+      });
+      const nodes = shopRes.data?.shop?.metafields?.nodes || [];
+      const targetMetafield = nodes.find((n: any) => n.key === cleanFileName);
+      if (targetMetafield) {
+        const deleteMutation = `#graphql
+          mutation deleteShopMetafield($metafieldIds: [ID!]!) {
+            metafieldsDelete(metafieldIds: $metafieldIds) {
+              userErrors { field message }
+            }
+          }
+        `;
+        await shopifyFetch({
+          store: "b2c",
+          query: deleteMutation,
+          variables: { metafieldIds: [targetMetafield.id] }
+        });
+      }
+    } catch (shopifyErr: any) {
+      console.error("Failed to delete font from Shopify Shop Metafield:", shopifyErr.message);
     }
 
     return NextResponse.json({ success: true });

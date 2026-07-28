@@ -26,20 +26,29 @@ export default function ProduzioneHistoryPage() {
   const [editItems, setEditItems] = useState<any[]>([]);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [togglingPreviewId, setTogglingPreviewId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
     loadHistory(store);
   }, [store]);
 
-  const loadHistory = (storeName: string) => {
-    const saved = localStorage.getItem(`pdfHistory_${storeName}`);
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
+  const loadHistory = async (storeName: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/pdf/history?store=${storeName}`);
+      const data = await res.json();
+      if (data.success) {
+        setHistory(data.history || []);
+      } else {
+        setHistory([]);
       }
-    } else {
+    } catch (e) {
+      console.error(e);
       setHistory([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,17 +59,57 @@ export default function ProduzioneHistoryPage() {
     });
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
     if (confirm("Vuoi davvero cancellare tutto lo storico di questa vista? I PDF non saranno più recuperabili.")) {
-      localStorage.removeItem(`pdfHistory_${store}`);
-      setHistory([]);
+      try {
+        const res = await fetch(`/api/pdf/history?store=${store}`, {
+          method: "DELETE"
+        });
+        const data = await res.json();
+        if (data.success) {
+          setHistory([]);
+        } else {
+          alert("Errore durante la cancellazione dello storico: " + data.error);
+        }
+      } catch (e: any) {
+        alert("Errore di rete: " + e.message);
+      }
+    }
+  };
+
+  const handleDownloadPdf = async (item: PdfHistoryItem) => {
+    setDownloadingId(item.id);
+    try {
+      const res = await fetch(`/api/pdf/history/file?id=${item.id}&store=${store}`);
+      const data = await res.json();
+      if (!data.success) {
+        alert("Errore nel download del file PDF: " + data.error);
+        return;
+      }
+      
+      const link = document.createElement("a");
+      link.href = `data:application/pdf;base64,${data.pdfBase64}`;
+      link.download = `Stampa_${store}_${item.id}.pdf`;
+      link.click();
+    } catch (e: any) {
+      alert("Errore download: " + e.message);
+    } finally {
+      setDownloadingId(null);
     }
   };
 
   // Quick Popup Preview (Occhio) - In-Page Modal without redirect
-  const handleOpenPopupPreview = (item: PdfHistoryItem) => {
+  const handleOpenPopupPreview = async (item: PdfHistoryItem) => {
+    setTogglingPreviewId(item.id);
     try {
-      const byteCharacters = atob(item.pdfBase64);
+      const res = await fetch(`/api/pdf/history/file?id=${item.id}&store=${store}`);
+      const data = await res.json();
+      if (!data.success) {
+        alert("Errore caricamento file PDF: " + data.error);
+        return;
+      }
+
+      const byteCharacters = atob(data.pdfBase64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -69,9 +118,11 @@ export default function ProduzioneHistoryPage() {
       const file = new Blob([byteArray], { type: 'application/pdf' });
       const fileURL = URL.createObjectURL(file);
       setPreviewBlobUrl(fileURL);
-      setPreviewItem(item);
+      setPreviewItem({ ...item, pdfBase64: data.pdfBase64 });
     } catch (e) {
       alert("Errore caricamento anteprima: " + e);
+    } finally {
+      setTogglingPreviewId(null);
     }
   };
 
@@ -156,16 +207,23 @@ export default function ProduzioneHistoryPage() {
         return;
       }
 
-      // Update history in localStorage
-      const updatedHistory = history.map(h => {
-        if (h.id === editingItem.id) {
-          return { ...h, pdfBase64: data.base64, date: new Date().toISOString() };
-        }
-        return h;
+      // Salva il layout modificato su Shopify in modo persistente
+      const updatedHistoryItem = {
+        ...editingItem,
+        pdfBase64: data.base64,
+        date: new Date().toISOString()
+      };
+
+      await fetch("/api/pdf/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store,
+          historyItem: updatedHistoryItem
+        })
       });
 
-      localStorage.setItem(`pdfHistory_${store}`, JSON.stringify(updatedHistory));
-      setHistory(updatedHistory);
+      await loadHistory(store);
       setEditingItem(null);
       alert("Layout modificato e PDF aggiornato con successo!");
     } catch (e: any) {
@@ -262,31 +320,40 @@ export default function ProduzioneHistoryPage() {
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => handleOpenPopupPreview(item)}
-                      className="p-2.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold"
+                      disabled={togglingPreviewId === item.id}
+                      className="p-2.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold disabled:opacity-50 cursor-pointer"
                       title="Anteprima Rapida (Popup)"
                     >
-                      <Eye className="w-4 h-4" />
+                      {togglingPreviewId === item.id ? (
+                        <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                      ) : (
+                        <Eye className="w-4 h-4 shrink-0" />
+                      )}
                       Anteprima
                     </button>
 
                     <button 
                       onClick={() => handleOpenEditLayout(item)}
-                      className="p-2.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold"
+                      className="p-2.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
                       title="Modifica Layout Posizioni"
                     >
-                      <Pencil className="w-4 h-4" />
+                      <Pencil className="w-4 h-4 shrink-0" />
                       Modifica
                     </button>
 
-                    <a 
-                      href={`data:application/pdf;base64,${item.pdfBase64}`}
-                      download={`Stampa_${store}_${item.id}.pdf`}
-                      className="p-2.5 text-white bg-[#303030] hover:bg-black rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-xs font-bold"
+                    <button 
+                      onClick={() => handleDownloadPdf(item)}
+                      disabled={downloadingId === item.id}
+                      className="p-2.5 text-white bg-[#303030] hover:bg-black rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-xs font-bold disabled:opacity-50 cursor-pointer"
                       title="Scarica File PDF"
                     >
-                      <Download className="w-4 h-4" />
+                      {downloadingId === item.id ? (
+                        <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                      ) : (
+                        <Download className="w-4 h-4 shrink-0" />
+                      )}
                       Scarica
-                    </a>
+                    </button>
                   </div>
                 </li>
               ))}
@@ -324,14 +391,18 @@ export default function ProduzioneHistoryPage() {
               />
             </div>
             <div className="p-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-              <a
-                href={`data:application/pdf;base64,${previewItem.pdfBase64}`}
-                download={`Stampa_${store}_${previewItem.id}.pdf`}
-                className="px-4 py-2 text-sm font-bold text-white bg-[#303030] hover:bg-black rounded-lg shadow-sm flex items-center gap-2"
+              <button
+                onClick={() => handleDownloadPdf(previewItem)}
+                disabled={downloadingId === previewItem.id}
+                className="px-4 py-2 text-sm font-bold text-white bg-[#303030] hover:bg-black rounded-lg shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
-                <Download className="w-4 h-4" />
+                {downloadingId === previewItem.id ? (
+                  <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                ) : (
+                  <Download className="w-4 h-4 shrink-0" />
+                )}
                 Scarica File
-              </a>
+              </button>
               <button 
                 onClick={() => {
                   setPreviewItem(null);

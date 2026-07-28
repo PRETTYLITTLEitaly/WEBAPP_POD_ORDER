@@ -307,6 +307,53 @@ export async function POST(req: NextRequest) {
 
     const base64Pdf = (pdfBuffer as Buffer).toString("base64");
 
+    // Tag orders and set metafield on Shopify persistently
+    if (!previewMode && orderIds && orderIds.length > 0) {
+      try {
+        await Promise.all(
+          orderIds.map(async (orderId: string) => {
+            // 1. Add tag POD_STAMPATO
+            const tagMutation = `#graphql
+              mutation tagsAdd($id: ID!, $tags: [String!]!) {
+                tagsAdd(id: $id, tags: $tags) {
+                  userErrors { field message }
+                }
+              }
+            `;
+            await shopifyFetch({
+              store: store || "b2c",
+              query: tagMutation,
+              variables: { id: orderId, tags: ["POD_STAMPATO"] }
+            }).catch((err: any) => console.error(`Error tagging ${orderId}:`, err));
+
+            // 2. Set status metafield to "printed"
+            const metafieldMutation = `#graphql
+              mutation setOrderMetafield($metafields: [MetafieldsSetInput!]!) {
+                metafieldsSet(metafields: $metafields) {
+                  userErrors { field message }
+                }
+              }
+            `;
+            await shopifyFetch({
+              store: store || "b2c",
+              query: metafieldMutation,
+              variables: {
+                metafields: [{
+                  ownerId: orderId,
+                  namespace: "pod",
+                  key: "status",
+                  type: "single_line_text_field",
+                  value: "printed"
+                }]
+              }
+            }).catch((err: any) => console.error(`Error setting metafield for ${orderId}:`, err));
+          })
+        );
+      } catch (err: any) {
+        console.error("Error setting printed tag/metafield on Shopify:", err.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       base64: base64Pdf,

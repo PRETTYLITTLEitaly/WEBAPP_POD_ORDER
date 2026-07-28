@@ -270,21 +270,40 @@ export async function GET(req: NextRequest) {
     let coloreStickChoices: string[] = [];
     let coloreBaseChoices: string[] = [];
     let coloreCavoChoices: string[] = [];
+    let coloreStickType = "single_line_text_field";
+    let coloreBaseType = "single_line_text_field";
+    let coloreCavoType = "single_line_text_field";
 
     metaDefs.forEach((def: any) => {
       if (def.namespace === "custom" && def.key === "colore_stick") {
+        coloreStickType = def.type?.name || "single_line_text_field";
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
         if (choiceVal?.value) { try { coloreStickChoices = JSON.parse(choiceVal.value); } catch (e) {} }
       }
       if (def.namespace === "custom" && def.key === "colore_base") {
+        coloreBaseType = def.type?.name || "single_line_text_field";
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
         if (choiceVal?.value) { try { coloreBaseChoices = JSON.parse(choiceVal.value); } catch (e) {} }
       }
       if (def.namespace === "custom" && def.key === "colore_cavo") {
+        coloreCavoType = def.type?.name || "single_line_text_field";
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
         if (choiceVal?.value) { try { coloreCavoChoices = JSON.parse(choiceVal.value); } catch (e) {} }
       }
     });
+
+    const parseValue = (val: string, typeName: string) => {
+      if (!val) return "";
+      if (typeName.startsWith("list.")) {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) {
+            return parsed[0] || "";
+          }
+        } catch (e) {}
+      }
+      return val;
+    };
 
     const products = rawProducts.map((p: any) => {
       const svgUrl = p.metafield_pod_svg_url?.value || "";
@@ -292,9 +311,9 @@ export async function GET(req: NextRequest) {
       const svgFileUrl = p.metafield_pod_svg?.reference?.url || p.metafield_pod_svg?.reference?.image?.url || "";
       const height = p.metafield_pod_height?.value || "";
       const width = p.metafield_pod_width?.value || "";
-      const coloreStick = p.metafield_colore_stick?.value || "";
-      const coloreBase = p.metafield_colore_base?.value || "";
-      const coloreCavo = p.metafield_colore_cavo?.value || "";
+      const coloreStick = parseValue(p.metafield_colore_stick?.value, coloreStickType);
+      const coloreBase = parseValue(p.metafield_colore_base?.value, coloreBaseType);
+      const coloreCavo = parseValue(p.metafield_colore_cavo?.value, coloreCavoType);
 
       const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase && coloreCavo);
       const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase || coloreCavo);
@@ -439,23 +458,25 @@ export async function POST(req: NextRequest) {
         const def = getDef(namespace, key);
         if (!def) return valStr;
 
+        const isList = def.type?.name?.startsWith("list.");
+
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
         if (choiceVal?.value) {
           try {
             const allowedChoices: string[] = JSON.parse(choiceVal.value);
             if (Array.isArray(allowedChoices) && allowedChoices.length > 0) {
               const exactMatch = allowedChoices.find((c: string) => c === valStr);
-              if (exactMatch) return exactMatch;
+              if (exactMatch) return isList ? JSON.stringify([exactMatch]) : exactMatch;
 
               const ciMatch = allowedChoices.find((c: string) => c.toLowerCase().trim() === valStr.toLowerCase());
-              if (ciMatch) return ciMatch;
+              if (ciMatch) return isList ? JSON.stringify([ciMatch]) : ciMatch;
 
               console.warn(`Valore '${valStr}' non presente tra le scelte di Shopify per ${namespace}.${key}`);
               return null;
             }
           } catch (e) {}
         }
-        return valStr;
+        return isList ? JSON.stringify([valStr]) : valStr;
       };
 
       const metafieldsInput: any[] = [];

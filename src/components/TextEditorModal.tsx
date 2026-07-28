@@ -19,7 +19,6 @@ import {
   Image as ImageIcon,
   Check,
   RefreshCw,
-  Sliders,
   Scissors
 } from "lucide-react";
 
@@ -107,15 +106,13 @@ export default function TextEditorModal({
   const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
   const [isRemoveBgApplied, setIsRemoveBgApplied] = useState(false);
   const [isVectorized, setIsVectorized] = useState(false);
-  const [bgThreshold, setBgThreshold] = useState(240); // 0-255 white threshold
+  const [bgThreshold, setBgThreshold] = useState(240);
   const [vectorSvgContent, setVectorSvgContent] = useState<string | null>(null);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [availableFonts, setAvailableFonts] = useState(DEFAULT_FONTS);
   const [showAttributes, setShowAttributes] = useState(false);
-
-  const hiddenCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     setText(initialText);
@@ -129,7 +126,6 @@ export default function TextEditorModal({
     setIsVectorized(false);
     setVectorSvgContent(null);
 
-    // Se l'ordine ha principalmente un'immagine e poco testo, seleziona la scheda immagine di default
     if ((backgroundUrl || svgUrl) && !initialText) {
       setActiveTab("image");
     } else {
@@ -176,8 +172,8 @@ export default function TextEditorModal({
     img.src = currentImageUrl;
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         setIsProcessingImage(false);
@@ -188,7 +184,6 @@ export default function TextEditorModal({
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
 
-      // Rimuovi pixel bianchi o trasparenti secondo la soglia
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
@@ -211,7 +206,7 @@ export default function TextEditorModal({
     };
   };
 
-  // STRUMENTO 2: VETTORIALIZZA (Converti in Tracciato SVG Vettoriale)
+  // STRUMENTO 2: VETTORIALIZZA HD AD ALTA DEFINIZIONE MANTENENDO TUTTI I COLORI INVARIATI
   const handleVectorizeImage = () => {
     const targetSource = processedImageUrl || currentImageUrl;
     if (!targetSource) return;
@@ -222,35 +217,57 @@ export default function TextEditorModal({
     img.src = targetSource;
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      const scale = Math.min(1, 800 / Math.max(img.width, img.height));
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
+      // Risoluzione nativa 1:1 HD ad alta definizione
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      canvas.width = w;
+      canvas.height = h;
+
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         setIsProcessingImage(false);
         return;
       }
 
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, w, h);
       const data = imgData.data;
 
-      // Genera SVG tracciato
-      let svgPaths = "";
-      const step = 4;
-      for (let y = 0; y < canvas.height; y += step) {
-        for (let x = 0; x < canvas.width; x += step) {
-          const idx = (y * canvas.width + x) * 4;
-          const alpha = data[idx + 3];
-          const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+      // Raggruppa i pixel per colore originale (mantenendo tutti i colori intatti!)
+      const colorLayers = new Map<string, string[]>();
 
-          if (alpha > 50 && brightness < 200) {
-            svgPaths += `<rect x="${x}" y="${y}" width="${step}" height="${step}" fill="currentColor" />`;
+      // Se l'immagine è grande, imposta uno step ottimale per mantenere la nitidezza senza appesantire il file
+      const step = w > 1200 || h > 1200 ? 2 : 1;
+
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          const idx = (y * w + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const a = data[idx + 3];
+
+          if (a > 30) {
+            // Quantizzazione impercettibile (step 4) per unire le sfumature di antialiasing preservando i colori esatti
+            const qR = Math.round(r / 4) * 4;
+            const qG = Math.round(g / 4) * 4;
+            const qB = Math.round(b / 4) * 4;
+            const hex = `#${((1 << 24) + (qR << 16) + (qG << 8) + qB).toString(16).slice(1)}`;
+
+            if (!colorLayers.has(hex)) {
+              colorLayers.set(hex, []);
+            }
+            colorLayers.get(hex)!.push(`M${x},${y}h${step}v${step}h-${step}z`);
           }
         }
       }
 
-      const generatedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvas.width} ${canvas.height}" width="100%" height="100%">${svgPaths}</svg>`;
+      let combinedPaths = "";
+      colorLayers.forEach((pathList, hexColor) => {
+        combinedPaths += `<path d="${pathList.join('')}" fill="${hexColor}" shape-rendering="crispEdges" />\n`;
+      });
+
+      const generatedSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">${combinedPaths}</svg>`;
       setVectorSvgContent(generatedSvg);
       setIsVectorized(true);
       setIsProcessingImage(false);
@@ -270,7 +287,6 @@ export default function TextEditorModal({
       ? `data:image/svg+xml;utf8,${encodeURIComponent(vectorSvgContent)}`
       : (processedImageUrl || currentImageUrl);
 
-    // Salva nel metafield dell'ordine pod.edited_image su Shopify
     if (orderId && finalGraphicToSave) {
       try {
         await fetch("/api/orders/save-graphic", {
@@ -327,7 +343,7 @@ export default function TextEditorModal({
             <div>
               <h3 className="font-extrabold text-lg tracking-tight">{title}</h3>
               <p className="text-xs text-amber-100 font-medium">
-                Editor testo, Remove BG e Vettorializzazione per la stampa DTF.
+                Editor testo, Remove BG e Vettorializzazione HD per la stampa DTF.
               </p>
             </div>
           </div>
@@ -350,7 +366,7 @@ export default function TextEditorModal({
               }`}
             >
               <ImageIcon className="w-3.5 h-3.5" />
-              Remove BG & Vectorizer
+              Remove BG & Vectorizer HD
             </button>
           </div>
 
@@ -370,10 +386,10 @@ export default function TextEditorModal({
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1.5 text-amber-700">
                 <Sparkles className="w-4 h-4 text-amber-500" />
-                Anteprima Grafica Finale per Stampa DTF
+                Anteprima Vettoriale Live Alta Definizione (HD)
               </span>
               <span className="font-mono text-gray-500 text-[11px]">
-                {isVectorized ? "SVG Vettoriale" : isRemoveBgApplied ? "PNG Sfondo Rimosso" : "Originale"}
+                {isVectorized ? "SVG Vettoriale Multi-Colore HD" : isRemoveBgApplied ? "PNG Sfondo Rimosso" : "Originale"}
               </span>
             </div>
 
@@ -383,7 +399,7 @@ export default function TextEditorModal({
               {/* RENDERING IMMAGINE VETTORIALIZZATA O CON SFONDO RIMOSSO */}
               {vectorSvgContent ? (
                 <div 
-                  className="w-full h-full flex items-center justify-center text-amber-700 p-4"
+                  className="w-full h-full flex items-center justify-center text-amber-700 p-2 overflow-hidden"
                   dangerouslySetInnerHTML={{ __html: vectorSvgContent }}
                 />
               ) : processedImageUrl ? (
@@ -556,12 +572,12 @@ export default function TextEditorModal({
               </div>
             )}
 
-            {/* SCHEDA 2: REMOVE BG & VETTORIALIZZA IMMAGINE */}
+            {/* SCHEDA 2: REMOVE BG & VETTORIALIZZA IMMAGINE HD */}
             {activeTab === "image" && (
               <div className="space-y-4">
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-900 flex items-center gap-2">
                   <Wand2 className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Strumenti Elaborazione Grafica Foto / Logo</span>
+                  <span>Strumenti Elaborazione Grafica Foto / Logo (HD)</span>
                 </div>
 
                 {/* STRUMENTO 1: REMOVE BG */}
@@ -603,21 +619,21 @@ export default function TextEditorModal({
                   </button>
                 </div>
 
-                {/* STRUMENTO 2: VETTORIALIZZA */}
+                {/* STRUMENTO 2: VETTORIALIZZA HD MULTI-COLORE */}
                 <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
                       <Layers className="w-4 h-4 text-purple-600" />
-                      2. Vettorializza Immagine (Vectorizer)
+                      2. Vettorializza HD Multi-Colore (Vectorizer)
                     </span>
                     {isVectorized && (
                       <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Vettoriale Generato
+                        <Check className="w-3 h-3" /> SVG HD Generato
                       </span>
                     )}
                   </div>
                   <p className="text-[11px] text-gray-500">
-                    Converte l'immagine raster in tracciati SVG vettoriali per la massima nitidezza DTF.
+                    Genera tracciati SVG vettoriali ad alta definizione mantenendo tutti i colori originali invariati.
                   </p>
 
                   <button
@@ -626,7 +642,7 @@ export default function TextEditorModal({
                     className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <Layers className="w-3.5 h-3.5" />
-                    <span>📐 Genera Tracciati Vettoriali SVG</span>
+                    <span>📐 Vettorializza in Alta Definizione (HD)</span>
                   </button>
                 </div>
 

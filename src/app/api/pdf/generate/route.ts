@@ -28,7 +28,7 @@ function generateSvgFromText(text: string, font: string, color: string, fontSize
 
   const textNodes = lines.map((line, idx) => {
     const yPos = 50 + idx * lineHeight;
-    return `<text x="50%" y="${yPos}" text-anchor="middle" font-family="'${fontName}', cursive, sans-serif" font-size="${fontSizePx}px" fill="${hexColor}" font-weight="600">${escapeXml(line)}</text>`;
+    return `<text x="250" y="${yPos}" text-anchor="middle" font-family="'${fontName}', cursive, sans-serif" font-size="${fontSizePx}px" fill="${hexColor}" font-weight="600">${escapeXml(line)}</text>`;
   }).join("\n");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">
@@ -280,6 +280,7 @@ export async function POST(req: NextRequest) {
                 widthMm: parseFloat(widthVal),
                 heightMm: parseFloat(heightVal),
                 svgContent: cleanSvgContent,
+                imageContent: cacheItem.isImage ? cacheItem.content : null,
                 previewUrl: previewUrl,
                 isImage: cacheItem.isImage
               });

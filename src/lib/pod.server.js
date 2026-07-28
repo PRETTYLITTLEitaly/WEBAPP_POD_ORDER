@@ -158,21 +158,21 @@ export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsI
               height: box.h,
               preserveAspectRatio: "xMidYMid meet",
               fontCallback: function(family, bold, italic) {
-                const cleanFamily = family.replace(/['"]/g, "").trim();
+                const firstFamily = (family || "").split(",")[0].replace(/['"]/g, "").trim();
                 
                 // Cerca corrispondenza esatta registrata
-                if (doc._fonts && doc._fonts[cleanFamily]) {
-                  return cleanFamily;
+                if (doc._fonts && doc._fonts[firstFamily]) {
+                  return firstFamily;
                 }
                 
                 // Cerca corrispondenza case-insensitive
                 if (doc._fonts) {
-                  const match = Object.keys(doc._fonts).find(f => f.toLowerCase() === cleanFamily.toLowerCase());
+                  const match = Object.keys(doc._fonts).find(f => f.toLowerCase() === firstFamily.toLowerCase());
                   if (match) return match;
                 }
 
                 // Cerca i font standard Helvetica
-                const cleanLower = cleanFamily.toLowerCase();
+                const cleanLower = firstFamily.toLowerCase();
                 if (cleanLower.includes('helvetica') && cleanLower.includes('bold')) return 'Helvetica-Bold';
                 if (cleanLower.includes('helvetica')) return 'Helvetica';
                 if (cleanLower.includes('courier')) return 'Courier';

@@ -33,7 +33,7 @@ function generateSvgFromText(text: string, font: string, color: string, fontSize
 
   const textNodes = lines.map((line, idx) => {
     const yPos = 50 + idx * lineHeight;
-    return `<text x="50%" y="${yPos}" text-anchor="middle" font-family="'${fontName}', cursive, sans-serif" font-size="${fontSizePx}px" fill="${hexColor}" font-weight="600">${escapeXml(line)}</text>`;
+    return `<text x="250" y="${yPos}" text-anchor="middle" font-family="'${fontName}', cursive, sans-serif" font-size="${fontSizePx}px" fill="${hexColor}" font-weight="600">${escapeXml(line)}</text>`;
   }).join("\n");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}">
@@ -180,22 +180,22 @@ export async function GET(req: NextRequest) {
         height: 300,
         preserveAspectRatio: "xMidYMid meet",
         fontCallback: function(family: any, bold: any, italic: any) {
-          const cleanFamily = String(family || "").replace(/['"]/g, "").trim();
-          debugLogs.push(`fontCallback requested: "${family}" -> cleaned: "${cleanFamily}"`);
+          const firstFamily = String(family || "").split(",")[0].replace(/['"]/g, "").trim();
+          debugLogs.push(`fontCallback requested: "${family}" -> firstFamily: "${firstFamily}"`);
           
           const docAny = doc as any;
-          if (docAny._fonts && docAny._fonts[cleanFamily]) {
-            debugLogs.push(`Found exact font match: "${cleanFamily}"`);
-            return cleanFamily;
+          if (docAny._fonts && docAny._fonts[firstFamily]) {
+            debugLogs.push(`Found exact font match: "${firstFamily}"`);
+            return firstFamily;
           }
           if (docAny._fonts) {
-            const match = Object.keys(docAny._fonts).find(f => f.toLowerCase() === cleanFamily.toLowerCase());
+            const match = Object.keys(docAny._fonts).find(f => f.toLowerCase() === firstFamily.toLowerCase());
             if (match) {
               debugLogs.push(`Found case-insensitive font match: "${match}"`);
               return match;
             }
           }
-          const cleanLower = cleanFamily.toLowerCase();
+          const cleanLower = firstFamily.toLowerCase();
           if (cleanLower.includes('helvetica') && cleanLower.includes('bold')) return 'Helvetica-Bold';
           if (cleanLower.includes('helvetica')) return 'Helvetica';
           if (cleanLower.includes('courier')) return 'Courier';

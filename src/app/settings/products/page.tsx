@@ -23,7 +23,9 @@ import {
   X,
   Zap,
   Wand2,
-  Plus
+  Plus,
+  Image as ImageIcon,
+  Grid
 } from "lucide-react";
 
 interface CollectionRef {
@@ -88,6 +90,10 @@ export default function ProductMetafieldsPage() {
   
   const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
 
+  // Modal Galleria Anteprime SVG
+  const [svgGalleryModalProductId, setSvgGalleryModalProductId] = useState<string | null>(null);
+  const [svgGallerySearch, setSvgGallerySearch] = useState("");
+
   // Filtri Shopify
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCollection, setSelectedCollection] = useState("");
@@ -102,7 +108,6 @@ export default function ProductMetafieldsPage() {
   const [editedTags, setEditedTags] = useState<{ [productId: string]: string[] }>({});
   const [editedCollections, setEditedCollections] = useState<{ [productId: string]: CollectionRef[] }>({});
 
-  // Stato per l'aggiunta di Tag e Collezioni
   const [addingTagForProduct, setAddingTagForProduct] = useState<string | null>(null);
   const [newTagInput, setNewTagInput] = useState("");
 
@@ -231,17 +236,29 @@ export default function ProductMetafieldsPage() {
       }));
       setMessage({ 
         type: "success", 
-        text: `🪄 Bacchetta Magica: Abbinato l'SVG "${matched.filename}" col punteggio di affinità (${maxScore})!` 
+        text: `🪄 Bacchetta Magica: Abbinata l'anteprima SVG "${matched.filename}" col punteggio di affinità (${maxScore})!` 
       });
     } else {
       setMessage({ 
         type: "error", 
-        text: `🪄 Bacchetta Magica: Nessun file SVG con nome simile a "${productTitle}" trovato. Selezionalo manualmente dal menu.` 
+        text: `🪄 Bacchetta Magica: Nessun file SVG con nome simile a "${productTitle}" trovato.` 
       });
     }
   };
 
-  // RIMUOVI TAG DAL PRODOTTO
+  const handleSelectSvgFromGallery = (productId: string, file: ShopifyFile) => {
+    setEditedMetafields(prev => ({
+      ...prev,
+      [productId]: {
+        ...(prev[productId] || {}),
+        pod_svg_file_id: file.id,
+        pod_svg_url: file.url
+      } as any
+    }));
+    setSvgGalleryModalProductId(null);
+    setMessage({ type: "success", text: `Selezionato il file SVG: ${file.filename}` });
+  };
+
   const handleRemoveTag = (productId: string, tagToRemove: string) => {
     setEditedTags(prev => ({
       ...prev,
@@ -249,7 +266,6 @@ export default function ProductMetafieldsPage() {
     }));
   };
 
-  // AGGIUNGI TAG AL PRODOTTO
   const handleAddTag = (productId: string, tagToAdd: string) => {
     const cleanTag = tagToAdd.trim();
     if (!cleanTag) return;
@@ -265,7 +281,6 @@ export default function ProductMetafieldsPage() {
     setAddingTagForProduct(null);
   };
 
-  // RIMUOVI COLLEZIONE DAL PRODOTTO
   const handleRemoveCollection = (productId: string, collectionIdToRemove: string) => {
     setEditedCollections(prev => ({
       ...prev,
@@ -273,7 +288,6 @@ export default function ProductMetafieldsPage() {
     }));
   };
 
-  // AGGIUNGI COLLEZIONE AL PRODOTTO
   const handleAddCollection = (productId: string, collectionItem: CollectionItem) => {
     setEditedCollections(prev => {
       const current = prev[productId] || [];
@@ -286,7 +300,6 @@ export default function ProductMetafieldsPage() {
     setAddingCollectionForProduct(null);
   };
 
-  // SALVATAGGIO COMPLETO SU SHOPIFY (Metafield + Tag + Collezioni)
   const handleSaveProduct = async (product: ProductItem) => {
     setSavingId(product.id);
     setMessage(null);
@@ -337,7 +350,11 @@ export default function ProductMetafieldsPage() {
     return true;
   });
 
-    return (
+  const filteredGalleryFiles = shopifyFiles.filter(f => 
+    f.filename.toLowerCase().includes(svgGallerySearch.toLowerCase())
+  );
+
+  return (
     <div className="space-y-6">
       
       {/* Header Page */}
@@ -348,7 +365,7 @@ export default function ProductMetafieldsPage() {
             Configuratore Metafield Prodotti & Grafiche SVG
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Gestisci i 7 metafield di produzione, la grafica SVG con Bacchetta Magica, Tag e Collezioni per i prodotti Shopify.
+            Gestisci i 7 metafield di produzione con anteprime grafiche SVG in tempo reale, Bacchetta Magica, Tag e Collezioni.
           </p>
         </div>
 
@@ -500,7 +517,7 @@ export default function ProductMetafieldsPage() {
           </div>
 
           <div className="flex items-center gap-2 text-xs font-semibold text-gray-600">
-            <span>📄 {shopifyFiles.length} file SVG trovati su Shopify</span>
+            <span>📄 {shopifyFiles.length} file .SVG trovati su Shopify</span>
             <button
               onClick={fetchProductsData}
               className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0 flex items-center gap-1 text-xs font-medium"
@@ -531,6 +548,11 @@ export default function ProductMetafieldsPage() {
             const currentTags = editedTags[product.id] || [];
             const currentCols = editedCollections[product.id] || [];
             const isSaving = savingId === product.id;
+
+            // Determina la grafica SVG selezionata per l'anteprima visuale in tempo reale
+            const selectedFileObj = shopifyFiles.find(f => f.id === form.pod_svg_file_id);
+            const activeSvgUrl = selectedFileObj?.url || form.pod_svg_url || form.pod_svg_file_url || "";
+            const activeSvgFilename = selectedFileObj?.filename || (activeSvgUrl ? activeSvgUrl.split("?")[0].split("/").pop() : "");
 
             return (
               <div 
@@ -582,11 +604,11 @@ export default function ProductMetafieldsPage() {
                         </a>
                       </div>
 
-                      {/* GESTIONE DINAMICA COLLEZIONI (CON BOTTONE RIMOZIONE X ED AGGIUNTA) */}
+                      {/* GESTIONE COLLEZIONI & TAG */}
                       <div className="flex items-center gap-2 flex-wrap text-xs">
                         <span className="text-gray-400 font-mono text-[11px]">Handle: {product.handle}</span>
 
-                        {/* GESTIONE COLLEZIONI */}
+                        {/* COLLEZIONI */}
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {currentCols.map(col => (
                             <span 
@@ -605,7 +627,6 @@ export default function ProductMetafieldsPage() {
                             </span>
                           ))}
 
-                          {/* Pulsante Aggiungi Collezione */}
                           {addingCollectionForProduct === product.id ? (
                             <div className="flex items-center gap-1">
                               <select
@@ -638,7 +659,7 @@ export default function ProductMetafieldsPage() {
                           )}
                         </div>
 
-                        {/* GESTIONE TAG */}
+                        {/* TAG */}
                         <div className="flex items-center gap-1.5 flex-wrap border-l border-gray-200 pl-2">
                           {currentTags.map(tag => (
                             <span 
@@ -656,7 +677,6 @@ export default function ProductMetafieldsPage() {
                             </span>
                           ))}
 
-                          {/* Pulsante Aggiungi Tag */}
                           {addingTagForProduct === product.id ? (
                             <div className="flex items-center gap-1">
                               <input 
@@ -720,7 +740,7 @@ export default function ProductMetafieldsPage() {
                     </div>
                   </div>
 
-                  {/* FORM GRIGLIA I 7 METAFIELD (CON BACCHETTA MAGICA E MENU SVG PULITO) */}
+                  {/* FORM GRIGLIA I 7 METAFIELD (CON ANTEPRIMA GRAFICA VISUALE E GALLERIA MODALE) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     
                     {/* 1. custom.pod_svg_url */}
@@ -741,7 +761,7 @@ export default function ProductMetafieldsPage() {
                       />
                     </div>
 
-                    {/* 2. pod.svg (SELETTORE FILE SVG CON BACCHETTA MAGICA AUTO-MATCH) */}
+                    {/* 2. pod.svg (SELETTORE CON ANTEPRIMA VISUALE E GALLERIA MODALE) */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
@@ -749,15 +769,30 @@ export default function ProductMetafieldsPage() {
                           File Reference SVG
                         </label>
 
-                        {/* PULSANTE BACCHETTA MAGICA */}
-                        <button
-                          onClick={() => handleAutoMatchSvg(product.id, product.title, product.handle)}
-                          className="text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1 transition-all"
-                          title="Auto-abbina l'SVG con nome più simile al prodotto"
-                        >
-                          <Wand2 className="w-3 h-3 text-amber-600" />
-                          <span>Bacchetta Magica</span>
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {/* PULSANTE BACCHETTA MAGICA */}
+                          <button
+                            onClick={() => handleAutoMatchSvg(product.id, product.title, product.handle)}
+                            className="text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1 transition-all"
+                            title="Auto-abbina l'SVG con nome più simile al prodotto"
+                          >
+                            <Wand2 className="w-3 h-3 text-amber-600" />
+                            <span>Magia</span>
+                          </button>
+
+                          {/* PULSANTE GALLERIA ANTEPRIME */}
+                          <button
+                            onClick={() => {
+                              setSvgGalleryModalProductId(product.id);
+                              setSvgGallerySearch("");
+                            }}
+                            className="text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-1 transition-all"
+                            title="Sfoglia tutte le anteprime grafiche in galleria"
+                          >
+                            <Grid className="w-3 h-3 text-indigo-600" />
+                            <span>Galleria</span>
+                          </button>
+                        </div>
                       </div>
 
                       {shopifyFiles.length > 0 ? (
@@ -781,6 +816,30 @@ export default function ProductMetafieldsPage() {
                           placeholder="Incolla URL o GID del file SVG..."
                           className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                         />
+                      )}
+
+                      {/* BADGE ANTEPRIMA GRAFICA VISUALE SVG SELEZIONATA */}
+                      {activeSvgUrl && (
+                        <div className="mt-1 flex items-center gap-2 bg-indigo-50/80 p-1.5 rounded-xl border border-indigo-100">
+                          <div 
+                            onClick={() => setZoomedImage({ url: activeSvgUrl, title: `Anteprima Vettoriale: ${product.title}` })}
+                            className="w-10 h-10 bg-white rounded-lg border border-indigo-200 flex items-center justify-center p-1 cursor-pointer hover:scale-105 transition-all shadow-sm shrink-0"
+                            title="Clicca per ingrandire vettoriale"
+                          >
+                            <img src={activeSvgUrl} alt="SVG Preview" className="max-w-full max-h-full object-contain" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] font-bold text-indigo-950 truncate">
+                              {activeSvgFilename || "Grafica SVG Selezionata"}
+                            </div>
+                            <button 
+                              onClick={() => setZoomedImage({ url: activeSvgUrl, title: `Anteprima Vettoriale: ${product.title}` })}
+                              className="text-[9px] text-indigo-600 font-bold hover:underline flex items-center gap-0.5 mt-0.5"
+                            >
+                              <Eye className="w-2.5 h-2.5" /> Ingrandisci Vettoriale
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
 
@@ -899,7 +958,72 @@ export default function ProductMetafieldsPage() {
         </div>
       )}
 
-      {/* MODAL INGRANDIMENTO FOTO PRODOTTO */}
+      {/* MODAL GALLERIA ANTEPRIME GRAFICHE SVG */}
+      {svgGalleryModalProductId && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setSvgGalleryModalProductId(null)}
+        >
+          <div 
+            className="bg-white rounded-3xl p-6 max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl relative space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                  <Grid className="w-5 h-5 text-indigo-600" />
+                  Galleria Anteprime Grafiche SVG ({shopifyFiles.length} file)
+                </h3>
+                <p className="text-xs text-gray-500">Seleziona visivamente l'anteprima vettoriale per il prodotto.</p>
+              </div>
+              <button 
+                onClick={() => setSvgGalleryModalProductId(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Ricerca veloce dentro la galleria */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+              <input 
+                type="text"
+                value={svgGallerySearch}
+                onChange={e => setSvgGallerySearch(e.target.value)}
+                placeholder="Filtra file SVG per nome..."
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+              />
+            </div>
+
+            {/* Griglia Anteprime Visuali SVG */}
+            <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-1">
+              {filteredGalleryFiles.map(file => (
+                <div 
+                  key={file.id}
+                  onClick={() => handleSelectSvgFromGallery(svgGalleryModalProductId, file)}
+                  className="bg-gray-50 hover:bg-indigo-50/50 border border-gray-200 hover:border-indigo-400 rounded-2xl p-3 flex flex-col items-center justify-between gap-2 cursor-pointer transition-all hover:shadow-md group"
+                >
+                  <div className="w-full h-24 bg-white rounded-xl border border-gray-100 flex items-center justify-center p-2 group-hover:scale-105 transition-transform">
+                    <img src={file.url} alt={file.filename} className="max-w-full max-h-full object-contain" />
+                  </div>
+                  <div className="w-full text-center">
+                    <div className="text-[11px] font-bold text-gray-800 truncate" title={file.filename}>
+                      {file.filename}
+                    </div>
+                    <span className="mt-1 inline-block px-2 py-0.5 rounded text-[9px] font-bold text-indigo-700 bg-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      Scegli SVG
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL INGRANDIMENTO FOTO PRODOTTO O VETTORIALE */}
       {zoomedImage && (
         <div 
           className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"

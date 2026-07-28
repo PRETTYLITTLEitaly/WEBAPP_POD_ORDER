@@ -3,7 +3,7 @@ import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/products/metafields — Paginazione automatica per recuperare TUTTI i 600+ prodotti, file SVG e collezioni da Shopify
+// GET /api/products/metafields — Paginazione automatica per recuperare TUTTI i 600+ prodotti, collezioni e file da Shopify
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const shopifySearchString = queryParts.join(" AND ");
 
-    // 1. Query Prodotti con paginazione
+    // 1. Query Prodotti con paginazione e Collezioni per singolo prodotto
     const productsQuery = `#graphql
       query getProducts($first: Int!, $after: String, $query: String) {
         products(first: $first, after: $after, query: $query, sortKey: TITLE) {
@@ -40,6 +40,12 @@ export async function GET(req: NextRequest) {
             handle
             productType
             tags
+            collections(first: 10) {
+              nodes {
+                id
+                title
+              }
+            }
             featuredImage {
               url
               altText
@@ -82,7 +88,7 @@ export async function GET(req: NextRequest) {
       afterProductCursor = pData?.pageInfo?.endCursor || null;
     }
 
-    // 2. Query File generici da Shopify (con campi corretti e senza 'filename' deprecato)
+    // 2. Query File generici da Shopify
     const filesQuery = `#graphql
       query getFiles($first: Int!, $after: String) {
         files(first: $first, after: $after) {
@@ -210,10 +216,9 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Filtriamo i file da Shopify o raccogliamo i file references già presenti nei prodotti
+    // Mappa dei file SVG (da Shopify Files e dai prodotti)
     const svgFilesMap = new Map<string, { id: string; url: string; filename: string }>();
 
-    // Aggiungiamo i file ritornati dalla query files
     allRawFiles.forEach((f: any) => {
       if (!f || !f.url) return;
       const cleanUrl = f.url.split("?")[0];
@@ -221,7 +226,6 @@ export async function GET(req: NextRequest) {
       svgFilesMap.set(f.id, { id: f.id, url: f.url, filename });
     });
 
-    // Raccogliamo anche tutti i file SVG già referenziati nei prodotti
     allRawProducts.forEach((p: any) => {
       const ref = p.metafield_pod_svg?.reference;
       if (ref && ref.id && ref.url) {
@@ -264,12 +268,15 @@ export async function GET(req: NextRequest) {
       const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase);
       const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase);
 
+      const productCollections = (p.collections?.nodes || []).map((c: any) => c.title);
+
       return {
         id: p.id,
         title: p.title,
         handle: p.handle,
         productType: p.productType || "",
         tags: p.tags || [],
+        collections: productCollections,
         imageUrl: p.featuredImage?.url || null,
         imageAlt: p.featuredImage?.altText || p.title,
         metafields: {

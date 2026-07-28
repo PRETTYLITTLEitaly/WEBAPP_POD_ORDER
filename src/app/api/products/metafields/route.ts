@@ -416,6 +416,10 @@ export async function POST(req: NextRequest) {
               type {
                 name
               }
+              validations {
+                name
+                value
+              }
             }
           }
         }
@@ -424,25 +428,51 @@ export async function POST(req: NextRequest) {
       const metaDefsRes: any = await shopifyFetch({ store: store || "b2c", query: metaDefsQuery }).catch(() => ({ data: { metafieldDefinitions: { nodes: [] } } }));
       const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
 
-      const getType = (namespace: string, key: string, fallback: string) => {
-        const found = metaDefs.find((d: any) => d.namespace === namespace && d.key === key);
-        return found?.type?.name || fallback;
+      const getDef = (namespace: string, key: string) => {
+        return metaDefs.find((d: any) => d.namespace === namespace && d.key === key);
+      };
+
+      const getValidatedValue = (namespace: string, key: string, rawVal: string) => {
+        const valStr = String(rawVal || "").trim();
+        if (!valStr) return null;
+
+        const def = getDef(namespace, key);
+        if (!def) return valStr;
+
+        const choiceVal = def.validations?.find((v: any) => v.name === "choices");
+        if (choiceVal?.value) {
+          try {
+            const allowedChoices: string[] = JSON.parse(choiceVal.value);
+            if (Array.isArray(allowedChoices) && allowedChoices.length > 0) {
+              const exactMatch = allowedChoices.find((c: string) => c === valStr);
+              if (exactMatch) return exactMatch;
+
+              const ciMatch = allowedChoices.find((c: string) => c.toLowerCase().trim() === valStr.toLowerCase());
+              if (ciMatch) return ciMatch;
+
+              console.warn(`Valore '${valStr}' non presente tra le scelte di Shopify per ${namespace}.${key}`);
+              return null;
+            }
+          } catch (e) {}
+        }
+        return valStr;
       };
 
       const metafieldsInput: any[] = [];
 
       const addMetafield = (namespace: string, key: string, value: string, defaultType: string) => {
-        const valStr = String(value || "").trim();
-        if (!valStr) return;
+        const validatedVal = getValidatedValue(namespace, key, value);
+        if (!validatedVal) return;
 
-        const targetType = getType(namespace, key, defaultType);
+        const def = getDef(namespace, key);
+        const targetType = def?.type?.name || defaultType;
 
         metafieldsInput.push({
           ownerId: productId,
           namespace,
           key,
           type: targetType,
-          value: valStr
+          value: validatedVal
         });
       };
 

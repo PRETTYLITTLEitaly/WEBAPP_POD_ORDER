@@ -96,11 +96,11 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
         {/* Brand & Logo Shopify */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center font-bold text-black text-lg shadow-sm">
-              S
+            <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-700 rounded-lg flex items-center justify-center font-black text-white text-lg shadow-sm">
+              P
             </div>
             <span className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
-              Shopify <span className="text-[10px] bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded font-mono">POD App</span>
+              Shopify <span className="text-[10px] bg-red-950/80 text-red-300 px-1.5 py-0.5 rounded font-mono border border-red-800/50">POD App</span>
             </span>
           </Link>
         </div>

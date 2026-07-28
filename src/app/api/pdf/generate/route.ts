@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { shopifyFetch } from "@/lib/shopify";
 import { generatePodPdf } from "@/lib/pod.server";
 import { editedImageMemoryCache } from "@/app/api/orders/save-graphic/route";
+import { syncFontsFromShopify } from "@/app/api/fonts/route";
 
 function escapeXml(unsafe: string): string {
   return (unsafe || "").replace(/[<>&'"]/g, (c) => {
@@ -45,6 +46,11 @@ export async function POST(req: NextRequest) {
     if (!orderIds || !orderIds.length) {
       return NextResponse.json({ success: false, error: "Nessun ordine selezionato" }, { status: 400 });
     }
+
+    // Restore custom fonts from Shopify to Vercel's /tmp before generating
+    await syncFontsFromShopify().catch((err: any) => {
+      console.error("Failed to sync fonts in generate route:", err);
+    });
 
     const query = `#graphql
       query getBatchOrders($ids: [ID!]!) {

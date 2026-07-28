@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import SVGtoPDF from "svg-to-pdfkit";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 const MM_TO_PT = 2.83465;
 const PADDING_MM = 3; 
@@ -113,11 +114,34 @@ export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsI
       doc.on("end", () => resolve(Buffer.concat(chunks)));
       doc.on("error", (err) => reject(err));
 
-      const fontDir = path.join(process.cwd(), "public", "fonts");
-      let availableFonts = [];
-      if (fs.existsSync(fontDir)) {
-        availableFonts = fs.readdirSync(fontDir).filter(f => f.endsWith(".ttf") || f.endsWith(".otf"));
-      }
+      // Carica e registra dinamicamente tutti i font sia da public/fonts sia da /tmp/pod_fonts
+      const PUBLIC_FONTS_DIR = path.join(process.cwd(), "public", "fonts");
+      const TMP_FONTS_DIR = path.join(os.tmpdir(), "pod_fonts");
+      
+      const registerAllFontsFromDir = (dir) => {
+        if (fs.existsSync(dir)) {
+          try {
+            const files = fs.readdirSync(dir);
+            for (const file of files) {
+              if (file.toLowerCase().endsWith(".ttf") || file.toLowerCase().endsWith(".otf")) {
+                const ext = path.extname(file).toLowerCase();
+                const fontName = path.basename(file, ext);
+                const fontPath = path.join(dir, file);
+                try {
+                  doc.registerFont(fontName, fontPath);
+                  const spaceName = fontName.replace(/_/g, " ");
+                  doc.registerFont(spaceName, fontPath);
+                } catch (e) {
+                  console.error(`Failed to register font ${fontName}:`, e);
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      };
+
+      registerAllFontsFromDir(PUBLIC_FONTS_DIR);
+      registerAllFontsFromDir(TMP_FONTS_DIR);
       
       for (const box of boxes) {
         if (box.svgContent) {
@@ -132,7 +156,34 @@ export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsI
             SVGtoPDF(doc, box.svgContent, 0, 0, {
               width: box.w,
               height: box.h,
-              preserveAspectRatio: "xMidYMid meet"
+              preserveAspectRatio: "xMidYMid meet",
+              fontCallback: function(family, bold, italic) {
+                const cleanFamily = family.replace(/['"]/g, "").trim();
+                
+                // Cerca corrispondenza esatta registrata
+                if (doc._fonts && doc._fonts[cleanFamily]) {
+                  return cleanFamily;
+                }
+                
+                // Cerca corrispondenza case-insensitive
+                if (doc._fonts) {
+                  const match = Object.keys(doc._fonts).find(f => f.toLowerCase() === cleanFamily.toLowerCase());
+                  if (match) return match;
+                }
+
+                // Cerca i font standard Helvetica
+                const cleanLower = cleanFamily.toLowerCase();
+                if (cleanLower.includes('helvetica') && cleanLower.includes('bold')) return 'Helvetica-Bold';
+                if (cleanLower.includes('helvetica')) return 'Helvetica';
+                if (cleanLower.includes('courier')) return 'Courier';
+                if (cleanLower.includes('times')) return 'Times-Roman';
+                
+                // Fallback al primo font registrato o a Helvetica
+                if (doc._fonts && Object.keys(doc._fonts).length > 0) {
+                  return Object.keys(doc._fonts)[0];
+                }
+                return 'Helvetica';
+              }
             });
             
             doc.restore();

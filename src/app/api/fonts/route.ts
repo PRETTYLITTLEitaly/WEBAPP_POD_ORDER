@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const PUBLIC_FONTS_DIR = path.join(process.cwd(), "public", "fonts");
 const TMP_FONTS_DIR = path.join(os.tmpdir(), "pod_fonts");
 
-function getWritableFontsDir(): string {
+export function getWritableFontsDir(): string {
   try {
     if (!fs.existsSync(PUBLIC_FONTS_DIR)) {
       fs.mkdirSync(PUBLIC_FONTS_DIR, { recursive: true });
@@ -28,7 +28,7 @@ function getWritableFontsDir(): string {
   }
 }
 
-async function syncFontsFromShopify() {
+export async function syncFontsFromShopify() {
   const fontsDir = getWritableFontsDir();
   try {
     const query = `#graphql

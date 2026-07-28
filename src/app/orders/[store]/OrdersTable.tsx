@@ -62,6 +62,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
   const [textEditorModal, setTextEditorModal] = useState<{
     open: boolean;
+    orderId?: string;
     title: string;
     initialText: string;
     initialFont: string;
@@ -69,15 +70,18 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
     initialFontSize: number;
     backgroundUrl: string;
     svgUrl: string;
+    customAttributes?: any[];
   }>({
     open: false,
+    orderId: "",
     title: "",
     initialText: "",
-    initialFont: "Outfit",
-    initialColor: "#000000",
-    initialFontSize: 36,
+    initialFont: "Get Show",
+    initialColor: "#38bdf8",
+    initialFontSize: 32,
     backgroundUrl: "",
-    svgUrl: ""
+    svgUrl: "",
+    customAttributes: []
   });
 
   const handleOpenPplrModal = (order: any) => {
@@ -117,44 +121,59 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       customAttributesList.push(...attrs);
 
       attrs.forEach((attr: any) => {
-        const k = (attr.key || "").toLowerCase().trim();
+        const rawKey = attr.key || "";
+        const k = rawKey.toLowerCase().trim();
         const v = String(attr.value || "").trim();
 
-        // 1. Testo ("Il tuo testo", "Nome Brano", "Testo", "Dedica")
-        if (!v.startsWith("http")) {
-          if (k.includes("il tuo testo") || k.includes("testo") || k.includes("frase") || k.includes("nome") || k.includes("dedica") || k === "5") {
-            if (v && !foundText) foundText = v;
-          }
+        const isSystemKey = rawKey.startsWith("_") || 
+          k.includes("font") || 
+          k.includes("align") || 
+          k.includes("scegli") || 
+          k.includes("modello") || 
+          k.includes("stick") || 
+          k.includes("colore") || 
+          k.includes("vedi") || 
+          k.includes("preview");
 
-          // 2. Font ("Scegli il font", "Font", "Carattere")
-          if (k.includes("scegli il font") || k.includes("font") || k.includes("carattere")) {
-            if (v) foundFont = v;
-          }
-
-          // 3. Font Size ("_font size Il tuo testo", "_font size", "font_size")
-          if (k.includes("font size") || k.includes("_font_size") || k.includes("fontsize")) {
-            const parsedSize = parseFloat(v);
-            if (!isNaN(parsedSize) && parsedSize > 0) {
-              foundFontSize = Math.round(parsedSize);
+        // 1. Estrazione Testo (es. "Il tuo testo", "Frase", "Nome Brano", ecc.)
+        if (!isSystemKey && !v.startsWith("http")) {
+          // Escludi valori brevi che indicano semplici opzioni (es. "Frase", "Iniziale", "Ammaccato", "Liscio")
+          const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
+          if (v && (!isSimpleOption || !foundText)) {
+            if (!foundText || v.length > foundText.length) {
+              foundText = v;
             }
           }
+        }
 
-          // 4. Colore ("Scegli il colore", "Colore testo", "Celeste", "Azzurro", "Bianco", "#...")
-          if (k.includes("scegli il colore") || k.includes("colore") || k.includes("color")) {
-            if (v.startsWith("#")) {
-              foundColor = v;
-            } else {
-              const lowerColor = v.toLowerCase();
-              if (lowerColor.includes("celeste") || lowerColor.includes("azzurro")) foundColor = "#38bdf8";
-              else if (lowerColor.includes("tiffany")) foundColor = "#0d9488";
-              else if (lowerColor.includes("bianco")) foundColor = "#ffffff";
-              else if (lowerColor.includes("nero")) foundColor = "#000000";
-              else if (lowerColor.includes("oro") || lowerColor.includes("giallo")) foundColor = "#d97706";
-              else if (lowerColor.includes("rosso")) foundColor = "#dc2626";
-              else if (lowerColor.includes("rosa")) foundColor = "#ec4899";
-              else if (lowerColor.includes("verde")) foundColor = "#16a34a";
-              else if (lowerColor.includes("blu")) foundColor = "#2563eb";
-            }
+        // 2. Estrazione Font Name (es: "Scegli il font", "Scegli un font", "Font")
+        if (k.includes("font") && !rawKey.startsWith("_")) {
+          if (v) foundFont = v;
+        }
+
+        // 3. Estrazione Font Size (es: "_font size Il tuo testo", "_font size Frase")
+        if (k.includes("font size") || k.includes("_font_size") || k.includes("fontsize")) {
+          const parsedSize = parseFloat(v);
+          if (!isNaN(parsedSize) && parsedSize > 0) {
+            foundFontSize = Math.round(parsedSize);
+          }
+        }
+
+        // 4. Estrazione Colore (es: "Scegli il colore", "Scegli un colore", "Celeste", "#ffffff")
+        if (k.includes("colore") || k.includes("color")) {
+          if (v.startsWith("#")) {
+            foundColor = v;
+          } else {
+            const lowerColor = v.toLowerCase();
+            if (lowerColor.includes("celeste") || lowerColor.includes("azzurro")) foundColor = "#38bdf8";
+            else if (lowerColor.includes("tiffany")) foundColor = "#0d9488";
+            else if (lowerColor.includes("bianco")) foundColor = "#ffffff";
+            else if (lowerColor.includes("nero")) foundColor = "#000000";
+            else if (lowerColor.includes("oro") || lowerColor.includes("giallo")) foundColor = "#d97706";
+            else if (lowerColor.includes("rosso")) foundColor = "#dc2626";
+            else if (lowerColor.includes("rosa")) foundColor = "#ec4899";
+            else if (lowerColor.includes("verde")) foundColor = "#16a34a";
+            else if (lowerColor.includes("blu")) foundColor = "#2563eb";
           }
         }
 
@@ -173,13 +192,15 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
     setTextEditorModal({
       open: true,
+      orderId: order.id,
       title: `Modifica Interattiva Testo & Grafica — Ordine ${order.name}`,
-      initialText: foundText || "Giulia & Riccardo 26.09.2026",
+      initialText: foundText || "",
       initialFont: foundFont || "Get Show",
       initialColor: foundColor || "#38bdf8",
       initialFontSize: foundFontSize || 32,
       backgroundUrl: foundImage,
-      svgUrl: foundSvg
+      svgUrl: foundSvg,
+      customAttributes: customAttributesList
     });
   };
 
@@ -1147,6 +1168,8 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       <TextEditorModal
         open={textEditorModal.open}
         onClose={() => setTextEditorModal(prev => ({ ...prev, open: false }))}
+        orderId={textEditorModal.orderId}
+        store={store === "b2b" ? "b2b" : "b2c"}
         title={textEditorModal.title}
         initialText={textEditorModal.initialText}
         initialFont={textEditorModal.initialFont}
@@ -1154,6 +1177,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         initialFontSize={textEditorModal.initialFontSize}
         backgroundUrl={textEditorModal.backgroundUrl}
         svgUrl={textEditorModal.svgUrl}
+        customAttributes={textEditorModal.customAttributes}
       />
     </div>
   );

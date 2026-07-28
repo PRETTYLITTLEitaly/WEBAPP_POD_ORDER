@@ -17,13 +17,17 @@ import {
   Palette, 
   RefreshCw, 
   ExternalLink,
-  Store
+  Store,
+  Layers,
+  Tag as TagIcon
 } from "lucide-react";
 
 interface ProductItem {
   id: string;
   title: string;
   handle: string;
+  productType: string;
+  tags: string[];
   imageUrl: string | null;
   imageAlt: string;
   metafields: {
@@ -44,6 +48,13 @@ interface ShopifyFile {
   filename: string;
 }
 
+interface CollectionItem {
+  id: string;
+  title: string;
+  handle: string;
+  productsCount?: number;
+}
+
 const DEFAULT_COLOR_OPTIONS = [
   "Nero", "Bianco", "Trasparente", "Naturale", "Legno", "Oro", "Argento", 
   "Rosso", "Blu", "Azzurro", "Verde", "Rosa", "Giallo", "Tiffany", "Bordeaux"
@@ -53,13 +64,23 @@ export default function ProductMetafieldsPage() {
   const [store, setStore] = useState<"b2c" | "b2b">("b2c");
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [shopifyFiles, setShopifyFiles] = useState<ShopifyFile[]>([]);
+  const [collections, setCollections] = useState<CollectionItem[]>([]);
+  const [tagsList, setTagsList] = useState<string[]>([]);
+  const [typesList, setTypesList] = useState<string[]>([]);
+
   const [coloreStickList, setColoreStickList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
   const [coloreBaseList, setColoreBaseList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
   
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  
+  // Filtri Shopify
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCollection, setSelectedCollection] = useState("");
+  const [selectedTag, setSelectedTag] = useState("");
+  const [selectedType, setSelectedType] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "missing" | "complete">("all");
+  
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Form local state per ogni prodotto
@@ -68,11 +89,16 @@ export default function ProductMetafieldsPage() {
   const fetchProductsData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/products/metafields?store=${store}&query=${encodeURIComponent(searchQuery)}`);
+      const url = `/api/products/metafields?store=${store}&query=${encodeURIComponent(searchQuery)}&collection=${encodeURIComponent(selectedCollection)}&tag=${encodeURIComponent(selectedTag)}&product_type=${encodeURIComponent(selectedType)}`;
+      const res = await fetch(url);
       const data = await res.json();
+
       if (data.success) {
-        setProducts(data.products);
+        setProducts(data.products || []);
         setShopifyFiles(data.files || []);
+        setCollections(data.collections || []);
+        setTagsList(data.tags || []);
+        setTypesList(data.productTypes || []);
 
         if (data.coloreStickChoices?.length > 0) {
           setColoreStickList(Array.from(new Set([...data.coloreStickChoices, ...DEFAULT_COLOR_OPTIONS])));
@@ -83,7 +109,7 @@ export default function ProductMetafieldsPage() {
 
         // Inizializziamo lo stato dei form
         const initialFormState: { [id: string]: ProductItem["metafields"] } = {};
-        data.products.forEach((p: ProductItem) => {
+        (data.products || []).forEach((p: ProductItem) => {
           initialFormState[p.id] = { ...p.metafields };
         });
         setEditedMetafields(initialFormState);
@@ -98,16 +124,28 @@ export default function ProductMetafieldsPage() {
 
   useEffect(() => {
     fetchProductsData();
-  }, [store]);
+  }, [store, selectedCollection, selectedTag, selectedType]);
 
   const handleInputChange = (productId: string, field: keyof ProductItem["metafields"], value: string) => {
-    setEditedMetafields(prev => ({
-      ...prev,
-      [productId]: {
+    setEditedMetafields(prev => {
+      const updated = {
         ...prev[productId],
         [field]: value
+      };
+
+      // Se viene selezionato un file SVG dal menu a tendina, compiliamo automaticamente anche custom.pod_svg_url se vuoto
+      if (field === "pod_svg_file_id" && value) {
+        const fileObj = shopifyFiles.find(f => f.id === value);
+        if (fileObj && fileObj.url) {
+          updated.pod_svg_url = fileObj.url;
+        }
       }
-    }));
+
+      return {
+        ...prev,
+        [productId]: updated
+      };
+    });
   };
 
   const handleSaveProductMetafields = async (productId: string) => {
@@ -145,7 +183,6 @@ export default function ProductMetafieldsPage() {
   const filteredProducts = products.filter(p => {
     if (filterStatus === "missing" && p.status === "complete") return false;
     if (filterStatus === "complete" && p.status !== "complete") return false;
-    if (searchQuery.trim() && !p.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
@@ -160,7 +197,7 @@ export default function ProductMetafieldsPage() {
             Configuratore Metafield Prodotti & Grafiche SVG
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Imposta i 6 metafield di produzione (<code className="text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded font-mono text-xs">pod.svg</code>, <code className="text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded font-mono text-xs">custom.pod_svg_url</code>, altezza, larghezza, colore stick e base).
+            Gestisci ed imposta rapidamente i 6 metafield di produzione per tutti i prodotti Shopify.
           </p>
         </div>
 
@@ -202,68 +239,132 @@ export default function ProductMetafieldsPage() {
         </div>
       )}
 
-      {/* BARRA FILTRI E RICERCA */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* BARRA FILTRI E RICERCA STILE SHOPIFY */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
         
-        {/* Ricerca per Nome */}
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-          <input 
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Cerca prodotto per nome..."
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
-          />
+        {/* Riga Superiore: Cerca + Menu Filtri Shopify */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          
+          {/* Cerca per Titolo / Nome */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+            <input 
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") fetchProductsData(); }}
+              placeholder="Cerca per titolo..."
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+            />
+          </div>
+
+          {/* Filtro Collezione Shopify */}
+          <div className="relative">
+            <select
+              value={selectedCollection}
+              onChange={e => setSelectedCollection(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+            >
+              <option value="">-- Filtra per Collezione --</option>
+              {collections.map(col => (
+                <option key={col.id} value={col.id}>
+                  📁 {col.title} ({col.productsCount ?? "N"} prodotti)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro Tag Shopify */}
+          <div className="relative">
+            <select
+              value={selectedTag}
+              onChange={e => setSelectedTag(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+            >
+              <option value="">-- Filtra per Tag Shopify --</option>
+              {tagsList.map(tag => (
+                <option key={tag} value={tag}>
+                  🏷️ {tag}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro Tipo Prodotto */}
+          <div className="relative">
+            <select
+              value={selectedType}
+              onChange={e => setSelectedType(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+            >
+              <option value="">-- Filtra per Tipo Prodotto --</option>
+              {typesList.map(t => (
+                <option key={t} value={t}>
+                  📦 {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
         </div>
 
-        {/* Tab Filtri Stato Metafield */}
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs font-bold shrink-0">
-          <button
-            onClick={() => setFilterStatus("all")}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              filterStatus === "all" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
-            }`}
-          >
-            Tutti ({products.length})
-          </button>
-          <button
-            onClick={() => setFilterStatus("missing")}
-            className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1 ${
-              filterStatus === "missing" ? "bg-white text-amber-800 shadow-sm" : "text-gray-500 hover:text-amber-700"
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-            Metafield Incompleti ({products.filter(p => p.status !== "complete").length})
-          </button>
-          <button
-            onClick={() => setFilterStatus("complete")}
-            className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1 ${
-              filterStatus === "complete" ? "bg-white text-green-800 shadow-sm" : "text-gray-500 hover:text-green-700"
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-            Completi ({products.filter(p => p.status === "complete").length})
-          </button>
+        {/* Riga Inferiore: Tab Stato Metafield & Refresh */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
+          
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 text-xs font-bold shrink-0">
+            <button
+              onClick={() => setFilterStatus("all")}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                filterStatus === "all" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              Tutti i Prodotti ({products.length})
+            </button>
+            <button
+              onClick={() => setFilterStatus("missing")}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                filterStatus === "missing" ? "bg-white text-amber-800 shadow-sm" : "text-gray-500 hover:text-amber-700"
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+              Metafield Incompleti ({products.filter(p => p.status !== "complete").length})
+            </button>
+            <button
+              onClick={() => setFilterStatus("complete")}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${
+                filterStatus === "complete" ? "bg-white text-green-800 shadow-sm" : "text-gray-500 hover:text-green-700"
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+              Completi ({products.filter(p => p.status === "complete").length})
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 font-medium">
+              📁 {shopifyFiles.length} File SVG disponibili su Shopify
+            </span>
+            <button
+              onClick={fetchProductsData}
+              className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+              title="Ricarica Prodotti e File"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
         </div>
 
-        <button
-          onClick={fetchProductsData}
-          className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
-          title="Ricarica Prodotti"
-        >
-          <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
-        </button>
       </div>
 
       {/* LISTA SCHEDE PRODOTTI */}
       {loading ? (
         <div className="p-16 text-center text-gray-400 font-medium animate-pulse">
-          Sincronizzazione prodotti e file da Shopify in corso...
+          Recupero prodotti, file SVG e collezioni da Shopify in corso...
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="bg-white p-12 text-center text-gray-500 rounded-xl border border-gray-200">
-          Nessun prodotto trovato con i filtri correnti.
+          Nessun prodotto trovato con i filtri selezionati.
         </div>
       ) : (
         <div className="space-y-6">
@@ -305,7 +406,14 @@ export default function ProductMetafieldsPage() {
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </div>
-                      <div className="text-xs text-gray-400 font-mono mt-0.5">Handle: {product.handle}</div>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 font-mono mt-0.5">
+                        <span>Handle: {product.handle}</span>
+                        {product.tags.length > 0 && (
+                          <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                            🏷️ {product.tags.slice(0, 3).join(", ")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -370,10 +478,10 @@ export default function ProductMetafieldsPage() {
                       onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                     >
-                      <option value="">-- Seleziona File SVG da Shopify --</option>
+                      <option value="">-- Seleziona File SVG ({shopifyFiles.length} trovati) --</option>
                       {shopifyFiles.map(file => (
                         <option key={file.id} value={file.id}>
-                          {file.filename}
+                          📄 {file.filename}
                         </option>
                       ))}
                     </select>

@@ -3,21 +3,40 @@ import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/products/metafields — Recupera lista prodotti, immagini, i 6 metafield e i file SVG da Shopify
+// GET /api/products/metafields — Recupera lista prodotti con filtri (Collezione, Tag, Tipo), Immagini, Metafield e Tutti i File SVG
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const store = (searchParams.get("store") as "b2b" | "b2c") || "b2c";
     const searchQuery = searchParams.get("query") || "";
+    const selectedCollection = searchParams.get("collection") || "";
+    const selectedTag = searchParams.get("tag") || "";
+    const selectedType = searchParams.get("product_type") || "";
 
-    // 1. Query prodotti con i 6 metafield ed immagine di copertina
+    // Costruiamo la stringa di ricerca flessibile per l'API Shopify
+    const queryParts: string[] = [];
+    if (searchQuery.trim()) {
+      queryParts.push(`title:*${searchQuery.trim()}*`);
+    }
+    if (selectedTag.trim()) {
+      queryParts.push(`tag:${selectedTag.trim()}`);
+    }
+    if (selectedType.trim()) {
+      queryParts.push(`product_type:"${selectedType.trim()}"`);
+    }
+
+    const shopifySearchString = queryParts.join(" AND ");
+
+    // 1. Query Prodotti con i 6 Metafield
     const productsQuery = `#graphql
-      query getProducts($query: String) {
+      query getProducts($query: String, $collectionId: ID) {
         products(first: 100, query: $query, sortKey: TITLE) {
           nodes {
             id
             title
             handle
+            productType
+            tags
             featuredImage {
               url
               altText
@@ -33,22 +52,45 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    // 2. Query file SVG generici caricati su Shopify Files
+    // 2. Query File generici da Shopify (SENZA query restrittive per catturare TUTTI gli SVG)
     const filesQuery = `#graphql
-      query getSvgFiles {
-        files(first: 100, query: "media_type:GENERIC_FILE") {
+      query getFiles {
+        files(first: 250) {
           nodes {
+            id
+            createdAt
             ... on GenericFile {
               id
               url
               filename
+              mimeType
+            }
+            ... on MediaImage {
+              id
+              image {
+                url
+              }
             }
           }
         }
       }
     `;
 
-    // 3. Query definizioni metafield per la lista dei colori ammessi
+    // 3. Query Collezioni Shopify per il filtro
+    const collectionsQuery = `#graphql
+      query getCollections {
+        collections(first: 150) {
+          nodes {
+            id
+            title
+            handle
+            productsCount
+          }
+        }
+      }
+    `;
+
+    // 4. Query Definizioni Metafield
     const metaDefsQuery = `#graphql
       query getMetafieldDefs {
         metafieldDefinitions(first: 100, ownerType: PRODUCT) {
@@ -65,17 +107,68 @@ export async function GET(req: NextRequest) {
       }
     `;
 
-    const [productsRes, filesRes, metaDefsRes] = await Promise.all([
-      shopifyFetch({ store, query: productsQuery, variables: { query: searchQuery ? `title:*${searchQuery}*` : undefined } }),
+    const [productsRes, filesRes, collectionsRes, metaDefsRes] = await Promise.all([
+      shopifyFetch({ store, query: productsQuery, variables: { query: shopifySearchString || undefined } }),
       shopifyFetch({ store, query: filesQuery }).catch(() => ({ data: { files: { nodes: [] } } })),
+      shopifyFetch({ store, query: collectionsQuery }).catch(() => ({ data: { collections: { nodes: [] } } })),
       shopifyFetch({ store, query: metaDefsQuery }).catch(() => ({ data: { metafieldDefinitions: { nodes: [] } } }))
     ]);
 
-    const rawProducts = productsRes.data?.products?.nodes || [];
-    const files = filesRes.data?.files?.nodes || [];
+    let rawProducts = productsRes.data?.products?.nodes || [];
+    const rawFiles = filesRes.data?.files?.nodes || [];
+    const collections = collectionsRes.data?.collections?.nodes || [];
     const metaDefs = metaDefsRes.data?.metafieldDefinitions?.nodes || [];
 
-    // Estraiamo le opzioni di colore da custom.colore_stick e custom.colore_base
+    // Se è stata selezionata una Collezione specifica, filtriamo i prodotti associati
+    if (selectedCollection.trim()) {
+      // Se l'utente ha selezionato una collezione, facciamo una query specifica per quella collezione
+      try {
+        const collectionProductsQuery = `#graphql
+          query getCollectionProducts($id: ID!) {
+            collection(id: $id) {
+              products(first: 100) {
+                nodes {
+                  id
+                }
+              }
+            }
+          }
+        `;
+        const colProdRes = await shopifyFetch({ store, query: collectionProductsQuery, variables: { id: selectedCollection } });
+        const colProductIds = new Set((colProdRes.data?.collection?.products?.nodes || []).map((p: any) => p.id));
+        rawProducts = rawProducts.filter((p: any) => colProductIds.has(p.id));
+      } catch (e) {
+        console.error("Errore filtro collezione:", e);
+      }
+    }
+
+    // Estraggo tutti i Tag e Tipi di prodotto unici per i filtri della UI
+    const allTagsSet = new Set<string>();
+    const allTypesSet = new Set<string>();
+    rawProducts.forEach((p: any) => {
+      if (Array.isArray(p.tags)) {
+        p.tags.forEach((t: string) => allTagsSet.add(t));
+      }
+      if (p.productType) {
+        allTypesSet.add(p.productType);
+      }
+    });
+
+    // Filtriamo i file SVG da Shopify Files
+    const svgFiles = rawFiles
+      .filter((f: any) => {
+        if (!f) return false;
+        const filename = (f.filename || f.url || "").toLowerCase();
+        const mime = (f.mimeType || "").toLowerCase();
+        return filename.endsWith(".svg") || mime.includes("svg") || f.id?.includes("GenericFile");
+      })
+      .map((f: any) => ({
+        id: f.id,
+        url: f.url,
+        filename: f.filename || f.url?.split("/").pop()?.split("?")[0] || f.id
+      }));
+
+    // Opzioni colore dalle definizioni
     let coloreStickChoices: string[] = [];
     let coloreBaseChoices: string[] = [];
 
@@ -103,7 +196,6 @@ export async function GET(req: NextRequest) {
       const coloreStick = p.metafield_colore_stick?.value || "";
       const coloreBase = p.metafield_colore_base?.value || "";
 
-      // Verifica se ha tutti e 6 i metafield configurati
       const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase);
       const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase);
 
@@ -111,6 +203,8 @@ export async function GET(req: NextRequest) {
         id: p.id,
         title: p.title,
         handle: p.handle,
+        productType: p.productType || "",
+        tags: p.tags || [],
         imageUrl: p.featuredImage?.url || null,
         imageAlt: p.featuredImage?.altText || p.title,
         metafields: {
@@ -129,7 +223,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       products,
-      files,
+      files: svgFiles,
+      allFilesCount: rawFiles.length,
+      collections,
+      tags: Array.from(allTagsSet),
+      productTypes: Array.from(allTypesSet),
       coloreStickChoices,
       coloreBaseChoices
     });

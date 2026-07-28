@@ -48,6 +48,7 @@ export default function Navbar() {
     { name: "Dashboard", href: "/" },
     { name: "Ordini B2B", href: "/orders/b2b", badge: stats.b2bCount },
     { name: "Ordini B2C", href: "/orders/b2c", badge: stats.b2cCount },
+    { name: "Metafield Prodotti", href: "/settings/products" },
     { name: "Report", href: "/report" },
     { name: "Produzione", href: "/produzione" },
     { name: "Spedizioni", href: "/spedizioni", badge: issuesCount, isAlert: true },

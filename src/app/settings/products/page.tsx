@@ -1,0 +1,461 @@
+"use client";
+
+export const dynamic = "force-dynamic";
+
+import { useState, useEffect } from "react";
+import { 
+  Package, 
+  Search, 
+  Filter, 
+  CheckCircle2, 
+  AlertTriangle, 
+  XCircle, 
+  Save, 
+  FileCode, 
+  Link as LinkIcon, 
+  Ruler, 
+  Palette, 
+  RefreshCw, 
+  ExternalLink,
+  Store
+} from "lucide-react";
+
+interface ProductItem {
+  id: string;
+  title: string;
+  handle: string;
+  imageUrl: string | null;
+  imageAlt: string;
+  metafields: {
+    pod_svg_url: string;
+    pod_svg_file_id: string;
+    pod_svg_file_url: string;
+    pod_height: string;
+    pod_width: string;
+    colore_stick: string;
+    colore_base: string;
+  };
+  status: "complete" | "partial" | "missing";
+}
+
+interface ShopifyFile {
+  id: string;
+  url: string;
+  filename: string;
+}
+
+const DEFAULT_COLOR_OPTIONS = [
+  "Nero", "Bianco", "Trasparente", "Naturale", "Legno", "Oro", "Argento", 
+  "Rosso", "Blu", "Azzurro", "Verde", "Rosa", "Giallo", "Tiffany", "Bordeaux"
+];
+
+export default function ProductMetafieldsPage() {
+  const [store, setStore] = useState<"b2c" | "b2b">("b2c");
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [shopifyFiles, setShopifyFiles] = useState<ShopifyFile[]>([]);
+  const [coloreStickList, setColoreStickList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
+  const [coloreBaseList, setColoreBaseList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
+  
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "missing" | "complete">("all");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Form local state per ogni prodotto
+  const [editedMetafields, setEditedMetafields] = useState<{ [productId: string]: ProductItem["metafields"] }>({});
+
+  const fetchProductsData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/products/metafields?store=${store}&query=${encodeURIComponent(searchQuery)}`);
+      const data = await res.json();
+      if (data.success) {
+        setProducts(data.products);
+        setShopifyFiles(data.files || []);
+
+        if (data.coloreStickChoices?.length > 0) {
+          setColoreStickList(Array.from(new Set([...data.coloreStickChoices, ...DEFAULT_COLOR_OPTIONS])));
+        }
+        if (data.coloreBaseChoices?.length > 0) {
+          setColoreBaseList(Array.from(new Set([...data.coloreBaseChoices, ...DEFAULT_COLOR_OPTIONS])));
+        }
+
+        // Inizializziamo lo stato dei form
+        const initialFormState: { [id: string]: ProductItem["metafields"] } = {};
+        data.products.forEach((p: ProductItem) => {
+          initialFormState[p.id] = { ...p.metafields };
+        });
+        setEditedMetafields(initialFormState);
+      }
+    } catch (e: any) {
+      console.error("Errore fetch metafields:", e);
+      setMessage({ type: "error", text: "Errore nel caricamento dei dati da Shopify." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProductsData();
+  }, [store]);
+
+  const handleInputChange = (productId: string, field: keyof ProductItem["metafields"], value: string) => {
+    setEditedMetafields(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSaveProductMetafields = async (productId: string) => {
+    setSavingId(productId);
+    setMessage(null);
+
+    const currentMetafields = editedMetafields[productId];
+
+    try {
+      const res = await fetch("/api/products/metafields", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store,
+          productId,
+          metafields: currentMetafields
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setMessage({ type: "success", text: "Metafield salvati con successo su Shopify!" });
+        fetchProductsData();
+      } else {
+        setMessage({ type: "error", text: data.error || "Errore durante il salvataggio." });
+      }
+    } catch (e: any) {
+      setMessage({ type: "error", text: e.message });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const filteredProducts = products.filter(p => {
+    if (filterStatus === "missing" && p.status === "complete") return false;
+    if (filterStatus === "complete" && p.status !== "complete") return false;
+    if (searchQuery.trim() && !p.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div className="p-8 space-y-6 max-w-7xl">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Package className="w-6 h-6 text-indigo-600" />
+            Configuratore Metafield Prodotti & Grafiche SVG
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Imposta i 6 metafield di produzione (<code className="text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded font-mono text-xs">pod.svg</code>, <code className="text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded font-mono text-xs">custom.pod_svg_url</code>, altezza, larghezza, colore stick e base).
+          </p>
+        </div>
+
+        {/* Store Selector Switcher */}
+        <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 shrink-0">
+          <button
+            onClick={() => setStore("b2c")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              store === "b2c"
+                ? "bg-white text-indigo-700 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <Store className="w-3.5 h-3.5" />
+            Store B2C (Prettylittle.it)
+          </button>
+          <button
+            onClick={() => setStore("b2b")}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              store === "b2b"
+                ? "bg-white text-indigo-700 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <Store className="w-3.5 h-3.5 text-purple-600" />
+            Store B2B (Wholesale)
+          </button>
+        </div>
+      </div>
+
+      {message && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between text-sm font-semibold ${
+          message.type === "success" 
+            ? "bg-green-50 border-green-200 text-green-800" 
+            : "bg-red-50 border-red-200 text-red-800"
+        }`}>
+          <span>{message.text}</span>
+          <button onClick={() => setMessage(null)} className="text-xs underline font-bold">Chiudi</button>
+        </div>
+      )}
+
+      {/* BARRA FILTRI E RICERCA */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        
+        {/* Ricerca per Nome */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Cerca prodotto per nome..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
+          />
+        </div>
+
+        {/* Tab Filtri Stato Metafield */}
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs font-bold shrink-0">
+          <button
+            onClick={() => setFilterStatus("all")}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              filterStatus === "all" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
+            }`}
+          >
+            Tutti ({products.length})
+          </button>
+          <button
+            onClick={() => setFilterStatus("missing")}
+            className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1 ${
+              filterStatus === "missing" ? "bg-white text-amber-800 shadow-sm" : "text-gray-500 hover:text-amber-700"
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+            Metafield Incompleti ({products.filter(p => p.status !== "complete").length})
+          </button>
+          <button
+            onClick={() => setFilterStatus("complete")}
+            className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1 ${
+              filterStatus === "complete" ? "bg-white text-green-800 shadow-sm" : "text-gray-500 hover:text-green-700"
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+            Completi ({products.filter(p => p.status === "complete").length})
+          </button>
+        </div>
+
+        <button
+          onClick={fetchProductsData}
+          className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+          title="Ricarica Prodotti"
+        >
+          <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      {/* LISTA SCHEDE PRODOTTI */}
+      {loading ? (
+        <div className="p-16 text-center text-gray-400 font-medium animate-pulse">
+          Sincronizzazione prodotti e file da Shopify in corso...
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-white p-12 text-center text-gray-500 rounded-xl border border-gray-200">
+          Nessun prodotto trovato con i filtri correnti.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {filteredProducts.map(product => {
+            const form = editedMetafields[product.id] || product.metafields;
+            const isSaving = savingId === product.id;
+
+            return (
+              <div 
+                key={product.id}
+                className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:border-gray-300 transition-all"
+              >
+                {/* Header Scheda Prodotto */}
+                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    {/* Immagine di Copertina */}
+                    <div className="w-14 h-14 bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+                      {product.imageUrl ? (
+                        <img 
+                          src={product.imageUrl} 
+                          alt={product.imageAlt}
+                          className="w-full h-full object-contain p-1"
+                        />
+                      ) : (
+                        <Package className="w-6 h-6 text-gray-300" />
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-gray-900 text-base">{product.title}</h3>
+                        <a 
+                          href={`https://admin.shopify.com/store/${store === "b2b" ? "wholesale-prettylittle-it" : "prettylittle-it"}/products/${product.id.split("/").pop()}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-gray-400 hover:text-indigo-600 transition-colors"
+                          title="Apri su Shopify Admin"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                      <div className="text-xs text-gray-400 font-mono mt-0.5">Handle: {product.handle}</div>
+                    </div>
+                  </div>
+
+                  {/* Badge Stato Metafield & Tasto Salva */}
+                  <div className="flex items-center gap-3">
+                    {product.status === "complete" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                        Metafield Completi
+                      </span>
+                    ) : product.status === "partial" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                        Parzialmente Configurato
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                        <XCircle className="w-3.5 h-3.5 text-red-600" />
+                        Nessun Metafield
+                      </span>
+                    )}
+
+                    <button
+                      onClick={() => handleSaveProductMetafields(product.id)}
+                      disabled={isSaving}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Save className={`w-4 h-4 ${isSaving ? "animate-spin" : ""}`} />
+                      <span>{isSaving ? "Salvataggio..." : "Salva Metafield"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form Griglia Metafield (6 Parametri) */}
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  
+                  {/* 1. custom.pod_svg_url */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <LinkIcon className="w-3.5 h-3.5 text-indigo-600" />
+                      URL Grafica SVG (<code className="text-gray-500 font-mono text-[10px]">custom.pod_svg_url</code>)
+                    </label>
+                    <input 
+                      type="text"
+                      value={form.pod_svg_url || ""}
+                      onChange={e => handleInputChange(product.id, "pod_svg_url", e.target.value)}
+                      placeholder="https://cdn.shopify.com/.../grafica.svg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* 2. pod.svg (File Reference Shopify) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <FileCode className="w-3.5 h-3.5 text-indigo-600" />
+                        File Reference SVG (<code className="text-gray-500 font-mono text-[10px]">pod.svg</code>)
+                      </span>
+                    </label>
+                    <select
+                      value={form.pod_svg_file_id || ""}
+                      onChange={e => handleInputChange(product.id, "pod_svg_file_id", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">-- Seleziona File SVG da Shopify --</option>
+                      {shopifyFiles.map(file => (
+                        <option key={file.id} value={file.id}>
+                          {file.filename}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 3. pod.height */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Ruler className="w-3.5 h-3.5 text-indigo-600" />
+                      Altezza Stampa in mm (<code className="text-gray-500 font-mono text-[10px]">pod.height</code>)
+                    </label>
+                    <input 
+                      type="text"
+                      value={form.pod_height || ""}
+                      onChange={e => handleInputChange(product.id, "pod_height", e.target.value)}
+                      placeholder="Es. 200"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* 4. pod.width */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Ruler className="w-3.5 h-3.5 text-indigo-600" />
+                      Larghezza Stampa in mm (<code className="text-gray-500 font-mono text-[10px]">pod.width</code>)
+                    </label>
+                    <input 
+                      type="text"
+                      value={form.pod_width || ""}
+                      onChange={e => handleInputChange(product.id, "pod_width", e.target.value)}
+                      placeholder="Es. 300"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* 5. custom.colore_stick */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-indigo-600" />
+                      Colore Stick (<code className="text-gray-500 font-mono text-[10px]">custom.colore_stick</code>)
+                    </label>
+                    <select
+                      value={form.colore_stick || ""}
+                      onChange={e => handleInputChange(product.id, "colore_stick", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">-- Seleziona Colore Stick --</option>
+                      {coloreStickList.map(color => (
+                        <option key={color} value={color}>
+                          {color}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 6. custom.colore_base */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-indigo-600" />
+                      Colore Base (<code className="text-gray-500 font-mono text-[10px]">custom.colore_base</code>)
+                    </label>
+                    <select
+                      value={form.colore_base || ""}
+                      onChange={e => handleInputChange(product.id, "colore_base", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">-- Seleziona Colore Base --</option>
+                      {coloreBaseList.map(color => (
+                        <option key={color} value={color}>
+                          {color}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+    </div>
+  );
+}

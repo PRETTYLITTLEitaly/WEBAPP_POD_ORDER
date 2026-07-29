@@ -63,8 +63,8 @@ async function run() {
           ownerId: shopId,
           namespace: "pod_custom_font",
           key: filename,
-          type: "multi_line_text_field",
-          value: b64
+          type: "json",
+          value: JSON.stringify({ b64: b64 })
         }]
       }
     });

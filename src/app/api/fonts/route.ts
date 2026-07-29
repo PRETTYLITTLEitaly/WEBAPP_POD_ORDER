@@ -52,7 +52,16 @@ export async function syncFontsFromShopify() {
       const targetPath = path.join(fontsDir, filename);
       if (!fs.existsSync(targetPath)) {
         console.log(`Restoring font ${filename} from Shopify Shop Metafield...`);
-        const buffer = Buffer.from(node.value, "base64");
+        let base64Data = node.value;
+        try {
+          const parsed = JSON.parse(node.value);
+          if (parsed && parsed.b64) {
+            base64Data = parsed.b64;
+          }
+        } catch (e) {
+          // Fallback to raw base64 if not JSON
+        }
+        const buffer = Buffer.from(base64Data, "base64");
         fs.writeFileSync(targetPath, buffer);
       }
     }
@@ -213,8 +222,8 @@ export async function POST(req: NextRequest) {
           ownerId: shopId,
           namespace: "pod_custom_font",
           key: filename,
-          type: "multi_line_text_field",
-          value: b64
+          type: "json",
+          value: JSON.stringify({ b64: b64 })
         }]
       }
     });

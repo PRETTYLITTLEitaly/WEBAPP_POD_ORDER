@@ -183,42 +183,45 @@ export async function POST(req: NextRequest) {
     const b64 = buffer.toString("base64");
 
     // Save persistently to Shopify Shop Metafield
-    try {
-      const shopRes = await shopifyFetch({
-        store: "b2c",
-        query: `#graphql
-          query getShopId {
-            shop {
-              id
-            }
+    const shopRes = await shopifyFetch({
+      store: "b2c",
+      query: `#graphql
+        query getShopId {
+          shop {
+            id
           }
-        `
-      });
-      const shopId = shopRes.data?.shop?.id;
-      if (shopId) {
-        const metafieldMutation = `#graphql
-          mutation setShopMetafield($metafields: [MetafieldsSetInput!]!) {
-            metafieldsSet(metafields: $metafields) {
-              userErrors { field message }
-            }
-          }
-        `;
-        await shopifyFetch({
-          store: "b2c",
-          query: metafieldMutation,
-          variables: {
-            metafields: [{
-              ownerId: shopId,
-              namespace: "pod_custom_font",
-              key: filename,
-              type: "multi_line_text_field",
-              value: b64
-            }]
-          }
-        });
+        }
+      `
+    });
+    const shopId = shopRes.data?.shop?.id;
+    if (!shopId) {
+      throw new Error("Impossibile recuperare l'ID del negozio da Shopify.");
+    }
+
+    const metafieldMutation = `#graphql
+      mutation setShopMetafield($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+          userErrors { field message }
+        }
       }
-    } catch (shopifyErr: any) {
-      console.error("Failed to save font to Shopify Shop Metafield:", shopifyErr.message);
+    `;
+    const mutationRes = await shopifyFetch({
+      store: "b2c",
+      query: metafieldMutation,
+      variables: {
+        metafields: [{
+          ownerId: shopId,
+          namespace: "pod_custom_font",
+          key: filename,
+          type: "multi_line_text_field",
+          value: b64
+        }]
+      }
+    });
+
+    const userErrors = mutationRes.data?.metafieldsSet?.userErrors || [];
+    if (userErrors.length > 0) {
+      throw new Error(`Errore Shopify: ${userErrors[0].message}`);
     }
 
     return NextResponse.json({

@@ -24,7 +24,8 @@ import {
   Sun,
   Moon,
   Pipette,
-  Upload
+  Upload,
+  AlertCircle
 } from "lucide-react";
 
 interface TextEditorModalProps {
@@ -853,6 +854,16 @@ export default function TextEditorModal({
                       </option>
                     ))}
                   </select>
+                  
+                  {font && !availableFonts.some(f => f.name.toLowerCase() === font.toLowerCase()) && 
+                    !["outfit", "dancing script", "montserrat"].includes(font.toLowerCase()) && (
+                      <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-1.5 text-amber-800 text-[10px] leading-relaxed">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-extrabold">Font non installato sul server!</span> Il PDF di stampa userà il font di default (Helvetica). Per risolvere, scarica il font sul tuo computer e caricalo in <a href="/settings/fonts" target="_blank" className="underline font-bold text-indigo-700 hover:text-indigo-900">Impostazioni &gt; Font</a>.
+                        </div>
+                      </div>
+                  )}
                 </div>
 
                 {/* 3. DIMENSIONE FONT */}

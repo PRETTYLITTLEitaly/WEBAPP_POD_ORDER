@@ -16,19 +16,17 @@ async function run() {
   `;
 
   try {
-    const res = await shopifyFetch({ store: "b2c", query });
+    const res = await shopifyFetch({
+      store: "b2c",
+      query
+    });
     const nodes = res.data?.shop?.metafields?.nodes || [];
-    console.log(`Found ${nodes.length} fonts in Shopify metafields:`);
+    console.log(`Found ${nodes.length} fonts on Shopify:`);
     for (const node of nodes) {
-      console.log(`- Key: "${node.key}"`);
-      console.log(`  Value Type: ${typeof node.value}`);
-      console.log(`  Value Length: ${node.value ? node.value.length : 0}`);
-      if (node.value) {
-        console.log(`  Value Start: "${node.value.substring(0, 50)}..."`);
-      }
+      console.log(`- Key (filename): "${node.key}" (Length: ${node.value?.length} bytes)`);
     }
   } catch (e) {
-    console.error("Error fetching shop fonts:", e);
+    console.error("Error fetching fonts:", e);
   }
 }
 

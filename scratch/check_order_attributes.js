@@ -29,7 +29,7 @@ async function run() {
     const res = await shopifyFetch({
       store: "b2c",
       query,
-      variables: { query: "name:#15100" }
+      variables: { query: "name:#15126" }
     });
     const order = res.data?.orders?.nodes[0];
     console.log(`Order: ${order?.name} (${order?.id})`);

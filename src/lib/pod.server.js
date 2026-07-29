@@ -161,23 +161,23 @@ export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsI
                 const firstFamily = (family || "").split(",")[0].replace(/['"]/g, "").trim();
                 
                 // Cerca corrispondenza esatta registrata
-                if (doc._fonts && doc._fonts[firstFamily]) {
+                if (doc._registeredFonts && doc._registeredFonts[firstFamily]) {
                   return firstFamily;
                 }
                 
                 // Cerca corrispondenza normalizzata e per sotto-stringa (ignora spazi, maiuscole, trattini)
-                if (doc._fonts) {
+                if (doc._registeredFonts) {
                   const requestedNorm = firstFamily.toLowerCase().replace(/[^a-z0-9]/g, "");
                   
                   // 1. Cerca corrispondenza normalizzata esatta
-                  let match = Object.keys(doc._fonts).find(f => {
+                  let match = Object.keys(doc._registeredFonts).find(f => {
                     const regNorm = f.toLowerCase().replace(/[^a-z0-9]/g, "");
                     return regNorm === requestedNorm;
                   });
                   if (match) return match;
 
                   // 2. Cerca se una contiene l'altra (es: "Wildy" matches "Wildy_Sans")
-                  match = Object.keys(doc._fonts).find(f => {
+                  match = Object.keys(doc._registeredFonts).find(f => {
                     const regNorm = f.toLowerCase().replace(/[^a-z0-9]/g, "");
                     return regNorm.includes(requestedNorm) || requestedNorm.includes(regNorm);
                   });
@@ -192,8 +192,8 @@ export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsI
                 if (cleanLower.includes('times')) return 'Times-Roman';
                 
                 // Fallback al primo font registrato o a Helvetica
-                if (doc._fonts && Object.keys(doc._fonts).length > 0) {
-                  return Object.keys(doc._fonts)[0];
+                if (doc._registeredFonts && Object.keys(doc._registeredFonts).length > 0) {
+                  return Object.keys(doc._registeredFonts)[0];
                 }
                 return 'Helvetica';
               }

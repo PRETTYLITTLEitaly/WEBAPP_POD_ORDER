@@ -176,7 +176,7 @@ export default function TextEditorModal({
           if (!foundText || v.length > foundText.length) foundText = v;
         }
       }
-      if (k.includes("font") && !rawKey.startsWith("_")) foundFont = v;
+      if (k.includes("font") && !k.includes("colore") && !k.includes("color") && !rawKey.startsWith("_")) foundFont = v;
       if (k.includes("font size") || k.includes("_font_size")) {
         const p = parseFloat(v);
         if (!isNaN(p) && p > 0) foundFontSize = Math.round(p);
@@ -617,7 +617,11 @@ export default function TextEditorModal({
                     left: `${posX}%`,
                     top: `${posY}%`,
                     transform: "translate(-50%, -50%)",
-                    fontFamily: availableFonts.find(f => f.name.toLowerCase() === font.toLowerCase())?.family || `'${font}', cursive, sans-serif`,
+                    fontFamily: availableFonts.find(f => {
+                      const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                      const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
+                      return normF.includes(normSelected) || normSelected.includes(normF);
+                    })?.family || `'${font}', cursive, sans-serif`,
                     fontSize: `${fontSize * 0.75}px`, // Scaled down overlay
                     color: color,
                     letterSpacing: `${letterSpacing}px`,
@@ -771,7 +775,11 @@ export default function TextEditorModal({
                 text ? (
                   <div 
                     style={{
-                      fontFamily: availableFonts.find(f => f.name.toLowerCase() === font.toLowerCase())?.family || `'${font}', cursive, sans-serif`,
+                      fontFamily: availableFonts.find(f => {
+                        const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        return normF.includes(normSelected) || normSelected.includes(normF);
+                      })?.family || `'${font}', cursive, sans-serif`,
                       fontSize: `${fontSize * 0.9}px`,
                       color: color,
                       letterSpacing: `${letterSpacing}px`,

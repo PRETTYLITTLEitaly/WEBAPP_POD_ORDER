@@ -165,9 +165,22 @@ export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsI
                   return firstFamily;
                 }
                 
-                // Cerca corrispondenza case-insensitive
+                // Cerca corrispondenza normalizzata e per sotto-stringa (ignora spazi, maiuscole, trattini)
                 if (doc._fonts) {
-                  const match = Object.keys(doc._fonts).find(f => f.toLowerCase() === firstFamily.toLowerCase());
+                  const requestedNorm = firstFamily.toLowerCase().replace(/[^a-z0-9]/g, "");
+                  
+                  // 1. Cerca corrispondenza normalizzata esatta
+                  let match = Object.keys(doc._fonts).find(f => {
+                    const regNorm = f.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    return regNorm === requestedNorm;
+                  });
+                  if (match) return match;
+
+                  // 2. Cerca se una contiene l'altra (es: "Wildy" matches "Wildy_Sans")
+                  match = Object.keys(doc._fonts).find(f => {
+                    const regNorm = f.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    return regNorm.includes(requestedNorm) || requestedNorm.includes(regNorm);
+                  });
                   if (match) return match;
                 }
 

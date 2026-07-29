@@ -199,7 +199,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         }
 
         // 2. Estrazione Font Name (es: "Scegli il font", "Scegli un font", "Font")
-        if (k.includes("font") && !rawKey.startsWith("_")) {
+        if (k.includes("font") && !k.includes("colore") && !k.includes("color") && !rawKey.startsWith("_")) {
           if (v) foundFont = v;
         }
 

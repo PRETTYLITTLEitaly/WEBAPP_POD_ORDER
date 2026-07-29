@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
               if (!customText || v.length > customText.length) customText = v;
             }
           }
-          if (k.includes("font") && !rawKey.startsWith("_")) fontName = v;
+          if (k.includes("font") && !k.includes("colore") && !k.includes("color") && !rawKey.startsWith("_")) fontName = v;
           if (k.includes("font size") || k.includes("_font_size")) {
             const p = parseFloat(v);
             if (!isNaN(p) && p > 0) fontSizePx = Math.round(p);

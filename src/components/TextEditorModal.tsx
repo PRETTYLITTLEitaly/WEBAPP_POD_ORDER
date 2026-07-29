@@ -128,6 +128,7 @@ export default function TextEditorModal({
   const [graphicWidth, setGraphicWidth] = useState(80);
   const [graphicHeight, setGraphicHeight] = useState(100);
   const [aspectRatio, setAspectRatio] = useState(0.8);
+  const [textBBox, setTextBBox] = useState({ x: 900, y: 980, w: 200, h: 40 });
 
   const fitGraphicInProduct = (aspect: number, productW: number, productH: number) => {
     const maxW = productW * 0.9;
@@ -227,27 +228,16 @@ export default function TextEditorModal({
   // Helper to generate a tight fitting SVG for text to keep the bounds accurate
   const generateTightSvgFromText = (txt: string, fontName: string, fontColor: string, size: number, spacing: number): string => {
     const lines = txt.split("\n");
-    let maxLineChars = 0;
-    lines.forEach(l => {
-      if (l.length > maxLineChars) maxLineChars = l.length;
-    });
-
-    const charWidth = size * 0.58;
-    const svgW = Math.max(50, maxLineChars * charWidth + (maxLineChars > 0 ? (maxLineChars - 1) * spacing : 0));
-    const lineHeight = size * 1.25;
-    const svgH = Math.max(20, lines.length * lineHeight);
-
     const hexColor = fontColor.startsWith("#") ? fontColor : "#000000";
 
     let textElements = "";
     lines.forEach((line, idx) => {
-      const yPos = size * 0.9 + idx * lineHeight;
-      textElements += `\n    <text x="${svgW / 2}" y="${yPos}" text-anchor="middle" font-family="'${fontName}', sans-serif" font-size="${size}px" fill="${hexColor}" font-weight="600" letter-spacing="${spacing}">${escapeXml(line)}</text>`;
+      textElements += `\n    <tspan x="1000" dy="${idx === 0 ? "0" : "1.25em"}" text-anchor="middle">${escapeXml(line)}</tspan>`;
     });
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" height="100%">
-      <rect width="${svgW}" height="${svgH}" fill="none" />
-      ${textElements}
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${textBBox.x} ${textBBox.y} ${textBBox.w} ${textBBox.h}" width="100%" height="100%">
+      <rect x="${textBBox.x}" y="${textBBox.y}" width="${textBBox.w}" height="${textBBox.h}" fill="none" />
+      <text x="1000" y="1000" font-family="'${fontName}', sans-serif" font-size="${size}px" fill="${hexColor}" font-weight="600" letter-spacing="${spacing}">${textElements}</text>
     </svg>`;
   };
 
@@ -266,31 +256,51 @@ export default function TextEditorModal({
 
   // Helper to calculate exact text dimensions in mm based on font size
   const getTextDimensionsMm = (txt: string, size: number, spacing: number) => {
-    const lines = txt.split("\n");
-    let maxLineChars = 0;
-    lines.forEach(l => {
-      if (l.length > maxLineChars) maxLineChars = l.length;
-    });
-
-    const scaleFactor = 0.35; // 1px = 0.35mm scale factor
-    const charWidth = size * 0.58;
-    const wMm = (maxLineChars * charWidth + (maxLineChars > 0 ? (maxLineChars - 1) * spacing : 0)) * scaleFactor;
-    const lineHeight = size * 1.25;
-    const hMm = (lines.length * lineHeight) * scaleFactor;
-
+    const scaleFactor = 0.32; // 1px = 0.32mm scale factor
+    const h = textBBox.h * scaleFactor;
+    const w = textBBox.w * scaleFactor;
     return {
-      w: Math.max(5, Math.round(wMm * 10) / 10),
-      h: Math.max(5, Math.round(hMm * 10) / 10)
+      w: Math.max(5, Math.round(w * 10) / 10),
+      h: Math.max(5, Math.round(h * 10) / 10)
     };
   };
 
-  // 1. Monitor text tab aspect ratio and dynamic mm sizing changes
+  // 1. Monitor text tab aspect ratio and dynamic mm sizing changes using exact SVG bbox measurement
   useEffect(() => {
     if (activeTab === "text" && text) {
-      const dims = getTextDimensionsMm(text, fontSize, letterSpacing);
-      setGraphicWidth(dims.w);
-      setGraphicHeight(dims.h);
-      setAspectRatio(dims.w / dims.h);
+      const measureText = () => {
+        const textNode = document.getElementById("text-measurer-node") as SVGTextElement | null;
+        if (textNode) {
+          const bbox = textNode.getBBox();
+          if (bbox && bbox.width > 0 && bbox.height > 0) {
+            // Apply slight horizontal padding to text to prevent edge clipping (e.g. +4px)
+            const paddedBBox = {
+              x: bbox.x - 2,
+              y: bbox.y - 1,
+              w: bbox.width + 4,
+              h: bbox.height + 2
+            };
+            setTextBBox(paddedBBox);
+
+            const aspect = paddedBBox.w / paddedBBox.h;
+            setAspectRatio(aspect);
+
+            const scaleFactor = 0.32;
+            const hMm = Math.round(paddedBBox.h * scaleFactor * 10) / 10;
+            const wMm = Math.round(paddedBBox.w * scaleFactor * 10) / 10;
+
+            setGraphicWidth(wMm);
+            setGraphicHeight(hMm);
+          }
+        }
+      };
+
+      // Measure only after fonts are fully loaded to get the exact width/height of the specific font
+      if (typeof document !== "undefined" && (document as any).fonts) {
+        (document as any).fonts.ready.then(measureText);
+      } else {
+        setTimeout(measureText, 50);
+      }
     }
   }, [text, font, fontSize, letterSpacing, activeTab]);
 
@@ -716,6 +726,39 @@ export default function TextEditorModal({
       onClick={onClose}
     >
       <style dangerouslySetInnerHTML={{ __html: fontStyles }} />
+
+      {/* Hidden measuring SVG element for exact bbox calculation */}
+      {activeTab === "text" && text && (
+        <div 
+          style={{ position: "absolute", visibility: "hidden", pointerEvents: "none", top: -9999, left: -9999 }}
+        >
+          <svg width="2000" height="2000">
+            <text
+              id="text-measurer-node"
+              x="1000"
+              y="1000"
+              style={{
+                fontFamily: availableFonts.find(f => {
+                  const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                  const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
+                  return normF.includes(normSelected) || normSelected.includes(normF);
+                })?.family || `'${font}', sans-serif`,
+                fontSize: `${fontSize}px`,
+                letterSpacing: `${letterSpacing}px`,
+                fontWeight: "600",
+                lineHeight: "1.25"
+              }}
+            >
+              {text.split("\n").map((line, idx) => (
+                <tspan key={idx} x="1000" dy={idx === 0 ? "0" : "1.25em"} textAnchor="middle">
+                  {line}
+                </tspan>
+              ))}
+            </text>
+          </svg>
+        </div>
+      )}
+
       <div 
         className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-gray-100"
         onClick={e => e.stopPropagation()}

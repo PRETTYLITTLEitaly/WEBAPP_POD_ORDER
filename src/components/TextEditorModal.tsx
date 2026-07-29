@@ -119,6 +119,8 @@ export default function TextEditorModal({
   const [color, setColor] = useState(initialColor);
   const [fontSize, setFontSize] = useState(initialFontSize);
   const [letterSpacing, setLetterSpacing] = useState(initialLetterSpacing);
+  const [lineHeight, setLineHeight] = useState(1.25);
+  const [strokeWidth, setStrokeWidth] = useState(0);
   const [align, setAlign] = useState<"left" | "center" | "right">("center");
   const [posX, setPosX] = useState(50);
   const [posY, setPosY] = useState(55);
@@ -199,6 +201,17 @@ export default function TextEditorModal({
     setColor(initialColor || "#38bdf8");
     setFontSize(initialFontSize || 32);
     setLetterSpacing(initialLetterSpacing || 0);
+    
+    let savedLH = 1.25;
+    let savedSW = 0;
+    const lhAttr = customAttributes?.find(a => a.key === "_pod_line_height" || a.key === "Interlinea")?.value;
+    const swAttr = customAttributes?.find(a => a.key === "_pod_stroke_width" || a.key === "Spessore")?.value;
+    if (lhAttr && parseFloat(lhAttr)) savedLH = parseFloat(lhAttr);
+    if (swAttr && parseFloat(swAttr)) savedSW = parseFloat(swAttr);
+
+    setLineHeight(savedLH);
+    setStrokeWidth(savedSW);
+
     setCurrentImageUrl(uploadedImageUrl || backgroundUrl || svgUrl);
     setProcessedImageUrl(null);
     setIsRemoveBgApplied(false);
@@ -229,13 +242,13 @@ export default function TextEditorModal({
   }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, open, customAttributes]);
 
   // Helper to generate a tight fitting SVG for text to keep the bounds accurate
-  const generateTightSvgFromText = (txt: string, fontName: string, fontColor: string, size: number, spacing: number): string => {
+  const generateTightSvgFromText = (txt: string, fontName: string, fontColor: string, size: number, spacing: number, lHeight: number, sWidth: number): string => {
     const lines = txt.split("\n");
     const hexColor = fontColor.startsWith("#") ? fontColor : "#000000";
 
     let textElements = "";
     lines.forEach((line, idx) => {
-      textElements += `\n    <tspan x="1000" dy="${idx === 0 ? "0" : "1.25em"}" text-anchor="middle">${escapeXml(line)}</tspan>`;
+      textElements += `\n    <tspan x="1000" dy="${idx === 0 ? "0" : `${lHeight}em`}" text-anchor="middle">${escapeXml(line)}</tspan>`;
     });
 
     const resolvedFontFamily = availableFonts.find(f => {
@@ -244,9 +257,11 @@ export default function TextEditorModal({
       return normF.includes(normSelected) || normSelected.includes(normF);
     })?.family || `'${fontName}', sans-serif`;
 
+    const strokeAttributes = sWidth > 0 ? `stroke="${hexColor}" stroke-width="${sWidth}" stroke-linejoin="round"` : "";
+
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${textBBox.x} ${textBBox.y} ${textBBox.w} ${textBBox.h}" width="100%" height="100%">
       <rect x="${textBBox.x}" y="${textBBox.y}" width="${textBBox.w}" height="${textBBox.h}" fill="none" />
-      <text x="1000" y="1000" font-family="${resolvedFontFamily}" font-size="${size}px" fill="${hexColor}" font-weight="600" letter-spacing="${spacing}">${textElements}</text>
+      <text x="1000" y="1000" font-family="${resolvedFontFamily}" font-size="${size}px" fill="${hexColor}" font-weight="600" letter-spacing="${spacing}" ${strokeAttributes}>${textElements}</text>
     </svg>`;
   };
 
@@ -316,7 +331,7 @@ export default function TextEditorModal({
         setTimeout(measureText, 50);
       }
     }
-  }, [text, font, fontSize, letterSpacing, activeTab]);
+  }, [text, font, fontSize, letterSpacing, lineHeight, strokeWidth, activeTab]);
 
   // 2. Monitor image tab aspect ratio changes
   useEffect(() => {
@@ -662,7 +677,7 @@ export default function TextEditorModal({
 
     let finalGraphicToSave = "";
     if (activeTab === "text" && text) {
-      const tightSvg = generateTightSvgFromText(text, font, color, fontSize, letterSpacing);
+      const tightSvg = generateTightSvgFromText(text, font, color, fontSize, letterSpacing, lineHeight, strokeWidth);
       finalGraphicToSave = `data:image/svg+xml;utf8,${encodeURIComponent(tightSvg)}`;
     } else {
       finalGraphicToSave = vectorSvgContent
@@ -679,7 +694,7 @@ export default function TextEditorModal({
             orderId,
             store,
             editedImageUrl: finalGraphicToSave,
-            textData: { text, font, fontSize, color },
+            textData: { text, font, fontSize, color, letterSpacing, lineHeight, strokeWidth },
             width: graphicWidth,
             height: graphicHeight
           })
@@ -753,6 +768,9 @@ export default function TextEditorModal({
               id="text-measurer-node"
               x="1000"
               y="1000"
+              stroke={strokeWidth > 0 ? color : "none"}
+              strokeWidth={strokeWidth > 0 ? strokeWidth : undefined}
+              strokeLinejoin={strokeWidth > 0 ? "round" : undefined}
               style={{
                 fontFamily: availableFonts.find(f => {
                   const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -762,11 +780,11 @@ export default function TextEditorModal({
                 fontSize: `${fontSize}px`,
                 letterSpacing: `${letterSpacing}px`,
                 fontWeight: "600",
-                lineHeight: "1.25"
+                lineHeight: `${lineHeight}`
               }}
             >
               {text.split("\n").map((line, idx) => (
-                <tspan key={idx} x="1000" dy={idx === 0 ? "0" : "1.25em"} textAnchor="middle">
+                <tspan key={idx} x="1000" dy={idx === 0 ? "0" : `${lineHeight}em`} textAnchor="middle">
                   {line}
                 </tspan>
               ))}
@@ -900,8 +918,9 @@ export default function TextEditorModal({
                       color: color,
                       letterSpacing: `${letterSpacing}px`,
                       textAlign: "center",
-                      lineHeight: "1.2",
+                      lineHeight: `${lineHeight}`,
                       whiteSpace: "pre-wrap",
+                      WebkitTextStroke: strokeWidth > 0 ? `${strokeWidth * 0.35}px ${color}` : undefined
                     }}
                     className="font-semibold select-none text-center"
                   >
@@ -1093,7 +1112,7 @@ export default function TextEditorModal({
                           <div 
                             className="w-full h-full flex items-center justify-center overflow-hidden text-center"
                             dangerouslySetInnerHTML={{
-                              __html: generateTightSvgFromText(text, font, color, fontSize, letterSpacing)
+                              __html: generateTightSvgFromText(text, font, color, fontSize, letterSpacing, lineHeight, strokeWidth)
                             }}
                           />
                         ) : (
@@ -1315,6 +1334,53 @@ export default function TextEditorModal({
                         />
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* 5. INTERLINEA E SPESSORE */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* INTERLINEA */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                        <List className="w-4 h-4 text-amber-600" />
+                        Interlinea
+                      </label>
+                      <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        {lineHeight}
+                      </span>
+                    </div>
+                    <input 
+                      type="range"
+                      min={0.8}
+                      max={2.5}
+                      step={0.05}
+                      value={lineHeight}
+                      onChange={e => setLineHeight(parseFloat(e.target.value))}
+                      className="w-full accent-amber-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {/* SPESSORE SCRITTA */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                        <Type className="w-4 h-4 text-amber-600" />
+                        Spessore Scritta
+                      </label>
+                      <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        +{strokeWidth} px
+                      </span>
+                    </div>
+                    <input 
+                      type="range"
+                      min={0}
+                      max={8}
+                      step={0.5}
+                      value={strokeWidth}
+                      onChange={e => setStrokeWidth(parseFloat(e.target.value))}
+                      className="w-full accent-amber-600 cursor-pointer"
+                    />
                   </div>
                 </div>
 

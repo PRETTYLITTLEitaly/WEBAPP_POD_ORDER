@@ -17,6 +17,7 @@ export const DEFAULT_ADMIN: User = {
   createdAt: new Date().toISOString()
 };
 
+// Client-side synchronous fallback
 export function getUsers(): User[] {
   if (typeof window === "undefined") return [DEFAULT_ADMIN];
   const saved = localStorage.getItem(USERS_KEY);
@@ -26,7 +27,7 @@ export function getUsers(): User[] {
   }
   try {
     const users: User[] = JSON.parse(saved);
-    if (!users.some(u => u.role === "admin")) {
+    if (!users.some(u => u.email.toLowerCase() === DEFAULT_ADMIN.email)) {
       users.unshift(DEFAULT_ADMIN);
       localStorage.setItem(USERS_KEY, JSON.stringify(users));
     }
@@ -37,9 +38,44 @@ export function getUsers(): User[] {
   }
 }
 
+// Client-side synchronous fallback
 export function saveUsers(users: User[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+// Asynchronous Server sync helper (GET)
+export async function syncUsersFromServer(): Promise<User[]> {
+  try {
+    const res = await fetch("/api/users");
+    const data = await res.json();
+    if (data.success && Array.isArray(data.users)) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(USERS_KEY, JSON.stringify(data.users));
+      }
+      return data.users;
+    }
+  } catch (e) {
+    console.error("Failed to sync users from server:", e);
+  }
+  return getUsers();
+}
+
+// Asynchronous Server sync helper (POST)
+export async function saveUsersToServer(users: User[]): Promise<boolean> {
+  saveUsers(users);
+  try {
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ users })
+    });
+    const data = await res.json();
+    return !!data.success;
+  } catch (e) {
+    console.error("Failed to save users to server:", e);
+    return false;
+  }
 }
 
 export function getCurrentUser(): User | null {
@@ -58,7 +94,6 @@ export function getCurrentUser(): User | null {
 export function setCurrentUser(user: User | null) {
   if (typeof window === "undefined") return;
   if (user) {
-    // Hide password from stored session
     const { password, ...safeUser } = user;
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(safeUser));
   } else {

@@ -8,6 +8,7 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/pdf") ||
+    pathname.startsWith("/api/users") ||
     pathname.startsWith("/fonts") ||
     pathname === "/favicon.ico"
   ) {
@@ -56,6 +57,6 @@ export const config = {
     /*
      * Protegge tutte le pagine dell'applicazione tranne asset statici, font ed API pubbliche
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/pdf|fonts).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/pdf|api/users|fonts).*)",
   ],
 };

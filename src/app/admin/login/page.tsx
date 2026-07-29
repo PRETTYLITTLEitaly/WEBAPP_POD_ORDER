@@ -1,20 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { loginAction } from "./actions";
 import { LockKeyhole, Mail, Key } from "lucide-react";
-import { getUsers, setCurrentUser, User } from "@/lib/userStore";
+import { getUsers, syncUsersFromServer, setCurrentUser, User } from "@/lib/userStore";
 
 export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  useEffect(() => {
+    syncUsersFromServer().catch(() => {});
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
-    const users = getUsers();
+    let users = getUsers();
+    try {
+      users = await syncUsersFromServer();
+    } catch (err) {}
+
     const foundUser = users.find(
       u => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
     );

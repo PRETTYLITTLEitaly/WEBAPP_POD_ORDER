@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getUsers, saveUsers, getCurrentUser, User } from "@/lib/userStore";
+import { getUsers, saveUsers, getCurrentUser, syncUsersFromServer, saveUsersToServer, User } from "@/lib/userStore";
 import { UserPlus, Shield, Key, Trash2, Users, AlertCircle } from "lucide-react";
 
 export default function UserManagementPage() {
@@ -19,7 +19,9 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     setCurrentUser(getCurrentUser());
-    setUsersList(getUsers());
+    syncUsersFromServer().then(list => {
+      setUsersList(list);
+    });
   }, []);
 
   if (currentUser && currentUser.role !== "admin") {
@@ -54,7 +56,7 @@ export default function UserManagementPage() {
     };
 
     const updated = [...users, newUser];
-    saveUsers(updated);
+    saveUsersToServer(updated);
     setUsersList(updated);
 
     setNewEmail("");
@@ -76,7 +78,7 @@ export default function UserManagementPage() {
       return u;
     });
 
-    saveUsers(updated);
+    saveUsersToServer(updated);
     setUsersList(updated);
     setShowResetModal(null);
     setResetPassVal("");
@@ -91,7 +93,7 @@ export default function UserManagementPage() {
     }
     if (confirm(`Sei sicuro di voler eliminare l'utente ${user.email}?`)) {
       const updated = users.filter(u => u.id !== user.id);
-      saveUsers(updated);
+      saveUsersToServer(updated);
       setUsersList(updated);
       setMessage(`Utente ${user.email} eliminato.`);
       setTimeout(() => setMessage(null), 4000);

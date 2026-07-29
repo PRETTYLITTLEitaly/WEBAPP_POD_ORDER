@@ -53,6 +53,8 @@ interface TextEditorModalProps {
     x: number;
     y: number;
     processedGraphicUrl?: string;
+    width?: number;
+    height?: number;
   }) => void;
 }
 
@@ -79,6 +81,15 @@ const PRESET_COLORS = [
   { name: "Rosa", hex: "#ec4899" },
   { name: "Verde", hex: "#16a34a" },
   { name: "Blu", hex: "#2563eb" }
+];
+
+const PRODUCT_PRESETS = [
+  { name: "PROFUMATORE", w: 110, h: 130 },
+  { name: "MINI PROFUMATORE", w: 75, h: 80 },
+  { name: "CANDELA 450", w: 110, h: 80 },
+  { name: "CANDELA 250", w: 75, h: 80 },
+  { name: "LAMPADA", w: 155, h: 150 },
+  { name: "VASO", w: 180, h: 240 }
 ];
 
 export default function TextEditorModal({
@@ -111,6 +122,48 @@ export default function TextEditorModal({
   const [align, setAlign] = useState<"left" | "center" | "right">("center");
   const [posX, setPosX] = useState(50);
   const [posY, setPosY] = useState(55);
+
+  // Product & Size states
+  const [selectedProductIdx, setSelectedProductIdx] = useState(0);
+  const [graphicWidth, setGraphicWidth] = useState(80);
+  const [graphicHeight, setGraphicHeight] = useState(100);
+  const [aspectRatio, setAspectRatio] = useState(0.8);
+
+  const fitGraphicInProduct = (aspect: number, productW: number, productH: number) => {
+    const maxW = productW * 0.9;
+    const maxH = productH * 0.9;
+    let w = maxW;
+    let h = w / aspect;
+    if (h > maxH) {
+      h = maxH;
+      w = h * aspect;
+    }
+    return {
+      w: Math.round(w * 10) / 10,
+      h: Math.round(h * 10) / 10
+    };
+  };
+
+  const selectProductPreset = (idx: number) => {
+    setSelectedProductIdx(idx);
+    const preset = PRODUCT_PRESETS[idx];
+    const fitted = fitGraphicInProduct(aspectRatio, preset.w, preset.h);
+    setGraphicWidth(fitted.w);
+    setGraphicHeight(fitted.h);
+  };
+
+  const detectPresetIndex = () => {
+    for (const item of lineItems || []) {
+      const t = (item.title || "").toLowerCase();
+      if (t.includes("mini") && t.includes("profumatore")) return 1;
+      if (t.includes("profumatore")) return 0;
+      if (t.includes("candela") && t.includes("450")) return 2;
+      if (t.includes("candela") && t.includes("250")) return 3;
+      if (t.includes("lampada")) return 4;
+      if (t.includes("vaso")) return 5;
+    }
+    return 0;
+  };
   
   // Image Processing & Vectorizer States
   const [currentImageUrl, setCurrentImageUrl] = useState(uploadedImageUrl || backgroundUrl || svgUrl);
@@ -142,12 +195,132 @@ export default function TextEditorModal({
     setVectorSvgContent(null);
     setSelectedItemIdx(0);
 
+    const presetIdx = detectPresetIndex();
+    setSelectedProductIdx(presetIdx);
+
+    // Get width and height from order metafields or attributes if possible
+    let savedW = 80;
+    let savedH = 100;
+    const wAttr = customAttributes?.find(a => a.key === "_pod_width" || a.key === "Larghezza")?.value;
+    const hAttr = customAttributes?.find(a => a.key === "_pod_height" || a.key === "Altezza")?.value;
+    if (wAttr && parseFloat(wAttr)) savedW = parseFloat(wAttr);
+    if (hAttr && parseFloat(hAttr)) savedH = parseFloat(hAttr);
+
+    setGraphicWidth(savedW);
+    setGraphicHeight(savedH);
+    setAspectRatio(savedW / savedH);
+
     if ((uploadedImageUrl || backgroundUrl || svgUrl) && !initialText) {
       setActiveTab("image");
     } else {
       setActiveTab("text");
     }
-  }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, open]);
+  }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, open, customAttributes]);
+
+  // Helper to generate a tight fitting SVG for text to keep the bounds accurate
+  const generateTightSvgFromText = (txt: string, fontName: string, fontColor: string, size: number, spacing: number): string => {
+    const lines = txt.split("\n");
+    let maxLineChars = 0;
+    lines.forEach(l => {
+      if (l.length > maxLineChars) maxLineChars = l.length;
+    });
+
+    const charWidth = size * 0.58;
+    const svgW = Math.max(50, maxLineChars * charWidth + (maxLineChars > 0 ? (maxLineChars - 1) * spacing : 0));
+    const lineHeight = size * 1.25;
+    const svgH = Math.max(20, lines.length * lineHeight);
+
+    const hexColor = fontColor.startsWith("#") ? fontColor : "#000000";
+
+    let textElements = "";
+    lines.forEach((line, idx) => {
+      const yPos = size * 0.9 + idx * lineHeight;
+      textElements += `\n    <text x="${svgW / 2}" y="${yPos}" text-anchor="middle" font-family="'${fontName}', sans-serif" font-size="${size}px" fill="${hexColor}" font-weight="600" letter-spacing="${spacing}">${escapeXml(line)}</text>`;
+    });
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="100%" height="100%">
+      <rect width="${svgW}" height="${svgH}" fill="none" />
+      ${textElements}
+    </svg>`;
+  };
+
+  const escapeXml = (unsafe: string): string => {
+    return (unsafe || "").replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        default: return c;
+      }
+    });
+  };
+
+  // 1. Monitor text tab aspect ratio changes
+  useEffect(() => {
+    if (activeTab === "text" && text) {
+      const lines = text.split("\n");
+      let maxLineChars = 0;
+      lines.forEach(l => {
+        if (l.length > maxLineChars) maxLineChars = l.length;
+      });
+
+      const charWidth = fontSize * 0.58;
+      const w = Math.max(50, maxLineChars * charWidth + (maxLineChars > 0 ? (maxLineChars - 1) * letterSpacing : 0));
+      const lineHeight = fontSize * 1.25;
+      const h = Math.max(20, lines.length * lineHeight);
+
+      const aspect = w / h;
+      setAspectRatio(aspect);
+
+      // Auto fit graphic into current preset boundaries on text change
+      const preset = PRODUCT_PRESETS[selectedProductIdx];
+      const fitted = fitGraphicInProduct(aspect, preset.w, preset.h);
+      setGraphicWidth(fitted.w);
+      setGraphicHeight(fitted.h);
+    }
+  }, [text, font, fontSize, letterSpacing, activeTab, selectedProductIdx]);
+
+  // 2. Monitor image tab aspect ratio changes
+  useEffect(() => {
+    if (activeTab === "image") {
+      const src = processedImageUrl || currentImageUrl;
+      if (src) {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          if (w && h) {
+            const aspect = w / h;
+            setAspectRatio(aspect);
+
+            // Auto fit graphic into current preset boundaries on image load
+            const preset = PRODUCT_PRESETS[selectedProductIdx];
+            const fitted = fitGraphicInProduct(aspect, preset.w, preset.h);
+            setGraphicWidth(fitted.w);
+            setGraphicHeight(fitted.h);
+          }
+        };
+      }
+    }
+  }, [currentImageUrl, processedImageUrl, activeTab, selectedProductIdx]);
+
+  // Handlers for manual input adjustments preserving ratio
+  const handleWidthChange = (w: number) => {
+    setGraphicWidth(w);
+    if (aspectRatio) {
+      setGraphicHeight(Math.round((w / aspectRatio) * 10) / 10);
+    }
+  };
+
+  const handleHeightChange = (h: number) => {
+    setGraphicHeight(h);
+    if (aspectRatio) {
+      setGraphicWidth(Math.round((h * aspectRatio) * 10) / 10);
+    }
+  };
 
   // Gestisci cambio di articolo selezionato in ordini multi-prodotto
   const handleSelectLineItem = (idx: number) => {
@@ -433,9 +606,15 @@ export default function TextEditorModal({
   const handleConfirmSave = async () => {
     setIsSaving(true);
 
-    const finalGraphicToSave = vectorSvgContent
-      ? `data:image/svg+xml;utf8,${encodeURIComponent(vectorSvgContent)}`
-      : (processedImageUrl || currentImageUrl);
+    let finalGraphicToSave = "";
+    if (activeTab === "text" && text) {
+      const tightSvg = generateTightSvgFromText(text, font, color, fontSize, letterSpacing);
+      finalGraphicToSave = `data:image/svg+xml;utf8,${encodeURIComponent(tightSvg)}`;
+    } else {
+      finalGraphicToSave = vectorSvgContent
+        ? `data:image/svg+xml;utf8,${encodeURIComponent(vectorSvgContent)}`
+        : (processedImageUrl || currentImageUrl);
+    }
 
     if (orderId && finalGraphicToSave) {
       try {
@@ -446,7 +625,9 @@ export default function TextEditorModal({
             orderId,
             store,
             editedImageUrl: finalGraphicToSave,
-            textData: { text, font, fontSize, color }
+            textData: { text, font, fontSize, color },
+            width: graphicWidth,
+            height: graphicHeight
           })
         });
       } catch (e) {
@@ -463,7 +644,9 @@ export default function TextEditorModal({
         letterSpacing,
         x: posX,
         y: posY,
-        processedGraphicUrl: finalGraphicToSave
+        processedGraphicUrl: finalGraphicToSave,
+        width: graphicWidth,
+        height: graphicHeight
       });
     }
 
@@ -743,60 +926,95 @@ export default function TextEditorModal({
 
             {/* CANVAS INTERATTIVO PELLICOLA DTF */}
             <div 
-              style={{ backgroundColor: canvasBgColor }}
-              className="w-full h-[240px] rounded-2xl border-2 border-dashed border-amber-300 shadow-inner relative overflow-hidden flex items-center justify-center p-4 group transition-colors duration-300"
+              className="w-full h-[240px] rounded-2xl border border-gray-200 shadow-inner relative overflow-hidden flex items-center justify-center p-2 bg-gray-150"
             >
-              {/* RENDERING IMMAGINE VETTORIALIZZATA O CON SFONDO RIMOSSO */}
-              {activeTab === "image" ? (
-                vectorSvgContent ? (
-                  <div 
-                    className="w-full h-full flex items-center justify-center text-amber-700 p-2 overflow-hidden"
-                    dangerouslySetInnerHTML={{ __html: vectorSvgContent }}
-                  />
-                ) : processedImageUrl ? (
-                  <img 
-                    src={processedImageUrl} 
-                    alt="Immagine senza sfondo" 
-                    className="max-w-full max-h-full object-contain p-2 drop-shadow-md"
-                  />
-                ) : currentImageUrl ? (
-                  <img 
-                    src={currentImageUrl} 
-                    alt="Anteprima Ordine" 
-                    className="max-w-full max-h-full object-contain p-2 opacity-60 pointer-events-none"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-transparent flex items-center justify-center text-gray-300 text-xs font-mono select-none">
-                    [Area di Stampa Grafica]
-                  </div>
-                )
-              ) : (
-                /* SE ABBIAMO ATTIVO IL TESTO, MOSTRIAMO SOLO IL TESTO CENTRATO NELLA PELLICOLA */
-                text ? (
-                  <div 
-                    style={{
-                      fontFamily: availableFonts.find(f => {
-                        const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-                        const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
-                        return normF.includes(normSelected) || normSelected.includes(normF);
-                      })?.family || `'${font}', cursive, sans-serif`,
-                      fontSize: `${fontSize * 0.9}px`,
-                      color: color,
-                      letterSpacing: `${letterSpacing}px`,
-                      textAlign: "center",
-                      lineHeight: "1.2",
-                      whiteSpace: "pre-wrap",
+              {/* Box Prodotto con Dimensioni e Proporzioni Reali */}
+              {(() => {
+                const preset = PRODUCT_PRESETS[selectedProductIdx];
+                const maxScreenW = 340;
+                const maxScreenH = 210;
+                const productAspect = preset.w / preset.h;
+                
+                let screenW = maxScreenW;
+                let screenH = screenW / productAspect;
+                if (screenH > maxScreenH) {
+                  screenH = maxScreenH;
+                  screenW = screenH * productAspect;
+                }
+
+                const mmToPxRatio = screenW / preset.w;
+                const graphicScreenW = graphicWidth * mmToPxRatio;
+                const graphicScreenH = graphicHeight * mmToPxRatio;
+
+                return (
+                  <div
+                    style={{ 
+                      width: `${screenW}px`, 
+                      height: `${screenH}px`,
+                      backgroundColor: canvasBgColor
                     }}
-                    className="font-semibold tracking-wide select-none max-w-[90%] text-center"
+                    className="relative border-2 border-indigo-400/80 rounded-lg shadow-md flex items-center justify-center overflow-hidden transition-colors duration-300"
                   >
-                    {text}
+                    {/* Badge Prodotto Bounding Box */}
+                    <span className="absolute top-1 left-1.5 text-[8px] font-extrabold text-indigo-800 bg-indigo-50 px-1 py-0.2 rounded border border-indigo-200 select-none z-10 opacity-75">
+                      {preset.name} ({preset.w}x{preset.h} mm)
+                    </span>
+
+                    {/* Contorno della Grafica / Testo (Bounding Box) */}
+                    <div
+                      style={{ 
+                        width: `${graphicScreenW}px`, 
+                        height: `${graphicScreenH}px`
+                      }}
+                      className="border border-dashed border-rose-500/70 relative flex items-center justify-center p-0.5 group"
+                    >
+                      {/* Bounding box sizes label */}
+                      <span className="absolute -bottom-4 right-0 text-[7px] font-bold font-mono text-rose-600 bg-rose-50 px-1 rounded select-none opacity-0 group-hover:opacity-100 transition-opacity">
+                        {graphicWidth} x {graphicHeight} mm
+                      </span>
+
+                      {activeTab === "image" ? (
+                        vectorSvgContent ? (
+                          <div 
+                            className="w-full h-full flex items-center justify-center overflow-hidden"
+                            style={{ color }}
+                            dangerouslySetInnerHTML={{ __html: vectorSvgContent }}
+                          />
+                        ) : processedImageUrl ? (
+                          <img 
+                            src={processedImageUrl} 
+                            alt="Immagine senza sfondo" 
+                            className="w-full h-full object-contain"
+                          />
+                        ) : currentImageUrl ? (
+                          <img 
+                            src={currentImageUrl} 
+                            alt="Anteprima Ordine" 
+                            className="w-full h-full object-contain opacity-60 pointer-events-none"
+                          />
+                        ) : (
+                          <div className="text-gray-300 text-[9px] font-mono select-none">
+                            [Nessuna Grafica]
+                          </div>
+                        )
+                      ) : (
+                        text ? (
+                          <div 
+                            className="w-full h-full flex items-center justify-center overflow-hidden text-center"
+                            dangerouslySetInnerHTML={{
+                              __html: generateTightSvgFromText(text, font, color, fontSize, letterSpacing)
+                            }}
+                          />
+                        ) : (
+                          <div className="text-gray-300 text-[9px] font-mono select-none">
+                            [Nessun Testo]
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div className="absolute inset-0 bg-transparent flex items-center justify-center text-gray-300 text-xs font-mono select-none">
-                    [Area di Stampa Testo]
-                  </div>
-                )
-              )}
+                );
+              })()}
             </div>
 
             {/* CONTROLLI DI POSIZIONAMENTO RAPIDO (SOLO SE TESTO ATTIVO E DISPONIBILE) */}
@@ -1029,6 +1247,81 @@ export default function TextEditorModal({
 
               </div>
             )}
+
+            {/* SEZIONE GESTIONE PRODOTTO & DIMENSIONI REAL-TIME */}
+            <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-indigo-950 flex items-center gap-1.5">
+                  <Package className="w-4 h-4 text-indigo-600" />
+                  Dimensionamento Reale (mm)
+                </span>
+                <span className="text-[10px] text-gray-400 font-normal">Seleziona il supporto di destinazione</span>
+              </div>
+
+              {/* SELETTORE PRODOTTO PRESET */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {PRODUCT_PRESETS.map((p, idx) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => selectProductPreset(idx)}
+                    className={`px-1.5 py-2 border rounded-xl text-[10px] font-extrabold transition-all text-center leading-tight flex flex-col justify-between h-14 ${
+                      selectedProductIdx === idx
+                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 shadow-xs"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="truncate w-full">{p.name}</span>
+                    <span className="font-mono text-[9px] text-indigo-600 mt-1">{p.w}x{p.h} mm</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* GESTIONE LARGHEZZA / ALTEZZA GRAFICA */}
+              <div className="grid grid-cols-2 gap-3 items-end pt-1">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-600">Larghezza Grafica (mm)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max={PRODUCT_PRESETS[selectedProductIdx].w * 1.5}
+                      value={graphicWidth}
+                      onChange={e => handleWidthChange(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="absolute right-3 top-2.5 text-[10px] font-bold text-gray-400">mm</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-600">Altezza Grafica (mm)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max={PRODUCT_PRESETS[selectedProductIdx].h * 1.5}
+                      value={graphicHeight}
+                      onChange={e => handleHeightChange(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="absolute right-3 top-2.5 text-[10px] font-bold text-gray-400">mm</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* AVVISO DI FUORI BORDO */}
+              {(graphicWidth > PRODUCT_PRESETS[selectedProductIdx].w || graphicHeight > PRODUCT_PRESETS[selectedProductIdx].h) && (
+                <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-1.5 text-rose-800 text-[10px] leading-relaxed">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
+                  <div>
+                    <span className="font-extrabold">Attenzione: Fuori bordo!</span> La grafica supera le dimensioni del prodotto selezionato ({PRODUCT_PRESETS[selectedProductIdx].w}x{PRODUCT_PRESETS[selectedProductIdx].h} mm).
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* ATTRIBUTI DETTAGLIATI ORDINE */}
             {customAttributes.length > 0 && (

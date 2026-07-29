@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   X, 
   Pencil, 
@@ -129,6 +129,7 @@ export default function TextEditorModal({
   const [graphicHeight, setGraphicHeight] = useState(100);
   const [aspectRatio, setAspectRatio] = useState(0.8);
   const [textBBox, setTextBBox] = useState({ x: 900, y: 980, w: 200, h: 40 });
+  const isUpdatingFromMmInput = useRef(false);
 
   const fitGraphicInProduct = (aspect: number, productW: number, productH: number) => {
     const maxW = productW * 0.9;
@@ -149,6 +150,8 @@ export default function TextEditorModal({
     setSelectedProductIdx(idx);
     const preset = PRODUCT_PRESETS[idx];
     const fitted = fitGraphicInProduct(aspectRatio, preset.w, preset.h);
+    
+    isUpdatingFromMmInput.current = true;
     setGraphicWidth(fitted.w);
     setGraphicHeight(fitted.h);
 
@@ -235,9 +238,15 @@ export default function TextEditorModal({
       textElements += `\n    <tspan x="1000" dy="${idx === 0 ? "0" : "1.25em"}" text-anchor="middle">${escapeXml(line)}</tspan>`;
     });
 
+    const resolvedFontFamily = availableFonts.find(f => {
+      const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const normSelected = fontName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return normF.includes(normSelected) || normSelected.includes(normF);
+    })?.family || `'${fontName}', sans-serif`;
+
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${textBBox.x} ${textBBox.y} ${textBBox.w} ${textBBox.h}" width="100%" height="100%">
       <rect x="${textBBox.x}" y="${textBBox.y}" width="${textBBox.w}" height="${textBBox.h}" fill="none" />
-      <text x="1000" y="1000" font-family="'${fontName}', sans-serif" font-size="${size}px" fill="${hexColor}" font-weight="600" letter-spacing="${spacing}">${textElements}</text>
+      <text x="1000" y="1000" font-family="${resolvedFontFamily}" font-size="${size}px" fill="${hexColor}" font-weight="600" letter-spacing="${spacing}">${textElements}</text>
     </svg>`;
   };
 
@@ -285,12 +294,17 @@ export default function TextEditorModal({
             const aspect = paddedBBox.w / paddedBBox.h;
             setAspectRatio(aspect);
 
-            const scaleFactor = 0.32;
-            const hMm = Math.round(paddedBBox.h * scaleFactor * 10) / 10;
-            const wMm = Math.round(paddedBBox.w * scaleFactor * 10) / 10;
+            if (isUpdatingFromMmInput.current) {
+              // Reset flag and do NOT overwrite manual sizing inputs
+              isUpdatingFromMmInput.current = false;
+            } else {
+              const scaleFactor = 0.32;
+              const hMm = Math.round(paddedBBox.h * scaleFactor * 10) / 10;
+              const wMm = Math.round(paddedBBox.w * scaleFactor * 10) / 10;
 
-            setGraphicWidth(wMm);
-            setGraphicHeight(hMm);
+              setGraphicWidth(wMm);
+              setGraphicHeight(hMm);
+            }
           }
         }
       };
@@ -331,6 +345,7 @@ export default function TextEditorModal({
 
   // Handlers for manual input adjustments preserving ratio
   const handleWidthChange = (w: number) => {
+    isUpdatingFromMmInput.current = true;
     setGraphicWidth(w);
     if (aspectRatio) {
       const h = Math.round((w / aspectRatio) * 10) / 10;
@@ -346,6 +361,7 @@ export default function TextEditorModal({
   };
 
   const handleHeightChange = (h: number) => {
+    isUpdatingFromMmInput.current = true;
     setGraphicHeight(h);
     if (aspectRatio) {
       const w = Math.round((h * aspectRatio) * 10) / 10;

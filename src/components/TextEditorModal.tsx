@@ -150,6 +150,13 @@ export default function TextEditorModal({
     const fitted = fitGraphicInProduct(aspectRatio, preset.w, preset.h);
     setGraphicWidth(fitted.w);
     setGraphicHeight(fitted.h);
+
+    if (activeTab === "text" && text) {
+      const lines = text.split("\n");
+      const scaleFactor = 0.35;
+      const computedSize = fitted.h / (lines.length * 1.25 * scaleFactor);
+      setFontSize(Math.max(8, Math.min(200, Math.round(computedSize))));
+    }
   };
 
   const detectPresetIndex = () => {
@@ -257,30 +264,35 @@ export default function TextEditorModal({
     });
   };
 
-  // 1. Monitor text tab aspect ratio changes
+  // Helper to calculate exact text dimensions in mm based on font size
+  const getTextDimensionsMm = (txt: string, size: number, spacing: number) => {
+    const lines = txt.split("\n");
+    let maxLineChars = 0;
+    lines.forEach(l => {
+      if (l.length > maxLineChars) maxLineChars = l.length;
+    });
+
+    const scaleFactor = 0.35; // 1px = 0.35mm scale factor
+    const charWidth = size * 0.58;
+    const wMm = (maxLineChars * charWidth + (maxLineChars > 0 ? (maxLineChars - 1) * spacing : 0)) * scaleFactor;
+    const lineHeight = size * 1.25;
+    const hMm = (lines.length * lineHeight) * scaleFactor;
+
+    return {
+      w: Math.max(5, Math.round(wMm * 10) / 10),
+      h: Math.max(5, Math.round(hMm * 10) / 10)
+    };
+  };
+
+  // 1. Monitor text tab aspect ratio and dynamic mm sizing changes
   useEffect(() => {
     if (activeTab === "text" && text) {
-      const lines = text.split("\n");
-      let maxLineChars = 0;
-      lines.forEach(l => {
-        if (l.length > maxLineChars) maxLineChars = l.length;
-      });
-
-      const charWidth = fontSize * 0.58;
-      const w = Math.max(50, maxLineChars * charWidth + (maxLineChars > 0 ? (maxLineChars - 1) * letterSpacing : 0));
-      const lineHeight = fontSize * 1.25;
-      const h = Math.max(20, lines.length * lineHeight);
-
-      const aspect = w / h;
-      setAspectRatio(aspect);
-
-      // Auto fit graphic into current preset boundaries on text change
-      const preset = PRODUCT_PRESETS[selectedProductIdx];
-      const fitted = fitGraphicInProduct(aspect, preset.w, preset.h);
-      setGraphicWidth(fitted.w);
-      setGraphicHeight(fitted.h);
+      const dims = getTextDimensionsMm(text, fontSize, letterSpacing);
+      setGraphicWidth(dims.w);
+      setGraphicHeight(dims.h);
+      setAspectRatio(dims.w / dims.h);
     }
-  }, [text, font, fontSize, letterSpacing, activeTab, selectedProductIdx]);
+  }, [text, font, fontSize, letterSpacing, activeTab]);
 
   // 2. Monitor image tab aspect ratio changes
   useEffect(() => {
@@ -311,14 +323,30 @@ export default function TextEditorModal({
   const handleWidthChange = (w: number) => {
     setGraphicWidth(w);
     if (aspectRatio) {
-      setGraphicHeight(Math.round((w / aspectRatio) * 10) / 10);
+      const h = Math.round((w / aspectRatio) * 10) / 10;
+      setGraphicHeight(h);
+      
+      if (activeTab === "text" && text) {
+        const lines = text.split("\n");
+        const scaleFactor = 0.35;
+        const computedSize = h / (lines.length * 1.25 * scaleFactor);
+        setFontSize(Math.max(8, Math.min(200, Math.round(computedSize))));
+      }
     }
   };
 
   const handleHeightChange = (h: number) => {
     setGraphicHeight(h);
     if (aspectRatio) {
-      setGraphicWidth(Math.round((h * aspectRatio) * 10) / 10);
+      const w = Math.round((h * aspectRatio) * 10) / 10;
+      setGraphicWidth(w);
+
+      if (activeTab === "text" && text) {
+        const lines = text.split("\n");
+        const scaleFactor = 0.35;
+        const computedSize = h / (lines.length * 1.25 * scaleFactor);
+        setFontSize(Math.max(8, Math.min(200, Math.round(computedSize))));
+      }
     }
   };
 
@@ -792,33 +820,37 @@ export default function TextEditorModal({
                 </div>
               )}
 
-              {/* TESTO SOPRA L'ANTEPRIMA DEL PRODOTTO (MOCKUP) */}
-              {text && activeTab === "text" && (
-                <div 
-                  style={{
-                    position: "absolute",
-                    left: `${posX}%`,
-                    top: `${posY}%`,
-                    transform: "translate(-50%, -50%)",
-                    fontFamily: availableFonts.find(f => {
-                      const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-                      const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
-                      return normF.includes(normSelected) || normSelected.includes(normF);
-                    })?.family || `'${font}', cursive, sans-serif`,
-                    fontSize: `${fontSize * 0.75}px`, // Scaled down overlay
-                    color: color,
-                    letterSpacing: `${letterSpacing}px`,
-                    textAlign: align,
-                    lineHeight: "1.2",
-                    whiteSpace: "pre-wrap",
-                    textShadow: color === "#ffffff" ? "0 1px 3px rgba(0,0,0,0.8)" : "none"
-                  }}
-                  className="max-w-[85%] font-semibold tracking-wide select-none pointer-events-none transition-all"
-                >
-                  {text}
-                </div>
-              )}
             </div>
+
+            {/* ANTEPRIMA TESTO GENERATO (SOTTO IL MOCKUP) */}
+            {activeTab === "text" && text && (
+              <div className="w-full bg-white p-4 rounded-2xl border border-gray-200 shadow-sm space-y-1.5">
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wide">Testo Generato (Anteprima Font e Colore)</span>
+                <div 
+                  className="w-full p-4 rounded-xl border border-dashed border-gray-200 flex items-center justify-center min-h-[60px]"
+                  style={{ backgroundColor: canvasBgColor }}
+                >
+                  <div 
+                    style={{
+                      fontFamily: availableFonts.find(f => {
+                        const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        return normF.includes(normSelected) || normSelected.includes(normF);
+                      })?.family || `'${font}', cursive, sans-serif`,
+                      fontSize: "22px",
+                      color: color,
+                      letterSpacing: `${letterSpacing}px`,
+                      textAlign: "center",
+                      lineHeight: "1.2",
+                      whiteSpace: "pre-wrap",
+                    }}
+                    className="font-semibold select-none text-center"
+                  >
+                    {text}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* BOX ANTEPRIMA IMMAGINE ORIGINALE CARICATA (Riferimento) */}
             {uploadedImageUrl && (
@@ -1034,6 +1066,81 @@ export default function TextEditorModal({
               </div>
             )}
 
+            {/* SEZIONE GESTIONE PRODOTTO & DIMENSIONI REAL-TIME */}
+            <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-700">
+                <span className="flex items-center gap-1.5 text-indigo-700">
+                  <Package className="w-4 h-4 text-indigo-500" />
+                  Dimensionamento Reale (mm)
+                </span>
+                <span className="text-[10px] text-gray-400 font-normal">Seleziona il supporto di destinazione</span>
+              </div>
+
+              {/* SELETTORE PRODOTTO PRESET - COMPATTO & MINIMALE */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {PRODUCT_PRESETS.map((p, idx) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => selectProductPreset(idx)}
+                    className={`py-1.5 px-2 border rounded-xl transition-all text-center leading-tight flex flex-col justify-center gap-0.5 h-10 ${
+                      selectedProductIdx === idx
+                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 shadow-xs"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="truncate w-full text-[9px] font-extrabold uppercase tracking-wide">{p.name}</span>
+                    <span className="font-mono text-[8px] text-gray-400 font-bold">{p.w}x{p.h} mm</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* GESTIONE LARGHEZZA / ALTEZZA GRAFICA */}
+              <div className="grid grid-cols-2 gap-3 items-end pt-0.5">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-600">Larghezza Grafica (mm)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max={PRODUCT_PRESETS[selectedProductIdx].w * 1.5}
+                      value={graphicWidth}
+                      onChange={e => handleWidthChange(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-extrabold text-gray-600">Altezza Grafica (mm)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max={PRODUCT_PRESETS[selectedProductIdx].h * 1.5}
+                      value={graphicHeight}
+                      onChange={e => handleHeightChange(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* AVVISO DI FUORI BORDO */}
+              {(graphicWidth > PRODUCT_PRESETS[selectedProductIdx].w || graphicHeight > PRODUCT_PRESETS[selectedProductIdx].h) && (
+                <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-1.5 text-rose-800 text-[10px] leading-relaxed">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
+                  <div>
+                    <span className="font-extrabold">Attenzione: Fuori bordo!</span> La grafica supera le dimensioni del prodotto selezionato ({PRODUCT_PRESETS[selectedProductIdx].w}x{PRODUCT_PRESETS[selectedProductIdx].h} mm).
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* PANNELLO CONTROLLI ED EDITOR (LARGHEZZA INTERA DESTRA) */}
             <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
             
@@ -1247,81 +1354,6 @@ export default function TextEditorModal({
 
               </div>
             )}
-
-            {/* SEZIONE GESTIONE PRODOTTO & DIMENSIONI REAL-TIME */}
-            <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-indigo-950 flex items-center gap-1.5">
-                  <Package className="w-4 h-4 text-indigo-600" />
-                  Dimensionamento Reale (mm)
-                </span>
-                <span className="text-[10px] text-gray-400 font-normal">Seleziona il supporto di destinazione</span>
-              </div>
-
-              {/* SELETTORE PRODOTTO PRESET */}
-              <div className="grid grid-cols-3 gap-1.5">
-                {PRODUCT_PRESETS.map((p, idx) => (
-                  <button
-                    key={p.name}
-                    type="button"
-                    onClick={() => selectProductPreset(idx)}
-                    className={`px-1.5 py-2 border rounded-xl text-[10px] font-extrabold transition-all text-center leading-tight flex flex-col justify-between h-14 ${
-                      selectedProductIdx === idx
-                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 shadow-xs"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    <span className="truncate w-full">{p.name}</span>
-                    <span className="font-mono text-[9px] text-indigo-600 mt-1">{p.w}x{p.h} mm</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* GESTIONE LARGHEZZA / ALTEZZA GRAFICA */}
-              <div className="grid grid-cols-2 gap-3 items-end pt-1">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-gray-600">Larghezza Grafica (mm)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="1"
-                      max={PRODUCT_PRESETS[selectedProductIdx].w * 1.5}
-                      value={graphicWidth}
-                      onChange={e => handleWidthChange(parseFloat(e.target.value) || 0)}
-                      className="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <span className="absolute right-3 top-2.5 text-[10px] font-bold text-gray-400">mm</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-gray-600">Altezza Grafica (mm)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="1"
-                      max={PRODUCT_PRESETS[selectedProductIdx].h * 1.5}
-                      value={graphicHeight}
-                      onChange={e => handleHeightChange(parseFloat(e.target.value) || 0)}
-                      className="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <span className="absolute right-3 top-2.5 text-[10px] font-bold text-gray-400">mm</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* AVVISO DI FUORI BORDO */}
-              {(graphicWidth > PRODUCT_PRESETS[selectedProductIdx].w || graphicHeight > PRODUCT_PRESETS[selectedProductIdx].h) && (
-                <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-1.5 text-rose-800 text-[10px] leading-relaxed">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
-                  <div>
-                    <span className="font-extrabold">Attenzione: Fuori bordo!</span> La grafica supera le dimensioni del prodotto selezionato ({PRODUCT_PRESETS[selectedProductIdx].w}x{PRODUCT_PRESETS[selectedProductIdx].h} mm).
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* ATTRIBUTI DETTAGLIATI ORDINE */}
             {customAttributes.length > 0 && (

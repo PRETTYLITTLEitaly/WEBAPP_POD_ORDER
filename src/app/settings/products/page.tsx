@@ -54,6 +54,7 @@ interface ProductItem {
     colore_stick: string;
     colore_base: string;
     colore_cavo: string;
+    colore_manico: string;
   };
   status: "complete" | "partial" | "missing";
 }
@@ -88,6 +89,7 @@ export default function ProductMetafieldsPage() {
   const [coloreStickList, setColoreStickList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
   const [coloreBaseList, setColoreBaseList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
   const [coloreCavoList, setColoreCavoList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
+  const [coloreManicoList, setColoreManicoList] = useState<string[]>(DEFAULT_COLOR_OPTIONS);
   
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -104,6 +106,10 @@ export default function ProductMetafieldsPage() {
   const [selectedTag, setSelectedTag] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "missing" | "partial" | "complete">("all");
+
+  // Filtro specifico per la mancanza di un metafield
+  const [selectedMetafieldKey, setSelectedMetafieldKey] = useState<string>("");
+  const [metafieldCondition, setMetafieldCondition] = useState<"missing" | "present">("missing");
   
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -149,6 +155,12 @@ export default function ProductMetafieldsPage() {
           setColoreCavoList(DEFAULT_COLOR_OPTIONS);
         }
 
+        if (data.coloreManicoChoices && Array.isArray(data.coloreManicoChoices) && data.coloreManicoChoices.length > 0) {
+          setColoreManicoList(Array.from(new Set(data.coloreManicoChoices)));
+        } else {
+          setColoreManicoList(DEFAULT_COLOR_OPTIONS);
+        }
+
         const initialFormState: { [id: string]: ProductItem["metafields"] } = {};
         const initialTagsState: { [id: string]: string[] } = {};
         const initialCollectionsState: { [id: string]: CollectionRef[] } = {};
@@ -178,7 +190,7 @@ export default function ProductMetafieldsPage() {
   const handleInputChange = (productId: string, field: keyof ProductItem["metafields"], value: string) => {
     setEditedMetafields(prev => {
       const currentForm = prev[productId] || {
-        pod_svg_url: "", pod_svg_file_id: "", pod_svg_file_url: "", pod_height: "", pod_width: "", colore_stick: "", colore_base: "", colore_cavo: ""
+        pod_svg_url: "", pod_svg_file_id: "", pod_svg_file_url: "", pod_height: "", pod_width: "", colore_stick: "", colore_base: "", colore_cavo: "", colore_manico: ""
       };
 
       const updated = {
@@ -358,6 +370,14 @@ export default function ProductMetafieldsPage() {
     if (filterStatus === "missing" && p.status !== "missing") return false;
     if (filterStatus === "partial" && p.status !== "partial") return false;
     if (filterStatus === "complete" && p.status !== "complete") return false;
+
+    if (selectedMetafieldKey) {
+      const val = p.metafields[selectedMetafieldKey as keyof typeof p.metafields];
+      const isEmpty = !val || String(val).trim() === "";
+      if (metafieldCondition === "missing" && !isEmpty) return false;
+      if (metafieldCondition === "present" && isEmpty) return false;
+    }
+
     return true;
   });
 
@@ -376,7 +396,7 @@ export default function ProductMetafieldsPage() {
             Configuratore Metafield Prodotti & Grafiche SVG
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Gestisci i 7 metafield di produzione con anteprime grafiche SVG, tasto Cestino rapido per svuotare i parametri, Bacchetta Magica, Tag e Collezioni.
+            Gestisci gli 8 metafield di produzione con anteprime grafiche SVG, tasto Cestino rapido per svuotare i parametri, Bacchetta Magica, Tag e Collezioni.
           </p>
         </div>
 
@@ -421,7 +441,7 @@ export default function ProductMetafieldsPage() {
       {/* BARRA FILTRI E RICERCA STILE SHOPIFY */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           
           {/* Cerca per Titolo / Nome */}
           <div className="relative">
@@ -481,6 +501,37 @@ export default function ProductMetafieldsPage() {
                   📦 {t}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Verifica Metafield Specifico */}
+          <div className="relative">
+            <select
+              value={selectedMetafieldKey}
+              onChange={e => setSelectedMetafieldKey(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+            >
+              <option value="">-- Verifica Metafield --</option>
+              <option value="pod_svg_url">URL Grafica SVG</option>
+              <option value="pod_svg_file_id">File Reference SVG</option>
+              <option value="pod_height">Altezza (mm)</option>
+              <option value="pod_width">Larghezza (mm)</option>
+              <option value="colore_stick">Colore Stick</option>
+              <option value="colore_base">Colore Base</option>
+              <option value="colore_cavo">Colore Cavo</option>
+              <option value="colore_manico">Colore Manico</option>
+            </select>
+          </div>
+
+          {/* Condizione Verifica Metafield */}
+          <div className="relative">
+            <select
+              value={metafieldCondition}
+              onChange={e => setMetafieldCondition(e.target.value as "missing" | "present")}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-gray-50/50"
+            >
+              <option value="missing">Mancante (vuoto)</option>
+              <option value="present">Compilato (presente)</option>
             </select>
           </div>
 
@@ -1066,6 +1117,40 @@ export default function ProductMetafieldsPage() {
                       </div>
                     </div>
 
+                    {/* 8. custom.colore_manico */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Palette className="w-3.5 h-3.5 text-indigo-600" />
+                          Colore Manico
+                        </span>
+                        <code className="text-gray-400 font-mono text-[9px]">custom.colore_manico</code>
+                      </label>
+                      <div className="relative flex items-center">
+                        <select
+                          value={form.colore_manico || ""}
+                          onChange={e => handleInputChange(product.id, "colore_manico", e.target.value)}
+                          className="w-full pl-2.5 pr-8 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        >
+                          <option value="">-- Seleziona Colore Manico --</option>
+                          {coloreManicoList.map(color => (
+                            <option key={color} value={color}>
+                              {color}
+                            </option>
+                          ))}
+                        </select>
+                        {form.colore_manico && (
+                          <button
+                            onClick={() => handleInputChange(product.id, "colore_manico", "")}
+                            className="absolute right-2 text-gray-400 hover:text-red-600 transition-colors p-0.5 z-10"
+                            title="Reset Colore Manico"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                   </div>
 
                 </div>
@@ -1092,7 +1177,7 @@ export default function ProductMetafieldsPage() {
                   <Grid className="w-5 h-5 text-indigo-600" />
                   Galleria Anteprime Grafiche SVG ({shopifyFiles.length} file)
                 </h3>
-                <p className="text-xs text-gray-500">Seleziona visivamente l'anteprima vettoriale per il prodotto.</p>
+                <p className="text-xs text-gray-500">Seleziona visivamente l&apos;anteprima vettoriale per il prodotto.</p>
               </div>
               <button 
                 onClick={() => setSvgGalleryModalProductId(null)}

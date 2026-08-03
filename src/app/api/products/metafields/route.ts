@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
             metafield_colore_stick: metafield(namespace: "custom", key: "colore_stick") { id value }
             metafield_colore_base: metafield(namespace: "custom", key: "colore_base") { id value }
             metafield_colore_cavo: metafield(namespace: "custom", key: "colore_cavo") { id value }
+            metafield_colore_manico: metafield(namespace: "custom", key: "colore_manico") { id value }
           }
         }
       }
@@ -270,9 +271,11 @@ export async function GET(req: NextRequest) {
     let coloreStickChoices: string[] = [];
     let coloreBaseChoices: string[] = [];
     let coloreCavoChoices: string[] = [];
+    let coloreManicoChoices: string[] = [];
     let coloreStickType = "single_line_text_field";
     let coloreBaseType = "single_line_text_field";
     let coloreCavoType = "single_line_text_field";
+    let coloreManicoType = "single_line_text_field";
 
     metaDefs.forEach((def: any) => {
       if (def.namespace === "custom" && def.key === "colore_stick") {
@@ -289,6 +292,11 @@ export async function GET(req: NextRequest) {
         coloreCavoType = def.type?.name || "single_line_text_field";
         const choiceVal = def.validations?.find((v: any) => v.name === "choices");
         if (choiceVal?.value) { try { coloreCavoChoices = JSON.parse(choiceVal.value); } catch (e) {} }
+      }
+      if (def.namespace === "custom" && def.key === "colore_manico") {
+        coloreManicoType = def.type?.name || "single_line_text_field";
+        const choiceVal = def.validations?.find((v: any) => v.name === "choices");
+        if (choiceVal?.value) { try { coloreManicoChoices = JSON.parse(choiceVal.value); } catch (e) {} }
       }
     });
 
@@ -314,9 +322,10 @@ export async function GET(req: NextRequest) {
       const coloreStick = parseValue(p.metafield_colore_stick?.value, coloreStickType);
       const coloreBase = parseValue(p.metafield_colore_base?.value, coloreBaseType);
       const coloreCavo = parseValue(p.metafield_colore_cavo?.value, coloreCavoType);
+      const coloreManico = parseValue(p.metafield_colore_manico?.value, coloreManicoType);
 
-      const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase && coloreCavo);
-      const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase || coloreCavo);
+      const isComplete = Boolean(svgUrl && (svgFileId || svgFileUrl) && height && width && coloreStick && coloreBase && coloreCavo && coloreManico);
+      const isPartial = Boolean(svgUrl || svgFileId || svgFileUrl || height || width || coloreStick || coloreBase || coloreCavo || coloreManico);
 
       const productCollections = (p.collections?.nodes || []).map((c: any) => ({
         id: c.id,
@@ -341,7 +350,8 @@ export async function GET(req: NextRequest) {
           pod_width: width,
           colore_stick: coloreStick,
           colore_base: coloreBase,
-          colore_cavo: coloreCavo
+          colore_cavo: coloreCavo,
+          colore_manico: coloreManico
         },
         status: isComplete ? "complete" : isPartial ? "partial" : "missing"
       };
@@ -358,7 +368,8 @@ export async function GET(req: NextRequest) {
       productTypes: Array.from(allTypesSet).sort(),
       coloreStickChoices,
       coloreBaseChoices,
-      coloreCavoChoices
+      coloreCavoChoices,
+      coloreManicoChoices
     });
   } catch (error: any) {
     console.error("Errore recupero metafield prodotti:", error);
@@ -506,6 +517,7 @@ export async function POST(req: NextRequest) {
       addMetafield("custom", "colore_stick", metafields.colore_stick, "single_line_text_field");
       addMetafield("custom", "colore_base", metafields.colore_base, "single_line_text_field");
       addMetafield("custom", "colore_cavo", metafields.colore_cavo, "single_line_text_field");
+      addMetafield("custom", "colore_manico", metafields.colore_manico, "single_line_text_field");
 
       if (metafieldsInput.length > 0) {
         const mutation = `#graphql

@@ -765,7 +765,7 @@ export default function TextEditorModal({
       )}
 
       <div 
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-gray-100"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-[96vw] xl:max-w-7xl max-h-[92vh] flex flex-col overflow-hidden border border-gray-100"
         onClick={e => e.stopPropagation()}
       >
         {/* INTESTAZIONE MODAL CON SWITCH SCHEDE TESTO / IMMAGINE */}
@@ -888,11 +888,11 @@ export default function TextEditorModal({
           </div>
         )}
 
-        {/* CORPO EDITOR SPLITATO: SX ANTEPRIMA BOTTIGLIA/PRODOTTO, DX PELLICOLA DTF E CONTROLLI */}
-        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-gray-50">
+        {/* CORPO EDITOR SPLITATO: SX ANTEPRIMA PRODOTTO, DX PELLICOLA DTF E CONTROLLI AFFIANCATI */}
+        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 bg-gray-50">
           
-          {/* COLONNA SINISTRA: ANTEPRIMA PRODOTTO ORIGINALE MOCKUP (5 COLONNE) */}
-          <div className="lg:col-span-5 flex flex-col space-y-3">
+          {/* COLONNA SINISTRA: ANTEPRIMA PRODOTTO ORIGINALE MOCKUP (4 COLONNE) */}
+          <div className="lg:col-span-4 flex flex-col space-y-3">
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1.5 text-indigo-700">
                 <Package className="w-4 h-4 text-indigo-500" />
@@ -1014,8 +1014,12 @@ export default function TextEditorModal({
             )}
           </div>
 
-          {/* COLONNA DESTRA: AREA PELLICOLA DTF + PANNELLO CONTROLLI (7 COLONNE) */}
-          <div className="lg:col-span-7 flex flex-col space-y-4">
+          {/* COLONNA DESTRA: AREA PELLICOLA DTF + PANNELLO CONTROLLI AFFIANCATI (8 COLONNE) */}
+          <div className="lg:col-span-8">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+
+              {/* SUB-COLONNA SINISTRA: SIMULATORE PELLICOLA DTF & DIMENSIONAMENTO (6 COLONNE) */}
+              <div className="md:col-span-6 flex flex-col space-y-4">
             
             {/* INTESTAZIONE CANALE PELLICOLA E TOOLBAR SFONDO */}
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
@@ -1260,10 +1264,11 @@ export default function TextEditorModal({
                   </>
                 );
               })()}
-            </div>
+              </div>
 
-            {/* PANNELLO CONTROLLI ED EDITOR (LARGHEZZA INTERA DESTRA) */}
-            <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
+              {/* SUB-COLONNA DESTRA: PANNELLO CONTROLLI TESTO, FONT, COLORI & SALVATAGGIO AFFIANCATO A DESTRA DEL SIMULATORE (6 COLONNE) */}
+              <div className="md:col-span-6 space-y-4">
+                <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
             
             {/* SCHEDA 1: TESTO & FONT */}
             {activeTab === "text" && (
@@ -1564,12 +1569,13 @@ export default function TextEditorModal({
                 <span>{isSaving ? "Salvataggio..." : "Conferma Grafica & Salva per Stampa"}</span>
               </button>
             </div>
-
-            </div>
           </div>
         </div>
-
       </div>
     </div>
-  );
+  </div>
+</div>
+</div>
+</div>
+);
 }

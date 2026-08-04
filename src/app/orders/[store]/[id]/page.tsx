@@ -1,7 +1,7 @@
 import { shopifyFetch, B2B_SHOP } from "@/lib/shopify";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Package } from "lucide-react";
 import FulfillButton from "./FulfillButton";
 
 export default async function OrderDetail({ params }: { params: Promise<{ store: string, id: string }> }) {
@@ -95,6 +95,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ store:
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Articoli</h2>
             <div className="divide-y divide-gray-200 dark:divide-gray-800">
               {order.lineItems.nodes.map((item: any) => {
+                const productImage = item.image?.url || item.variant?.image?.url || item.product?.featuredImage?.url;
                 const podSvg = item.product?.pod_svg?.reference?.url || item.product?.pod_svg?.reference?.image?.url || item.variant?.pod_svg?.reference?.url || item.variant?.pod_svg?.reference?.image?.url;
                 
                 // Estrarre anteprima generata dall'app Product Personalizer
@@ -110,26 +111,55 @@ export default async function OrderDetail({ params }: { params: Promise<{ store:
                 ) || item.customAttributes?.find((attr: any) => typeof attr.value === "string" && attr.value.startsWith("http"));
 
                 const personalizerPreviewUrl = customPreviewAttr?.value;
-                const displayImage = personalizerPreviewUrl || podSvg || item.image?.url || "https://via.placeholder.com/80";
+                const customGraphicImage = personalizerPreviewUrl || podSvg;
                 
                 return (
-                  <div key={item.id} className="py-4 flex gap-4">
-                    <div className="flex-shrink-0 w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden ring-1 ring-black/5 relative group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={displayImage} 
-                        alt={item.title} 
-                        className="w-full h-full object-contain p-1"
-                      />
-                      {personalizerPreviewUrl && (
-                        <a 
-                          href={personalizerPreviewUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity"
-                        >
-                          Apri Anteprima ↗
-                        </a>
+                  <div key={item.id} className="py-4 flex gap-4 items-start">
+                    {/* ANTEPRIME DIANZI E DIETRO (FOTO PRODOTTO ORIGINALE E GRAFICA SVG SIDE-BY-SIDE) */}
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      {/* 1. Foto Prodotto Originale (Mockup/Boccetta/Candela) */}
+                      {productImage && (
+                        <div className="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs">
+                          <span className="absolute top-1 left-1 bg-gray-900/80 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">
+                            Prodotto
+                          </span>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={productImage} 
+                            alt={item.title} 
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
+                      )}
+
+                      {/* 2. Grafica SVG / Personalizzazione (di fianco a destra) */}
+                      {customGraphicImage && (
+                        <div className="w-24 h-24 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl overflow-hidden border border-indigo-200 dark:border-indigo-800 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs">
+                          <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">
+                            Grafica SVG
+                          </span>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={customGraphicImage} 
+                            alt="Grafica SVG" 
+                            className="max-w-full max-h-full object-contain"
+                          />
+                          <a 
+                            href={customGraphicImage} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
+                          >
+                            Apri ↗
+                          </a>
+                        </div>
+                      )}
+
+                      {/* Fallback se non c'è nessuna immagine */}
+                      {!productImage && !customGraphicImage && (
+                        <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center p-2 border border-gray-200">
+                          <Package className="w-8 h-8 text-gray-400" />
+                        </div>
                       )}
                     </div>
                     <div className="flex-1">

@@ -436,6 +436,31 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
+  const [lastSelectedIdx, setLastSelectedIdx] = useState<number | null>(null);
+
+  const handleCheckboxClick = (e: React.MouseEvent<HTMLInputElement>, orderId: string, idx: number) => {
+    e.stopPropagation();
+    const isCurrentlySelected = selected.includes(orderId);
+    const willBeChecked = !isCurrentlySelected;
+
+    if (e.shiftKey && lastSelectedIdx !== null) {
+      const start = Math.min(lastSelectedIdx, idx);
+      const end = Math.max(lastSelectedIdx, idx);
+      const rangeOrderIds = filteredOrders.slice(start, end + 1).map(o => o.id);
+
+      setSelected(prev => {
+        if (willBeChecked) {
+          return Array.from(new Set([...prev, ...rangeOrderIds]));
+        } else {
+          return prev.filter(id => !rangeOrderIds.includes(id));
+        }
+      });
+    } else {
+      toggleOne(orderId);
+      setLastSelectedIdx(idx);
+    }
+  };
+
   const handleGeneratePdf = async (customItemsToUse?: any[]) => {
     setLoading(true);
     try {
@@ -784,14 +809,49 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
             </div>
             <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
               <button 
-                onClick={() => {
+                onClick={async () => {
+                  if (selected.length === 0) return;
+
+                  const selectedIdsAndNames: string[] = [];
+                  selected.forEach(id => {
+                    selectedIdsAndNames.push(id);
+                    const short = id.split('/').pop();
+                    if (short) selectedIdsAndNames.push(short);
+                    const orderObj = filteredOrders.find(o => o.id === id);
+                    if (orderObj && orderObj.name) selectedIdsAndNames.push(orderObj.name);
+                  });
+
+                  // 1. Aggiorna lo stato locale per mostrare subito l'icona rossa DDT per tutti gli ordini selezionati
+                  setDdtHistoryIds(prev => Array.from(new Set([...prev, ...selectedIdsAndNames])));
+
+                  // 2. Salva lo storico in modo persistente su Shopify tramite API
+                  const selectedNames = selected.map(id => {
+                    const order = filteredOrders.find(o => o.id === id);
+                    return order ? order.name : id.split('/').pop();
+                  });
+
+                  const historyItem = {
+                    id: Date.now().toString(),
+                    date: new Date().toISOString(),
+                    orderCount: selected.length,
+                    selectedIds: selectedIdsAndNames,
+                    selectedNames: selectedNames
+                  };
+
+                  await fetch("/api/pdf/history", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ store, historyItem })
+                  }).catch(err => console.error("Failed to save DDT history:", err));
+
+                  // 3. Apri l'URL di stampa dei documenti di trasporto su Shopify
                   const selectedOrderIds = selected.map(id => id.split('/').pop()).filter(Boolean);
                   const queryStr = selectedOrderIds.join(' OR ');
                   const shopName = store === "b2b" ? "wholesale-prettylittle-it" : "prettylittle-it";
                   const url = `https://admin.shopify.com/store/${shopName}/orders?query=${encodeURIComponent(queryStr)}`;
                   window.open(url, '_blank');
                 }}
-                className="text-xs px-3 py-1.5 rounded-lg text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 shadow-sm font-semibold whitespace-nowrap shrink-0"
+                className="text-xs px-3 py-1.5 rounded-lg text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 shadow-sm font-semibold whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Stampa documenti di trasporto
               </button>
@@ -847,14 +907,19 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                     <p className="text-gray-400 mt-1 text-sm">Prova a cambiare o rimuovere i filtri.</p>
                   </td>
                 </tr>
-              ) : filteredOrders.map((order) => {
+              ) : filteredOrders.map((order, idx) => {
                 const orderNum = order.name;
                 const date = new Date(order.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
                 const isSelected = selected.includes(order.id);
                 const isEvaso = order.displayFulfillmentStatus === "FULFILLED";
                 const isPrinted = printedIds.includes(order.id);
                 const isStampatoEdEvaso = isPrinted && isEvaso;
-                const hasDdt = ddtHistoryIds.includes(order.id) || isPrinted;
+                const shortId = order.id ? order.id.split('/').pop() : "";
+                const hasDdt = ddtHistoryIds.includes(order.id) || 
+                               ddtHistoryIds.includes(order.name) || 
+                               (shortId && ddtHistoryIds.includes(shortId)) ||
+                               (order.tags || []).some((t: string) => t.toLowerCase().includes("ddt")) ||
+                               isPrinted;
                 const trackingUrl = order.fulfillments?.[0]?.trackingInfo?.[0]?.url;
                 const trackingNumber = order.fulfillments?.[0]?.trackingInfo?.[0]?.number;
                 
@@ -874,7 +939,8 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                         type="checkbox" 
                         className="w-4 h-4 rounded-[4px] border-gray-400 text-black focus:ring-black cursor-pointer bg-white"
                         checked={isSelected}
-                        onChange={() => toggleOne(order.id)}
+                        onClick={(e) => handleCheckboxClick(e, order.id, idx)}
+                        onChange={() => {}}
                       />
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap font-semibold text-gray-900 hover:underline">
@@ -1403,6 +1469,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
             <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-gray-50/50">
               {(selectedArticlesOrder.lineItems?.nodes || []).map((item: any, idx: number) => {
+                const productImage = item.variant?.image?.url || item.product?.featuredImage?.url || item.image?.url;
                 const podSvg = item.product?.pod_svg?.reference?.url || item.product?.pod_svg?.reference?.image?.url || item.variant?.pod_svg?.reference?.url || item.variant?.pod_svg?.reference?.image?.url;
 
                 const customPreviewAttr = item.customAttributes?.find((attr: any) => 
@@ -1417,31 +1484,50 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                 ) || item.customAttributes?.find((attr: any) => typeof attr.value === "string" && attr.value.startsWith("http"));
 
                 const personalizerPreviewUrl = customPreviewAttr?.value;
-                const displayImage = personalizerPreviewUrl || podSvg || item.variant?.image?.url || item.product?.featuredImage?.url;
+                const customGraphicImage = personalizerPreviewUrl || podSvg;
 
                 const rawPrice = item.originalUnitPriceSet?.shopMoney?.amount || item.variant?.price;
                 const price = typeof rawPrice === "object" ? rawPrice?.amount : rawPrice;
                 
                 return (
                   <div key={item.id || idx} className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3">
-                    <div className="flex gap-4">
-                      {/* Product / Personalizer Image */}
-                      <div className="flex-shrink-0 w-20 h-20 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-center p-1 relative group overflow-hidden">
-                        {displayImage ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={displayImage} alt={item.title} className="max-w-full max-h-full object-contain" />
-                        ) : (
-                          <Package className="w-8 h-8 text-gray-300" />
+                    <div className="flex gap-4 items-start">
+                      {/* Product / Personalizer Images Side-by-Side */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* 1. Foto Prodotto Originale (Mockup/Boccetta) */}
+                        {productImage && (
+                          <div className="w-20 h-20 bg-gray-50 rounded-xl border border-gray-200 flex flex-col items-center justify-center p-1 relative group overflow-hidden shadow-2xs">
+                            <span className="absolute top-1 left-1 bg-gray-900/80 text-white text-[7px] font-extrabold px-1 py-0.2 rounded z-10">
+                              Prodotto
+                            </span>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={productImage} alt={item.title} className="max-w-full max-h-full object-contain" />
+                          </div>
                         )}
-                        {personalizerPreviewUrl && (
-                          <a 
-                            href={personalizerPreviewUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
-                          >
-                            Apri ↗
-                          </a>
+
+                        {/* 2. Grafica SVG / Personalizzata (a destra) */}
+                        {customGraphicImage && (
+                          <div className="w-20 h-20 bg-indigo-50/70 rounded-xl border border-indigo-200 flex flex-col items-center justify-center p-1 relative group overflow-hidden shadow-2xs">
+                            <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[7px] font-extrabold px-1 py-0.2 rounded z-10">
+                              Grafica SVG
+                            </span>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={customGraphicImage} alt="Grafica SVG" className="max-w-full max-h-full object-contain" />
+                            <a 
+                              href={customGraphicImage} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
+                            >
+                              Apri ↗
+                            </a>
+                          </div>
+                        )}
+
+                        {!productImage && !customGraphicImage && (
+                          <div className="w-20 h-20 bg-gray-100 rounded-xl flex items-center justify-center p-2 border border-gray-200">
+                            <Package className="w-6 h-6 text-gray-300" />
+                          </div>
                         )}
                       </div>
 

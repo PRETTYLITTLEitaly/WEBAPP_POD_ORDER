@@ -497,7 +497,6 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       // Save as printed locally (it is also tagged on Shopify by the route)
       const newPrinted = Array.from(new Set([...printedIds, ...selected]));
       setPrintedIds(newPrinted);
-      setDdtHistoryIds(prev => Array.from(new Set([...prev, ...selected])));
 
       // Save to history
       const selectedNames = selected.map(id => {
@@ -938,8 +937,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                 const hasDdt = ddtHistoryIds.includes(order.id) || 
                                ddtHistoryIds.includes(order.name) || 
                                (shortId && ddtHistoryIds.includes(shortId)) ||
-                               (order.tags || []).some((t: string) => t.toLowerCase().includes("ddt")) ||
-                               isPrinted;
+                               (order.tags || []).some((t: string) => t.toLowerCase().includes("ddt"));
                 const trackingUrl = order.fulfillments?.[0]?.trackingInfo?.[0]?.url;
                 const trackingNumber = order.fulfillments?.[0]?.trackingInfo?.[0]?.number;
                 

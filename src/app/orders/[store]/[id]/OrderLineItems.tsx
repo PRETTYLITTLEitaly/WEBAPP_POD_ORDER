@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Package, X } from "lucide-react";
 
 export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
   const [zoomImage, setZoomImage] = useState<{ url: string; title: string; type: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -108,11 +114,11 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
         );
       })}
 
-      {/* POPUP LIGHTBOX SENZA BOX CONTENITORE (FOTO PURA A SCHERMO INTERO) */}
-      {zoomImage && (
+      {/* POPUP LIGHTBOX PORTAL AGGANCIATO A DOCUMENT.BODY (ESCE DA QUALSIASI CONTENITORE CSS PARENTE) */}
+      {zoomImage && mounted && createPortal(
         <div 
           onClick={() => setZoomImage(null)}
-          className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-150"
+          className="fixed inset-0 z-[999999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-150"
         >
           {/* Pulsante X in alto a destra */}
           <button
@@ -121,25 +127,26 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
               e.stopPropagation();
               setZoomImage(null);
             }}
-            className="fixed top-5 right-5 z-[10000] text-white bg-black/70 hover:bg-rose-600 p-3 rounded-full transition-colors cursor-pointer shadow-2xl border border-white/20"
+            className="fixed top-6 right-6 z-[1000000] text-white bg-black/70 hover:bg-rose-600 p-3 rounded-full transition-colors cursor-pointer shadow-2xl border border-white/20"
             title="Chiudi (oppure clicca ovunque sullo sfondo)"
           >
-            <X className="w-6 h-6 text-white" />
+            <X className="w-7 h-7 text-white" />
           </button>
 
-          {/* Immagine ingrandita a schermo intero senza riquadro/box contorno che la limita */}
+          {/* Immagine ingrandita a tutto schermo senza riquadri o tagli */}
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className="relative flex items-center justify-center max-w-[92vw] max-h-[92vh]"
+            className="relative flex items-center justify-center max-w-[95vw] max-h-[95vh]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={zoomImage.url} 
               alt={zoomImage.title} 
-              className="max-w-[92vw] max-h-[92vh] object-contain rounded-2xl shadow-2xl select-none"
+              className="max-w-[95vw] max-h-[95vh] object-contain rounded-2xl shadow-2xl select-none"
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

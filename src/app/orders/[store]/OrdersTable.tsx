@@ -1514,6 +1514,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         uploadedImageUrl={textEditorModal.uploadedImageUrl}
         svgUrl={textEditorModal.svgUrl}
         customAttributes={textEditorModal.customAttributes}
+        lineItems={textEditorModal.lineItems}
         onSave={() => {
           window.location.reload();
         }}

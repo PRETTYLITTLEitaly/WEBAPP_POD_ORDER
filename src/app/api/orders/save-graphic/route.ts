@@ -9,7 +9,7 @@ export const editedImageMemoryCache = new Map<string, string>();
 // POST /api/orders/save-graphic — Salva la grafica modificata nel metafield pod.edited_image dell'ordine
 export async function POST(req: NextRequest) {
   try {
-    const { orderId, store = "b2c", editedImageUrl, textData, width, height } = await req.json();
+    const { orderId, store = "b2c", editedImageUrl, textData, width, height, itemIndex } = await req.json();
 
     if (!orderId) {
       return NextResponse.json({ success: false, error: "ID Ordine mancante" }, { status: 400 });
@@ -18,7 +18,11 @@ export async function POST(req: NextRequest) {
     const valueToSave = typeof editedImageUrl === "string" ? editedImageUrl : JSON.stringify(editedImageUrl);
 
     // Salva in cache in memoria per accesso istantaneo immediato durante la generazione PDF
+    const cacheKey = itemIndex !== undefined ? `${orderId}_${itemIndex}` : orderId;
+    editedImageMemoryCache.set(cacheKey, valueToSave);
     editedImageMemoryCache.set(orderId, valueToSave);
+
+    const metafieldKey = itemIndex !== undefined ? `edited_image_${itemIndex}` : "edited_image";
 
     // Mutation per aggiornare i metafield pod.edited_image e pod.status su Shopify
     const mutation = `#graphql
@@ -38,6 +42,13 @@ export async function POST(req: NextRequest) {
       }`;
 
     const metafields = [
+      {
+        ownerId: orderId,
+        namespace: "pod",
+        key: metafieldKey,
+        type: "multi_line_text_field",
+        value: valueToSave
+      },
       {
         ownerId: orderId,
         namespace: "pod",

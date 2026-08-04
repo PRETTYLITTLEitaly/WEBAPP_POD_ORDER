@@ -180,18 +180,31 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
   const handleOpenTextEditor = (order: any) => {
     const lineItemsNodes = order.lineItems?.nodes || [];
-    let foundText = "";
-    let foundFont = "Get Show";
-    let foundColor = "#38bdf8";
-    let foundFontSize = 32;
-    let foundImage = "";
-    let foundUploadedImage = "";
-    let foundSvg = "";
-    let customAttributesList: any[] = [];
 
-    lineItemsNodes.forEach((item: any) => {
+    const parsedItems = lineItemsNodes.map((item: any) => {
+      let foundText = "";
+      let foundFont = "Get Show";
+      let foundColor = "#38bdf8";
+      let foundFontSize = 32;
+      let foundImage = "";
+      let foundUploadedImage = "";
+      let foundSvg = "";
       const attrs = item.customAttributes || [];
-      customAttributesList.push(...attrs);
+
+      const podSvg = item.product?.pod_svg?.reference?.url || item.product?.pod_svg?.reference?.image?.url || item.variant?.pod_svg?.reference?.url || item.variant?.pod_svg?.reference?.image?.url;
+      const customPreviewAttr = attrs.find((attr: any) => 
+        typeof attr.value === "string" && attr.value.startsWith("http") && (
+          attr.key.toLowerCase().includes("vedi") || 
+          attr.key.toLowerCase().includes("preview") || 
+          attr.key.toLowerCase().includes("immagine") || 
+          attr.key.toLowerCase().includes("grafica") || 
+          attr.key.toLowerCase().includes("_pplr") || 
+          attr.key.toLowerCase().includes("design")
+        )
+      ) || attrs.find((attr: any) => typeof attr.value === "string" && attr.value.startsWith("http"));
+
+      const personalizerPreviewUrl = customPreviewAttr?.value;
+      const displayImage = personalizerPreviewUrl || podSvg || item.variant?.image?.url || item.product?.featuredImage?.url;
 
       attrs.forEach((attr: any) => {
         const rawKey = attr.key || "";
@@ -208,9 +221,8 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           k.includes("vedi") || 
           k.includes("preview");
 
-        // 1. Estrazione Testo (es. "Il tuo testo", "Frase", "Nome Brano", ecc.)
+        // 1. Estrazione Testo
         if (!isSystemKey && !v.startsWith("http")) {
-          // Escludi valori brevi che indicano semplici opzioni (es. "Frase", "Iniziale", "Ammaccato", "Liscio")
           const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
           if (v && (!isSimpleOption || !foundText)) {
             if (!foundText || v.length > foundText.length) {
@@ -219,12 +231,12 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           }
         }
 
-        // 2. Estrazione Font Name (es: "Scegli il font", "Scegli un font", "Font")
+        // 2. Estrazione Font Name
         if (k.includes("font") && !k.includes("colore") && !k.includes("color") && !rawKey.startsWith("_")) {
           if (v) foundFont = v;
         }
 
-        // 3. Estrazione Font Size (es: "_font size Il tuo testo", "_font size Frase")
+        // 3. Estrazione Font Size
         if (k.includes("font size") || k.includes("_font_size") || k.includes("fontsize")) {
           const parsedSize = parseFloat(v);
           if (!isNaN(parsedSize) && parsedSize > 0) {
@@ -232,7 +244,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           }
         }
 
-        // 4. Estrazione Colore (es: "Scegli il colore", "Scegli un colore", "Celeste", "#ffffff")
+        // 4. Estrazione Colore
         if (k.includes("colore") || k.includes("color")) {
           if (v.startsWith("#")) {
             foundColor = v;
@@ -268,21 +280,39 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           }
         }
       });
+
+      return {
+        id: item.id,
+        title: item.title || "Prodotto Personalizzato",
+        variantTitle: item.variant?.title || "",
+        quantity: item.quantity || 1,
+        displayImage: displayImage || foundImage,
+        initialText: foundText || "",
+        initialFont: foundFont || "Get Show",
+        initialColor: foundColor || "#38bdf8",
+        initialFontSize: foundFontSize || 32,
+        backgroundUrl: foundImage || displayImage,
+        uploadedImageUrl: foundUploadedImage,
+        svgUrl: foundSvg,
+        customAttributes: attrs
+      };
     });
+
+    const firstItem = parsedItems[0] || {};
 
     setTextEditorModal({
       open: true,
       orderId: order.id,
       title: `Modifica Interattiva Testo & Grafica — Ordine ${order.name}`,
-      initialText: foundText || "",
-      initialFont: foundFont || "Get Show",
-      initialColor: foundColor || "#38bdf8",
-      initialFontSize: foundFontSize || 32,
-      backgroundUrl: foundImage,
-      uploadedImageUrl: foundUploadedImage,
-      svgUrl: foundSvg,
-      customAttributes: customAttributesList,
-      lineItems: lineItemsNodes
+      initialText: firstItem.initialText || "",
+      initialFont: firstItem.initialFont || "Get Show",
+      initialColor: firstItem.initialColor || "#38bdf8",
+      initialFontSize: firstItem.initialFontSize || 32,
+      backgroundUrl: firstItem.backgroundUrl || "",
+      uploadedImageUrl: firstItem.uploadedImageUrl || "",
+      svgUrl: firstItem.svgUrl || "",
+      customAttributes: firstItem.customAttributes || [],
+      lineItems: parsedItems
     });
   };
 

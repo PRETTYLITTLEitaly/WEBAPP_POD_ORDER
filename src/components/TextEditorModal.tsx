@@ -112,6 +112,7 @@ export default function TextEditorModal({
 }: TextEditorModalProps) {
   const [activeTab, setActiveTab] = useState<"text" | "image">("text");
   const [selectedItemIdx, setSelectedItemIdx] = useState(0);
+  const [savedItemIndices, setSavedItemIndices] = useState<number[]>([]);
 
   // Text Editor States
   const [text, setText] = useState(initialText);
@@ -234,12 +235,42 @@ export default function TextEditorModal({
     setGraphicHeight(savedH);
     setAspectRatio(savedW / savedH);
 
-    if ((uploadedImageUrl || backgroundUrl || svgUrl) && !initialText) {
-      setActiveTab("image");
+    setSavedItemIndices([]);
+
+    if (lineItems && lineItems.length > 0 && lineItems[0]) {
+      const item = lineItems[0];
+      setText(item.initialText !== undefined ? item.initialText : initialText);
+      setFont(item.initialFont || initialFont || "Get Show");
+      setColor(item.initialColor || initialColor || "#38bdf8");
+      setFontSize(item.initialFontSize || initialFontSize || 32);
+      const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
+      setCurrentImageUrl(imgUrl || "");
     } else {
-      setActiveTab("text");
+      if ((uploadedImageUrl || backgroundUrl || svgUrl) && !initialText) {
+        setActiveTab("image");
+      } else {
+        setActiveTab("text");
+      }
     }
-  }, [initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, open, customAttributes]);
+  }, [open, initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, customAttributes, lineItems]);
+
+  const handleSelectLineItem = (idx: number) => {
+    setSelectedItemIdx(idx);
+    const item = lineItems[idx];
+    if (!item) return;
+
+    setText(item.initialText !== undefined ? item.initialText : "");
+    setFont(item.initialFont || "Get Show");
+    setColor(item.initialColor || "#38bdf8");
+    setFontSize(item.initialFontSize || 32);
+
+    const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
+    setCurrentImageUrl(imgUrl || "");
+    setProcessedImageUrl(null);
+    setIsRemoveBgApplied(false);
+    setIsVectorized(false);
+    setVectorSvgContent(null);
+  };
 
   // Helper to generate a tight fitting SVG for text to keep the bounds accurate
   const generateTightSvgFromText = (txt: string, fontName: string, fontColor: string, size: number, spacing: number, lHeight: number, sWidth: number): string => {
@@ -389,68 +420,6 @@ export default function TextEditorModal({
         setFontSize(Math.max(8, Math.min(200, Math.round(computedSize))));
       }
     }
-  };
-
-  // Gestisci cambio di articolo selezionato in ordini multi-prodotto
-  const handleSelectLineItem = (idx: number) => {
-    setSelectedItemIdx(idx);
-    const targetItem = lineItems[idx];
-    if (!targetItem) return;
-
-    const attrs = targetItem.customAttributes || [];
-    let foundText = "";
-    let foundFont = "Get Show";
-    let foundColor = "#38bdf8";
-    let foundFontSize = 32;
-    let foundImage = "";
-    let foundUploadedImage = "";
-
-    attrs.forEach((a: any) => {
-      const rawKey = a.key || "";
-      const k = rawKey.toLowerCase().trim();
-      const v = String(a.value || "").trim();
-
-      const isSystemKey = rawKey.startsWith("_") || k.includes("font") || k.includes("align") || k.includes("scegli") || k.includes("modello") || k.includes("stick") || k.includes("colore") || k.includes("vedi");
-
-      if (!isSystemKey && !v.startsWith("http")) {
-        const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
-        if (v && (!isSimpleOption || !foundText)) {
-          if (!foundText || v.length > foundText.length) foundText = v;
-        }
-      }
-      if (k.includes("font") && !k.includes("colore") && !k.includes("color") && !rawKey.startsWith("_")) foundFont = v;
-      if (k.includes("font size") || k.includes("_font_size")) {
-        const p = parseFloat(v);
-        if (!isNaN(p) && p > 0) foundFontSize = Math.round(p);
-      }
-      if (k.includes("colore") || k.includes("color")) {
-        if (v.startsWith("#")) foundColor = v;
-        else if (v.toLowerCase().includes("celeste") || v.toLowerCase().includes("azzurro")) foundColor = "#38bdf8";
-        else if (v.toLowerCase().includes("tiffany")) foundColor = "#0d9488";
-      }
-      if (v.startsWith("http")) {
-        const isMock = k.includes("vedi") || k.includes("preview") || k.includes("_pplr");
-        if (isMock) {
-          foundImage = v;
-        } else if (k.includes("immagine") || k.includes("foto") || k.includes("logo") || k.includes("file") || k.includes("carica")) {
-          foundUploadedImage = v;
-        } else {
-          if (!foundImage) {
-            foundImage = v;
-          } else if (!foundUploadedImage) {
-            foundUploadedImage = v;
-          }
-        }
-      }
-    });
-
-    setText(foundText);
-    setFont(foundFont);
-    setColor(foundColor);
-    setFontSize(foundFontSize);
-    setCurrentImageUrl(foundUploadedImage || foundImage || backgroundUrl || svgUrl);
-    setProcessedImageUrl(null);
-    setVectorSvgContent(null);
   };
 
   // Carica i font custom
@@ -696,7 +665,8 @@ export default function TextEditorModal({
             editedImageUrl: finalGraphicToSave,
             textData: { text, font, fontSize, color, letterSpacing, lineHeight, strokeWidth },
             width: graphicWidth,
-            height: graphicHeight
+            height: graphicHeight,
+            itemIndex: selectedItemIdx
           })
         });
       } catch (e) {
@@ -719,9 +689,23 @@ export default function TextEditorModal({
       });
     }
 
+    const updatedSaved = Array.from(new Set([...savedItemIndices, selectedItemIdx]));
+    setSavedItemIndices(updatedSaved);
+
+    const totalCount = lineItems.length || 1;
     setTimeout(() => {
       setIsSaving(false);
-      onClose();
+      if (totalCount > 1 && updatedSaved.length < totalCount) {
+        // Switch to next unsaved item if available
+        const nextUnsavedIdx = lineItems.findIndex((_, i) => !updatedSaved.includes(i));
+        if (nextUnsavedIdx !== -1) {
+          handleSelectLineItem(nextUnsavedIdx);
+        }
+        alert(`✓ Grafica per il Prodotto #${selectedItemIdx + 1} salvata!\n\nAttenzione: Mancano ancora ${totalCount - updatedSaved.length} prodotti personalizzati da completare nell'ordine. Seleziona l'icona del prossimo prodotto in alto.`);
+      } else {
+        alert(`✓ Tutte le grafiche dell'ordine (${totalCount}/${totalCount}) sono state salvate con successo!`);
+        onClose();
+      }
     }, 400);
   };
 
@@ -834,31 +818,86 @@ export default function TextEditorModal({
           </div>
 
           <button 
-            onClick={onClose}
+            onClick={() => {
+              const totalCount = lineItems.length || 1;
+              if (totalCount > 1 && savedItemIndices.length < totalCount) {
+                const confirmExit = confirm(
+                  `Attenzione!\nHai salvato le grafiche per solo ${savedItemIndices.length} di ${totalCount} prodotti personalizzati dell'ordine.\n\nSe chiudi ora l'editor, i prodotti non salvati andranno persi.\n\nVuoi davvero uscire?`
+                );
+                if (!confirmExit) return;
+              }
+              onClose();
+            }}
             className="p-1.5 hover:bg-amber-600 rounded-full transition-all text-amber-100 hover:text-white"
+            title="Chiudi"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* CONTROLLO MULTI-ARTICOLI (SE L'ORDINE CONTIENE PIÙ PRODOTTI) */}
+        {/* CONTROLLO MULTI-ARTICOLI CON ICONE ANTEPRIMA E BORDO VERDE AL SALVATAGGIO */}
         {lineItems.length > 1 && (
-          <div className="bg-amber-50 px-6 py-2.5 border-b border-amber-200 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-extrabold text-amber-900">
+          <div className="bg-amber-50/90 px-6 py-3 border-b border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-amber-900 shrink-0">
               <Package className="w-4 h-4 text-amber-600" />
-              <span>Ordine Multi-Articolo ({lineItems.length} prodotti differenti):</span>
+              <span>Ordine Multi-Prodotto ({lineItems.length} articoli):</span>
+              <span className="text-[11px] font-bold text-amber-800 bg-amber-200/70 px-2 py-0.5 rounded-full">
+                {savedItemIndices.length} di {lineItems.length} completati
+              </span>
             </div>
-            <select
-              value={selectedItemIdx}
-              onChange={e => handleSelectLineItem(parseInt(e.target.value, 10))}
-              className="px-3 py-1 bg-white border border-amber-300 rounded-lg text-xs font-bold text-gray-800 shadow-xs focus:ring-2 focus:ring-amber-500"
-            >
-              {lineItems.map((item, idx) => (
-                <option key={idx} value={idx}>
-                  Articolo #{idx + 1}: {item.title || "Articolo"} (Qtà: {item.quantity || 1})
-                </option>
-              ))}
-            </select>
+
+            {/* CARDS ICONE PRODOTTI CON ANTEPRIMA, SPUNTA VERDE E BORDO VERDE AL SALVATAGGIO */}
+            <div className="flex items-center gap-2.5 overflow-x-auto py-1 max-w-full">
+              {lineItems.map((item, idx) => {
+                const isSelected = selectedItemIdx === idx;
+                const isSaved = savedItemIndices.includes(idx);
+                const displayImg = item.displayImage || item.backgroundUrl || item.uploadedImageUrl || item.svgUrl;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectLineItem(idx)}
+                    className={`relative flex items-center gap-2 p-1.5 pr-3 rounded-2xl border transition-all duration-200 text-left shrink-0 cursor-pointer ${
+                      isSaved
+                        ? isSelected
+                          ? "border-2 border-green-600 bg-green-100/90 shadow-md scale-102"
+                          : "border-2 border-green-500 bg-green-50/90 hover:bg-green-100/80"
+                        : isSelected
+                          ? "border-2 border-indigo-600 bg-white shadow-md ring-2 ring-indigo-500/20 scale-102"
+                          : "border-amber-200 bg-white hover:bg-amber-100/50"
+                    }`}
+                    title={`Seleziona Prodotto #${idx + 1}: ${item.title || 'Articolo'}`}
+                  >
+                    {/* THUMBNAIL CON IMMAGINE E ANTEPRIMA */}
+                    <div className={`w-10 h-10 rounded-xl overflow-hidden bg-white border flex items-center justify-center p-0.5 shrink-0 ${isSaved ? 'border-green-400' : 'border-gray-200'}`}>
+                      {displayImg ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={displayImg} alt={item.title} className="max-w-full max-h-full object-contain" />
+                      ) : (
+                        <Package className="w-5 h-5 text-gray-400" />
+                      )}
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                      <span className={`text-[10px] font-extrabold truncate max-w-[110px] ${isSaved ? 'text-green-900' : isSelected ? 'text-indigo-900' : 'text-gray-700'}`}>
+                        #{idx + 1} {item.title || 'Articolo'}
+                      </span>
+                      <span className={`text-[9px] font-semibold ${isSaved ? 'text-green-700 font-extrabold' : 'text-gray-400'}`}>
+                        {isSaved ? '✓ Salvato' : `Qtà: ${item.quantity || 1}`}
+                      </span>
+                    </div>
+
+                    {/* OVERLAY SPUNTA VERDE QUANDO SALVATO */}
+                    {isSaved && (
+                      <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-green-600 text-white rounded-full flex items-center justify-center shadow-md ring-2 ring-white">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -1493,7 +1532,7 @@ export default function TextEditorModal({
 
                 {showAttributes && (
                   <div className="mt-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-[11px] font-mono space-y-1 max-h-36 overflow-y-auto">
-                    {customAttributes.map((attr, idx) => (
+                    {customAttributes.map((attr: any, idx: number) => (
                       <div key={idx} className="flex justify-between gap-2 border-b border-gray-100 pb-0.5">
                         <span className="font-bold text-gray-700">{attr.key}:</span>
                         <span className="text-gray-900 truncate max-w-[200px]">{attr.value}</span>

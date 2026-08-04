@@ -1012,257 +1012,7 @@ export default function TextEditorModal({
                 🎯 Clicca sulla foto del prodotto sopra per catturare il suo colore!
               </div>
             )}
-          </div>
-
-          {/* PANNELLO 2: SIMULATORE PELLICOLA DTF & DIMENSIONAMENTO (CENTRO - LARGHEZZA FISSA 370px) */}
-          <div className="w-[370px] shrink-0 flex flex-col space-y-4">
-            
-            {/* INTESTAZIONE CANALE PELLICOLA E TOOLBAR SFONDO */}
-            <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
-              <span className="flex items-center gap-1.5 text-amber-700">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                2. Pellicola di Stampa DTF (Sfondo Trasparente)
-              </span>
-              
-              {/* TOOLBAR CONTROLLO SFONDO ANTEPRIMA */}
-              <div className="flex items-center gap-1.5 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => { setCanvasBgColor("#ffffff"); setIsDropperActive(false); }}
-                  className={`p-1 rounded-md transition-all ${
-                    canvasBgColor === "#ffffff" && !isDropperActive ? "bg-white text-amber-600 shadow-xs" : "text-gray-400 hover:text-gray-600"
-                  }`}
-                  title="Sfondo Bianco (Sole)"
-                >
-                  <Sun className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setCanvasBgColor("#111827"); setIsDropperActive(false); }}
-                  className={`p-1 rounded-md transition-all ${
-                    canvasBgColor === "#111827" && !isDropperActive ? "bg-white text-amber-600 shadow-xs" : "text-gray-400 hover:text-gray-600"
-                  }`}
-                  title="Sfondo Nero (Luna)"
-                >
-                  <Moon className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsDropperActive(!isDropperActive)}
-                  className={`p-1 py-0.5 rounded-md transition-all flex items-center gap-1 ${
-                    isDropperActive ? "bg-indigo-600 text-white shadow-xs" : "text-gray-400 hover:text-gray-600"
-                  }`}
-                  title="Campionatore Colore (Contagocce)"
-                >
-                  <Pipette className="w-3.5 h-3.5" />
-                  <span className="text-[9px] font-bold">Campiona</span>
-                </button>
-                {canvasBgColor !== "#ffffff" && canvasBgColor !== "#111827" && (
-                  <span 
-                    className="text-[9px] font-mono px-1.5 py-0.5 bg-white rounded border border-gray-300 ml-1 text-gray-700 font-bold"
-                    style={{ borderLeftColor: canvasBgColor, borderLeftWidth: 4 }}
-                  >
-                    {canvasBgColor.toUpperCase()}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* CANVAS INTERATTIVO PELLICOLA DTF */}
-            <div 
-              className="w-full h-[240px] rounded-2xl border border-gray-200 shadow-inner relative overflow-hidden flex items-center justify-center p-2 bg-gray-150"
-            >
-              {/* Box Prodotto con Dimensioni e Proporzioni Reali */}
-              {(() => {
-                const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
-                const preset = presetsList[selectedProductIdx] || presetsList[0] || { name: "PRODOTTO", supportW: 110, supportH: 130 };
-                const maxScreenW = 340;
-                const maxScreenH = 210;
-                const productAspect = preset.supportW / preset.supportH;
-                
-                let screenW = maxScreenW;
-                let screenH = screenW / productAspect;
-                if (screenH > maxScreenH) {
-                  screenH = maxScreenH;
-                  screenW = screenH * productAspect;
-                }
-
-                const mmToPxRatio = screenW / preset.supportW;
-                const graphicScreenW = graphicWidth * mmToPxRatio;
-                const graphicScreenH = graphicHeight * mmToPxRatio;
-
-                return (
-                  <div
-                    style={{ 
-                      width: `${screenW}px`, 
-                      height: `${screenH}px`,
-                      backgroundColor: canvasBgColor
-                    }}
-                    className="relative border-2 border-indigo-400/80 rounded-lg shadow-md flex items-center justify-center overflow-hidden transition-colors duration-300"
-                  >
-                    {/* Badge Prodotto Bounding Box */}
-                    <span className="absolute top-1 left-1.5 text-[8px] font-extrabold text-indigo-800 bg-indigo-50 px-1 py-0.2 rounded border border-indigo-200 select-none z-10 opacity-75">
-                      {preset.name} ({preset.supportW}x{preset.supportH} mm)
-                    </span>
-
-                    {/* Contorno della Grafica / Testo (Bounding Box) */}
-                    <div
-                      style={{ 
-                        width: `${graphicScreenW}px`, 
-                        height: `${graphicScreenH}px`
-                      }}
-                      className="border border-dashed border-rose-500/70 relative flex items-center justify-center p-0.5 group"
-                    >
-                      {/* Bounding box sizes label */}
-                      <span className="absolute -bottom-4 right-0 text-[7px] font-bold font-mono text-rose-600 bg-rose-50 px-1 rounded select-none opacity-0 group-hover:opacity-100 transition-opacity">
-                        {graphicWidth} x {graphicHeight} mm
-                      </span>
-
-                      {activeTab === "image" ? (
-                        vectorSvgContent ? (
-                          <div 
-                            className="w-full h-full flex items-center justify-center overflow-hidden"
-                            style={{ color }}
-                            dangerouslySetInnerHTML={{ __html: vectorSvgContent }}
-                          />
-                        ) : processedImageUrl ? (
-                          <img 
-                            src={processedImageUrl} 
-                            alt="Immagine senza sfondo" 
-                            className="w-full h-full object-contain"
-                          />
-                        ) : currentImageUrl ? (
-                          <img 
-                            src={currentImageUrl} 
-                            alt="Anteprima Ordine" 
-                            className="w-full h-full object-contain opacity-60 pointer-events-none"
-                          />
-                        ) : (
-                          <div className="text-gray-300 text-[9px] font-mono select-none">
-                            [Nessuna Grafica]
-                          </div>
-                        )
-                      ) : (
-                        text ? (
-                          <div 
-                            className="w-full h-full flex items-center justify-center overflow-hidden text-center"
-                            dangerouslySetInnerHTML={{
-                              __html: generateTightSvgFromText(text, font, color, fontSize, letterSpacing, lineHeight, strokeWidth)
-                            }}
-                          />
-                        ) : (
-                          <div className="text-gray-300 text-[9px] font-mono select-none">
-                            [Nessun Testo]
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* CONTROLLI DI POSIZIONAMENTO RAPIDO (SOLO SE TESTO ATTIVO E DISPONIBILE) */}
-            {activeTab === "text" && text && (
-              <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-3 text-xs">
-                <span className="font-bold text-gray-600 flex items-center gap-1">
-                  <Move className="w-3.5 h-3.5 text-amber-600" />
-                  Spostamento Scritta su Mockup (Sinistra):
-                </span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { setPosX(50); setPosY(55); }} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-200 transition-all text-[11px]">Centra</button>
-                  <button onClick={() => setPosY(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↑</button>
-                  <button onClick={() => setPosY(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↓</button>
-                  <button onClick={() => setPosX(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">←</button>
-                  <button onClick={() => setPosX(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">→</button>
-                </div>
-              </div>
-            )}
-
-            {/* SEZIONE GESTIONE PRODOTTO & DIMENSIONI REAL-TIME */}
-            <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold text-gray-700">
-                <span className="flex items-center gap-1.5 text-indigo-700">
-                  <Package className="w-4 h-4 text-indigo-500" />
-                  Dimensionamento Reale (mm)
-                </span>
-                <span className="text-[10px] text-gray-400 font-normal">Seleziona il supporto di destinazione</span>
-              </div>
-
-              {/* SELETTORE PRODOTTO PRESET - COMPATTO & MINIMALE */}
-              <div className="grid grid-cols-3 gap-1.5">
-                {(productPresets.length > 0 ? productPresets : getProductGraphicPresets()).map((p, idx) => (
-                  <button
-                    key={p.name}
-                    type="button"
-                    onClick={() => selectProductPreset(idx)}
-                    className={`py-1.5 px-2 border rounded-xl transition-all text-center leading-tight flex flex-col justify-center gap-0.5 h-10 ${
-                      selectedProductIdx === idx
-                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 shadow-xs"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    <span className="truncate w-full text-[9px] font-extrabold uppercase tracking-wide">{p.name}</span>
-                    <span className="font-mono text-[8px] text-gray-400 font-bold">{p.supportW}x{p.supportH} mm</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* GESTIONE LARGHEZZA / ALTEZZA GRAFICA */}
-              {(() => {
-                const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
-                const activeP = presetsList[selectedProductIdx] || presetsList[0];
-                return (
-                  <>
-                    <div className="grid grid-cols-2 gap-3 items-end pt-0.5">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold text-gray-600">Larghezza Grafica (mm)</label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="1"
-                            max={activeP.supportW * 1.5}
-                            value={graphicWidth}
-                            onChange={e => handleWidthChange(parseFloat(e.target.value) || 0)}
-                            className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold text-gray-600">Altezza Grafica (mm)</label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="1"
-                            max={activeP.supportH * 1.5}
-                            value={graphicHeight}
-                            onChange={e => handleHeightChange(parseFloat(e.target.value) || 0)}
-                            className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* AVVISO DI FUORI BORDO */}
-                    {(graphicWidth > activeP.supportW || graphicHeight > activeP.supportH) && (
-                      <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-1.5 text-rose-800 text-[10px] leading-relaxed">
-                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
-                        <div>
-                          <span className="font-extrabold">Attenzione: Fuori bordo!</span> La grafica supera le dimensioni del supporto selezionato ({activeP.supportW}x{activeP.supportH} mm).
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-          </div>
-
-          {/* PANNELLO 3: CONTROLLI TESTO, FONT, COLORI & SALVATAGGIO (DESTRA - ESPANDIBILE A DESTRA DEL SIMULATORE) */}
+                {/* PANNELLO 2 (SINISTRA-CENTRO): CONTROLLI TESTO, FONT, COLORI & SALVATAGGIO */}
           <div className="flex-1 min-w-[320px] flex flex-col space-y-4">
             <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
             
@@ -1565,11 +1315,261 @@ export default function TextEditorModal({
                 <span>{isSaving ? "Salvataggio..." : "Conferma Grafica & Salva per Stampa"}</span>
               </button>
             </div>
+            </div>
+          </div>
+
+          {/* PANNELLO 3 (DESTRA): SIMULATORE PELLICOLA DTF & DIMENSIONAMENTO REALE */}
+          <div className="w-[370px] shrink-0 flex flex-col space-y-4">
+            
+            {/* INTESTAZIONE CANALE PELLICOLA E TOOLBAR SFONDO */}
+            <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
+              <span className="flex items-center gap-1.5 text-amber-700">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                2. Pellicola di Stampa DTF (Sfondo Trasparente)
+              </span>
+              
+              {/* TOOLBAR CONTROLLO SFONDO ANTEPRIMA */}
+              <div className="flex items-center gap-1.5 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => { setCanvasBgColor("#ffffff"); setIsDropperActive(false); }}
+                  className={`p-1 rounded-md transition-all ${
+                    canvasBgColor === "#ffffff" && !isDropperActive ? "bg-white text-amber-600 shadow-xs" : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="Sfondo Bianco (Sole)"
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCanvasBgColor("#111827"); setIsDropperActive(false); }}
+                  className={`p-1 rounded-md transition-all ${
+                    canvasBgColor === "#111827" && !isDropperActive ? "bg-white text-amber-600 shadow-xs" : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="Sfondo Nero (Luna)"
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDropperActive(!isDropperActive)}
+                  className={`p-1 py-0.5 rounded-md transition-all flex items-center gap-1 ${
+                    isDropperActive ? "bg-indigo-600 text-white shadow-xs" : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="Campionatore Colore (Contagocce)"
+                >
+                  <Pipette className="w-3.5 h-3.5" />
+                  <span className="text-[9px] font-bold">Campiona</span>
+                </button>
+                {canvasBgColor !== "#ffffff" && canvasBgColor !== "#111827" && (
+                  <span 
+                    className="text-[9px] font-mono px-1.5 py-0.5 bg-white rounded border border-gray-300 ml-1 text-gray-700 font-bold"
+                    style={{ borderLeftColor: canvasBgColor, borderLeftWidth: 4 }}
+                  >
+                    {canvasBgColor.toUpperCase()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* CANVAS INTERATTIVO PELLICOLA DTF */}
+            <div 
+              className="w-full h-[240px] rounded-2xl border border-gray-200 shadow-inner relative overflow-hidden flex items-center justify-center p-2 bg-gray-150"
+            >
+              {/* Box Prodotto con Dimensioni e Proporzioni Reali */}
+              {(() => {
+                const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+                const preset = presetsList[selectedProductIdx] || presetsList[0] || { name: "PRODOTTO", supportW: 110, supportH: 130 };
+                const maxScreenW = 340;
+                const maxScreenH = 210;
+                const productAspect = preset.supportW / preset.supportH;
+                
+                let screenW = maxScreenW;
+                let screenH = screenW / productAspect;
+                if (screenH > maxScreenH) {
+                  screenH = maxScreenH;
+                  screenW = screenH * productAspect;
+                }
+
+                const mmToPxRatio = screenW / preset.supportW;
+                const graphicScreenW = graphicWidth * mmToPxRatio;
+                const graphicScreenH = graphicHeight * mmToPxRatio;
+
+                return (
+                  <div
+                    style={{ 
+                      width: `${screenW}px`, 
+                      height: `${screenH}px`,
+                      backgroundColor: canvasBgColor
+                    }}
+                    className="relative border-2 border-indigo-400/80 rounded-lg shadow-md flex items-center justify-center overflow-hidden transition-colors duration-300"
+                  >
+                    {/* Badge Prodotto Bounding Box */}
+                    <span className="absolute top-1 left-1.5 text-[8px] font-extrabold text-indigo-800 bg-indigo-50 px-1 py-0.2 rounded border border-indigo-200 select-none z-10 opacity-75">
+                      {preset.name} ({preset.supportW}x{preset.supportH} mm)
+                    </span>
+
+                    {/* Contorno della Grafica / Testo (Bounding Box) */}
+                    <div
+                      style={{ 
+                        width: `${graphicScreenW}px`, 
+                        height: `${graphicScreenH}px`
+                      }}
+                      className="border border-dashed border-rose-500/70 relative flex items-center justify-center p-0.5 group"
+                    >
+                      {/* Bounding box sizes label */}
+                      <span className="absolute -bottom-4 right-0 text-[7px] font-bold font-mono text-rose-600 bg-rose-50 px-1 rounded select-none opacity-0 group-hover:opacity-100 transition-opacity">
+                        {graphicWidth} x {graphicHeight} mm
+                      </span>
+
+                      {activeTab === "image" ? (
+                        vectorSvgContent ? (
+                          <div 
+                            className="w-full h-full flex items-center justify-center overflow-hidden"
+                            style={{ color }}
+                            dangerouslySetInnerHTML={{ __html: vectorSvgContent }}
+                          />
+                        ) : processedImageUrl ? (
+                          <img 
+                            src={processedImageUrl} 
+                            alt="Immagine senza sfondo" 
+                            className="w-full h-full object-contain"
+                          />
+                        ) : currentImageUrl ? (
+                          <img 
+                            src={currentImageUrl} 
+                            alt="Anteprima Ordine" 
+                            className="w-full h-full object-contain opacity-60 pointer-events-none"
+                          />
+                        ) : (
+                          <div className="text-gray-300 text-[9px] font-mono select-none">
+                            [Nessuna Grafica]
+                          </div>
+                        )
+                      ) : (
+                        text ? (
+                          <div 
+                            className="w-full h-full flex items-center justify-center overflow-hidden text-center"
+                            dangerouslySetInnerHTML={{
+                              __html: generateTightSvgFromText(text, font, color, fontSize, letterSpacing, lineHeight, strokeWidth)
+                            }}
+                          />
+                        ) : (
+                          <div className="text-gray-300 text-[9px] font-mono select-none">
+                            [Nessun Testo]
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* CONTROLLI DI POSIZIONAMENTO RAPIDO (SOLO SE TESTO ATTIVO E DISPONIBILE) */}
+            {activeTab === "text" && text && (
+              <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-3 text-xs">
+                <span className="font-bold text-gray-600 flex items-center gap-1">
+                  <Move className="w-3.5 h-3.5 text-amber-600" />
+                  Spostamento Scritta su Mockup (Sinistra):
+                </span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setPosX(50); setPosY(55); }} className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-200 transition-all text-[11px]">Centra</button>
+                  <button onClick={() => setPosY(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↑</button>
+                  <button onClick={() => setPosY(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">↓</button>
+                  <button onClick={() => setPosX(prev => Math.max(10, prev - 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">←</button>
+                  <button onClick={() => setPosX(prev => Math.min(90, prev + 5))} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 font-bold rounded-lg text-gray-700">→</button>
+                </div>
+              </div>
+            )}
+
+            {/* SEZIONE GESTIONE PRODOTTO & DIMENSIONI REAL-TIME */}
+            <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-gray-700">
+                <span className="flex items-center gap-1.5 text-indigo-700">
+                  <Package className="w-4 h-4 text-indigo-500" />
+                  Dimensionamento Reale (mm)
+                </span>
+                <span className="text-[10px] text-gray-400 font-normal">Seleziona il supporto di destinazione</span>
+              </div>
+
+              {/* SELETTORE PRODOTTO PRESET - COMPATTO & MINIMALE */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {(productPresets.length > 0 ? productPresets : getProductGraphicPresets()).map((p, idx) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => selectProductPreset(idx)}
+                    className={`py-1.5 px-2 border rounded-xl transition-all text-center leading-tight flex flex-col justify-center gap-0.5 h-10 ${
+                      selectedProductIdx === idx
+                        ? "border-indigo-600 bg-indigo-50 text-indigo-900 shadow-xs"
+                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className="truncate w-full text-[9px] font-extrabold uppercase tracking-wide">{p.name}</span>
+                    <span className="font-mono text-[8px] text-gray-400 font-bold">{p.supportW}x{p.supportH} mm</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* GESTIONE LARGHEZZA / ALTEZZA GRAFICA */}
+              {(() => {
+                const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+                const activeP = presetsList[selectedProductIdx] || presetsList[0];
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 items-end pt-0.5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-gray-600">Larghezza Grafica (mm)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="1"
+                            max={activeP.supportW * 1.5}
+                            value={graphicWidth}
+                            onChange={e => handleWidthChange(parseFloat(e.target.value) || 0)}
+                            className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-gray-600">Altezza Grafica (mm)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="1"
+                            max={activeP.supportH * 1.5}
+                            value={graphicHeight}
+                            onChange={e => handleHeightChange(parseFloat(e.target.value) || 0)}
+                            className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* AVVISO DI FUORI BORDO */}
+                    {(graphicWidth > activeP.supportW || graphicHeight > activeP.supportH) && (
+                      <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-1.5 text-rose-800 text-[10px] leading-relaxed">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
+                        <div>
+                          <span className="font-extrabold">Attenzione: Fuori bordo!</span> La grafica supera le dimensioni del supporto selezionato ({activeP.supportW}x{activeP.supportH} mm).
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+          </div>
+
+          </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-</div>
-);
+  );
 }

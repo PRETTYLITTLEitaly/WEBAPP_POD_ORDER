@@ -80,6 +80,7 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
       title: "Impostazioni App",
       items: [
         { name: "Impostazioni Bobina", href: "/settings", icon: Settings },
+        { name: "Impostazione Grafica", href: "/settings/grafica", icon: Sliders },
         { name: "Libreria Font", href: "/settings/fonts", icon: Type },
         { name: "Gestione Utenti", href: "/settings/users", icon: Users },
         { name: "Account Utente", href: "/settings/account", icon: UserIcon },

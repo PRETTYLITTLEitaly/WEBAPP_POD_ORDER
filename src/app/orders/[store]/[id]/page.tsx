@@ -2,6 +2,7 @@ import { shopifyFetch, B2B_SHOP } from "@/lib/shopify";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Package } from "lucide-react";
+import OrderLineItems from "./OrderLineItems";
 import FulfillButton from "./FulfillButton";
 
 export default async function OrderDetail({ params }: { params: Promise<{ store: string, id: string }> }) {
@@ -93,107 +94,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ store:
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl overflow-hidden backdrop-blur-xl p-6">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Articoli</h2>
-            <div className="divide-y divide-gray-200 dark:divide-gray-800">
-              {order.lineItems.nodes.map((item: any) => {
-                const productImage = item.image?.url || item.variant?.image?.url || item.product?.featuredImage?.url;
-                const podSvg = item.product?.pod_svg?.reference?.url || item.product?.pod_svg?.reference?.image?.url || item.variant?.pod_svg?.reference?.url || item.variant?.pod_svg?.reference?.image?.url;
-                
-                // Estrarre anteprima generata dall'app Product Personalizer
-                const customPreviewAttr = item.customAttributes?.find((attr: any) => 
-                  typeof attr.value === "string" && attr.value.startsWith("http") && (
-                    attr.key.toLowerCase().includes("vedi") || 
-                    attr.key.toLowerCase().includes("preview") || 
-                    attr.key.toLowerCase().includes("immagine") || 
-                    attr.key.toLowerCase().includes("grafica") || 
-                    attr.key.toLowerCase().includes("_pplr") || 
-                    attr.key.toLowerCase().includes("design")
-                  )
-                ) || item.customAttributes?.find((attr: any) => typeof attr.value === "string" && attr.value.startsWith("http"));
-
-                const personalizerPreviewUrl = customPreviewAttr?.value;
-                const customGraphicImage = personalizerPreviewUrl || podSvg;
-                
-                return (
-                  <div key={item.id} className="py-4 flex gap-4 items-start">
-                    {/* ANTEPRIME DIANZI E DIETRO (FOTO PRODOTTO ORIGINALE E GRAFICA SVG SIDE-BY-SIDE) */}
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      {/* 1. Foto Prodotto Originale (Mockup/Boccetta/Candela) */}
-                      {productImage && (
-                        <div className="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs">
-                          <span className="absolute top-1 left-1 bg-gray-900/80 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">
-                            Prodotto
-                          </span>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={productImage} 
-                            alt={item.title} 
-                            className="max-w-full max-h-full object-contain"
-                          />
-                        </div>
-                      )}
-
-                      {/* 2. Grafica SVG / Personalizzazione (di fianco a destra) */}
-                      {customGraphicImage && (
-                        <div className="w-24 h-24 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl overflow-hidden border border-indigo-200 dark:border-indigo-800 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs">
-                          <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">
-                            Grafica SVG
-                          </span>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img 
-                            src={customGraphicImage} 
-                            alt="Grafica SVG" 
-                            className="max-w-full max-h-full object-contain"
-                          />
-                          <a 
-                            href={customGraphicImage} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
-                          >
-                            Apri ↗
-                          </a>
-                        </div>
-                      )}
-
-                      {/* Fallback se non c'è nessuna immagine */}
-                      {!productImage && !customGraphicImage && (
-                        <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center p-2 border border-gray-200">
-                          <Package className="w-8 h-8 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{item.title}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Quantità: {item.quantity}</p>
-                      {item.customAttributes?.length > 0 && (
-                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 space-y-1 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
-                          {item.customAttributes.map((attr: any) => {
-                            const isUrl = typeof attr.value === "string" && attr.value.startsWith("http");
-                            return (
-                              <div key={attr.key} className="flex flex-wrap items-center gap-1.5 text-xs">
-                                <span className="font-bold text-gray-700 dark:text-gray-300">{attr.key}:</span>
-                                {isUrl ? (
-                                  <a 
-                                    href={attr.value} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 underline"
-                                  >
-                                    Apri Grafica Personalizzata Product Personalizer ↗
-                                  </a>
-                                ) : (
-                                  <span>{attr.value}</span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <OrderLineItems lineItems={order.lineItems.nodes} />
           </div>
         </div>
 

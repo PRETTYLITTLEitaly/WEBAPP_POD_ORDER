@@ -18,6 +18,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showOnlySelected, setShowOnlySelected] = useState(false);
+  const [zoomImage, setZoomImage] = useState<{ url: string; title: string; type: string } | null>(null);
 
   // Product Personalizer Quick Preview Modal State
   const [pplrModal, setPplrModal] = useState<{
@@ -1509,31 +1510,31 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                       <div className="flex items-center gap-2 shrink-0">
                         {/* 1. Foto Prodotto Originale (Mockup/Boccetta) */}
                         {productImage && (
-                          <div className="w-20 h-20 bg-gray-50 rounded-xl border border-gray-200 flex flex-col items-center justify-center p-1 relative group overflow-hidden shadow-2xs">
+                          <div 
+                            onClick={() => setZoomImage({ url: productImage, title: item.title, type: "Foto Prodotto" })}
+                            className="w-20 h-20 bg-gray-50 rounded-xl border border-gray-200 flex flex-col items-center justify-center p-1 relative group overflow-hidden shadow-2xs cursor-pointer hover:border-indigo-400 transition-all"
+                            title="Clicca per ingrandire la foto del prodotto"
+                          >
                             <span className="absolute top-1 left-1 bg-gray-900/80 text-white text-[7px] font-extrabold px-1 py-0.2 rounded z-10">
                               Prodotto
                             </span>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={productImage} alt={item.title} className="max-w-full max-h-full object-contain" />
+                            <img src={productImage} alt={item.title} className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform" />
                           </div>
                         )}
 
                         {/* 2. Grafica SVG / Personalizzata (a destra) */}
                         {customGraphicImage && (
-                          <div className="w-20 h-20 bg-indigo-50/70 rounded-xl border border-indigo-200 flex flex-col items-center justify-center p-1 relative group overflow-hidden shadow-2xs">
+                          <div 
+                            onClick={() => setZoomImage({ url: customGraphicImage, title: item.title, type: "Grafica SVG" })}
+                            className="w-20 h-20 bg-indigo-50/70 rounded-xl border border-indigo-200 flex flex-col items-center justify-center p-1 relative group overflow-hidden shadow-2xs cursor-pointer hover:border-indigo-500 transition-all"
+                            title="Clicca per ingrandire la grafica SVG"
+                          >
                             <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[7px] font-extrabold px-1 py-0.2 rounded z-10">
                               Grafica SVG
                             </span>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={customGraphicImage} alt="Grafica SVG" className="max-w-full max-h-full object-contain" />
-                            <a 
-                              href={customGraphicImage} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
-                            >
-                              Apri ↗
-                            </a>
+                            <img src={customGraphicImage} alt="Grafica SVG" className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform" />
                           </div>
                         )}
 
@@ -1639,6 +1640,60 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           window.location.reload();
         }}
       />
+      {/* POPUP LIGHTBOX INGRANDIMENTO IMMAGINE NELLA STESSA PAGINA */}
+      {zoomImage && (
+        <div 
+          onClick={() => setZoomImage(null)}
+          className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl relative border border-gray-200 flex flex-col items-center max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+          >
+            {/* Header Modal */}
+            <div className="w-full flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full ${
+                  zoomImage.type === "Grafica SVG" ? "bg-indigo-100 text-indigo-800" : "bg-gray-100 text-gray-800"
+                }`}>
+                  {zoomImage.type}
+                </span>
+                <h3 className="text-base font-bold text-gray-900 truncate max-w-lg">
+                  {zoomImage.title}
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a 
+                  href={zoomImage.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all flex items-center gap-1"
+                >
+                  Apri Originale ↗
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setZoomImage(null)}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Immagine Ingrandita */}
+            <div className="flex-1 w-full flex items-center justify-center p-2 overflow-auto min-h-[300px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={zoomImage.url} 
+                alt={zoomImage.title} 
+                className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-md border border-gray-100"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

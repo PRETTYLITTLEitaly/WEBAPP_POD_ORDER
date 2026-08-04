@@ -1640,55 +1640,58 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           window.location.reload();
         }}
       />
-      {/* POPUP LIGHTBOX INGRANDIMENTO IMMAGINE NELLA STESSA PAGINA */}
+      {/* POPUP SUPER RAPIDO E PULITO INGRANDIMENTO IMMAGINE (CLICCA SULLO SFONDO O SU X PER CHIUDERE) */}
       {zoomImage && (
         <div 
           onClick={() => setZoomImage(null)}
-          className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[300] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
         >
+          {/* Tasto X di chiusura veloce */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setZoomImage(null);
+            }}
+            className="fixed top-5 right-5 z-[310] text-white bg-black/60 hover:bg-red-600 p-2.5 rounded-full transition-colors cursor-pointer shadow-lg border border-white/20"
+            title="Chiudi (oppure clicca ovunque sullo sfondo)"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl relative border border-gray-200 flex flex-col items-center max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-3xl max-w-3xl w-full p-4 shadow-2xl relative border border-gray-200 flex flex-col items-center max-h-[85vh] cursor-default"
           >
-            {/* Header Modal */}
-            <div className="w-full flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+            {/* Header essenziale */}
+            <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full ${
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
                   zoomImage.type === "Grafica SVG" ? "bg-indigo-100 text-indigo-800" : "bg-gray-100 text-gray-800"
                 }`}>
                   {zoomImage.type}
                 </span>
-                <h3 className="text-base font-bold text-gray-900 truncate max-w-lg">
+                <span className="text-xs font-bold text-gray-700 truncate max-w-md">
                   {zoomImage.title}
-                </h3>
+                </span>
               </div>
-
-              <div className="flex items-center gap-2">
-                <a 
-                  href={zoomImage.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all flex items-center gap-1"
-                >
-                  Apri Originale ↗
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setZoomImage(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+              <a 
+                href={zoomImage.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1"
+              >
+                Apri ↗
+              </a>
             </div>
 
             {/* Immagine Ingrandita */}
-            <div className="flex-1 w-full flex items-center justify-center p-2 overflow-auto min-h-[300px]">
+            <div className="w-full flex items-center justify-center p-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={zoomImage.url} 
                 alt={zoomImage.title} 
-                className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-md border border-gray-100"
+                className="max-w-full max-h-[72vh] object-contain rounded-xl"
               />
             </div>
           </div>

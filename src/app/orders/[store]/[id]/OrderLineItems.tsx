@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Package, X, ExternalLink, ZoomIn } from "lucide-react";
+import { Package, X, ExternalLink } from "lucide-react";
 
 export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
   const [zoomImage, setZoomImage] = useState<{ url: string; title: string; type: string } | null>(null);
@@ -35,21 +35,18 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
               {productImage && (
                 <div 
                   onClick={() => setZoomImage({ url: productImage, title: item.title, type: "Foto Prodotto" })}
-                  className="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs cursor-pointer hover:border-indigo-400 transition-all"
-                  title="Clicca per ingrandire la foto del prodotto"
+                  className="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs cursor-pointer hover:border-indigo-500 hover:scale-105 transition-all"
+                  title="Clicca per aprire il popup foto"
                 >
-                  <span className="absolute top-1 left-1 bg-gray-900/80 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">
+                  <span className="absolute top-1 left-1 bg-gray-900/80 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10 select-none">
                     Prodotto
                   </span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={productImage} 
                     alt={item.title} 
-                    className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                    className="max-w-full max-h-full object-contain"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity rounded-xl">
-                    <ZoomIn className="w-5 h-5 text-white drop-shadow-md" />
-                  </div>
                 </div>
               )}
 
@@ -57,21 +54,18 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
               {customGraphicImage && (
                 <div 
                   onClick={() => setZoomImage({ url: customGraphicImage, title: item.title, type: "Grafica SVG" })}
-                  className="w-24 h-24 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl overflow-hidden border border-indigo-200 dark:border-indigo-800 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs cursor-pointer hover:border-indigo-500 transition-all"
-                  title="Clicca per ingrandire la grafica SVG"
+                  className="w-24 h-24 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl overflow-hidden border border-indigo-200 dark:border-indigo-800 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs cursor-pointer hover:border-indigo-600 hover:scale-105 transition-all"
+                  title="Clicca per aprire il popup grafica SVG"
                 >
-                  <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">
+                  <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10 select-none">
                     Grafica SVG
                   </span>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={customGraphicImage} 
                     alt="Grafica SVG" 
-                    className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                    className="max-w-full max-h-full object-contain"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white gap-1 transition-opacity rounded-xl">
-                    <ZoomIn className="w-5 h-5 text-white drop-shadow-md" />
-                  </div>
                 </div>
               )}
 
@@ -114,56 +108,58 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
         );
       })}
 
-      {/* POPUP MODAL INGRANDIMENTO IMMAGINE NELLA STESSA PAGINA */}
+      {/* POPUP SUPER RAPIDO E PULITO INGRANDIMENTO IMMAGINE (CLICCA SULLO SFONDO O SU X PER CHIUDERE) */}
       {zoomImage && (
         <div 
           onClick={() => setZoomImage(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[300] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
         >
+          {/* Tasto X di chiusura veloce */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setZoomImage(null);
+            }}
+            className="fixed top-5 right-5 z-[310] text-white bg-black/60 hover:bg-red-600 p-2.5 rounded-full transition-colors cursor-pointer shadow-lg border border-white/20"
+            title="Chiudi (oppure clicca ovunque sullo sfondo)"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-gray-900 rounded-3xl max-w-4xl w-full p-6 shadow-2xl relative border border-gray-200 dark:border-gray-800 flex flex-col items-center max-h-[90vh] overflow-hidden"
+            className="bg-white dark:bg-gray-900 rounded-3xl max-w-3xl w-full p-4 shadow-2xl relative border border-gray-200 dark:border-gray-800 flex flex-col items-center max-h-[85vh] cursor-default"
           >
-            {/* Header Modal */}
-            <div className="w-full flex items-center justify-between pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
+            {/* Header essenziale */}
+            <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
-                <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full ${
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
                   zoomImage.type === "Grafica SVG" ? "bg-indigo-100 text-indigo-800" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
                 }`}>
                   {zoomImage.type}
                 </span>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white truncate max-w-lg">
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate max-w-md">
                   {zoomImage.title}
-                </h3>
+                </span>
               </div>
-
-              <div className="flex items-center gap-2">
-                <a 
-                  href={zoomImage.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all flex items-center gap-1"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Apri Originale
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setZoomImage(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+              <a 
+                href={zoomImage.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1"
+              >
+                Apri ↗
+              </a>
             </div>
 
             {/* Immagine Ingrandita */}
-            <div className="flex-1 w-full flex items-center justify-center p-2 overflow-auto min-h-[300px]">
+            <div className="w-full flex items-center justify-center p-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={zoomImage.url} 
                 alt={zoomImage.title} 
-                className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-md border border-gray-100 dark:border-gray-800"
+                className="max-w-full max-h-[72vh] object-contain rounded-xl"
               />
             </div>
           </div>

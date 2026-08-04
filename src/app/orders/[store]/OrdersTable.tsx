@@ -1332,7 +1332,8 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
             <div className="p-4 overflow-y-auto space-y-3 flex-1">
               {(selectedArticlesOrder.lineItems?.nodes || []).map((item: any, idx: number) => {
                 const imgUrl = item.variant?.image?.url || item.product?.featuredImage?.url;
-                const price = item.originalUnitPriceSet?.shopMoney?.amount || item.variant?.price?.amount;
+                const rawPrice = item.originalUnitPriceSet?.shopMoney?.amount || item.variant?.price;
+                const price = typeof rawPrice === "object" ? rawPrice?.amount : rawPrice;
                 const currency = item.originalUnitPriceSet?.shopMoney?.currencyCode || "EUR";
                 
                 return (

@@ -180,8 +180,9 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
   const handleOpenTextEditor = (order: any) => {
     const lineItemsNodes = order.lineItems?.nodes || [];
+    const parsedItems: any[] = [];
 
-    const parsedItems = lineItemsNodes.map((item: any) => {
+    lineItemsNodes.forEach((item: any) => {
       let foundText = "";
       let foundFont = "Get Show";
       let foundColor = "#38bdf8";
@@ -281,7 +282,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         }
       });
 
-      return {
+      const baseItem = {
         id: item.id,
         title: item.title || "Prodotto Personalizzato",
         variantTitle: item.variant?.title || "",
@@ -296,6 +297,26 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         svgUrl: foundSvg,
         customAttributes: attrs
       };
+
+      const qty = item.quantity || 1;
+      if (qty > 1) {
+        for (let q = 1; q <= qty; q++) {
+          parsedItems.push({
+            ...baseItem,
+            title: `${baseItem.title} (${q}/${qty})`,
+            pieceIndex: q,
+            totalPieces: qty,
+            uniqueId: `${item.id}_${q}`
+          });
+        }
+      } else {
+        parsedItems.push({
+          ...baseItem,
+          pieceIndex: 1,
+          totalPieces: 1,
+          uniqueId: item.id
+        });
+      }
     });
 
     const firstItem = parsedItems[0] || {};

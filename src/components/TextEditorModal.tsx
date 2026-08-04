@@ -339,18 +339,6 @@ export default function TextEditorModal({
 
             const aspect = paddedBBox.w / paddedBBox.h;
             setAspectRatio(aspect);
-
-            if (isUpdatingFromMmInput.current) {
-              // Reset flag and do NOT overwrite manual sizing inputs
-              isUpdatingFromMmInput.current = false;
-            } else {
-              const scaleFactor = 0.32;
-              const hMm = Math.round(paddedBBox.h * scaleFactor * 10) / 10;
-              const wMm = Math.round(paddedBBox.w * scaleFactor * 10) / 10;
-
-              setGraphicWidth(wMm);
-              setGraphicHeight(hMm);
-            }
           }
         }
       };
@@ -391,34 +379,18 @@ export default function TextEditorModal({
 
   // Handlers for manual input adjustments preserving ratio
   const handleWidthChange = (w: number) => {
-    isUpdatingFromMmInput.current = true;
     setGraphicWidth(w);
-    if (aspectRatio) {
+    if (aspectRatio && aspectRatio > 0) {
       const h = Math.round((w / aspectRatio) * 10) / 10;
       setGraphicHeight(h);
-      
-      if (activeTab === "text" && text) {
-        const lines = text.split("\n");
-        const scaleFactor = 0.35;
-        const computedSize = h / (lines.length * 1.25 * scaleFactor);
-        setFontSize(Math.max(8, Math.min(200, Math.round(computedSize))));
-      }
     }
   };
 
   const handleHeightChange = (h: number) => {
-    isUpdatingFromMmInput.current = true;
     setGraphicHeight(h);
-    if (aspectRatio) {
+    if (aspectRatio && aspectRatio > 0) {
       const w = Math.round((h * aspectRatio) * 10) / 10;
       setGraphicWidth(w);
-
-      if (activeTab === "text" && text) {
-        const lines = text.split("\n");
-        const scaleFactor = 0.35;
-        const computedSize = h / (lines.length * 1.25 * scaleFactor);
-        setFontSize(Math.max(8, Math.min(200, Math.round(computedSize))));
-      }
     }
   };
 

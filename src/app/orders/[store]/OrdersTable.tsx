@@ -1307,7 +1307,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
           onClick={() => setSelectedArticlesOrder(null)}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
@@ -1329,67 +1329,117 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
               </button>
             </div>
 
-            <div className="p-4 overflow-y-auto space-y-3 flex-1">
+            <div className="p-4 overflow-y-auto space-y-4 flex-1 bg-gray-50/50">
               {(selectedArticlesOrder.lineItems?.nodes || []).map((item: any, idx: number) => {
-                const imgUrl = item.variant?.image?.url || item.product?.featuredImage?.url;
+                const podSvg = item.product?.pod_svg?.reference?.url || item.product?.pod_svg?.reference?.image?.url || item.variant?.pod_svg?.reference?.url || item.variant?.pod_svg?.reference?.image?.url;
+
+                const customPreviewAttr = item.customAttributes?.find((attr: any) => 
+                  typeof attr.value === "string" && attr.value.startsWith("http") && (
+                    attr.key.toLowerCase().includes("vedi") || 
+                    attr.key.toLowerCase().includes("preview") || 
+                    attr.key.toLowerCase().includes("immagine") || 
+                    attr.key.toLowerCase().includes("grafica") || 
+                    attr.key.toLowerCase().includes("_pplr") || 
+                    attr.key.toLowerCase().includes("design")
+                  )
+                ) || item.customAttributes?.find((attr: any) => typeof attr.value === "string" && attr.value.startsWith("http"));
+
+                const personalizerPreviewUrl = customPreviewAttr?.value;
+                const displayImage = personalizerPreviewUrl || podSvg || item.variant?.image?.url || item.product?.featuredImage?.url;
+
                 const rawPrice = item.originalUnitPriceSet?.shopMoney?.amount || item.variant?.price;
                 const price = typeof rawPrice === "object" ? rawPrice?.amount : rawPrice;
-                const currency = item.originalUnitPriceSet?.shopMoney?.currencyCode || "EUR";
                 
                 return (
-                  <div key={item.id || idx} className="flex items-center gap-3 p-3 bg-gray-50/80 rounded-xl border border-gray-200/80 hover:bg-white transition-colors">
-                    <div className="w-14 h-14 bg-white rounded-lg border border-gray-200 flex items-center justify-center p-1 shrink-0 overflow-hidden">
-                      {imgUrl ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={imgUrl} alt={item.title} className="max-w-full max-h-full object-contain" />
-                      ) : (
-                        <Package className="w-7 h-7 text-gray-300" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-gray-900 text-sm truncate" title={item.title}>
-                        {item.title}
-                      </h4>
-                      {item.variant?.title && item.variant.title !== "Default Title" && (
-                        <p className="text-xs text-indigo-600 font-medium truncate">
-                          Variante: {item.variant.title}
-                        </p>
-                      )}
-                      {item.variant?.sku && (
-                        <p className="text-[11px] text-gray-400 font-mono">
-                          SKU: {item.variant.sku}
-                        </p>
-                      )}
-                      {item.customAttributes && item.customAttributes.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {item.customAttributes.map((attr: any, i: number) => (
-                            <span key={i} className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 font-medium">
-                              {attr.key}: {attr.value}
+                  <div key={item.id || idx} className="p-4 bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3">
+                    <div className="flex gap-4">
+                      {/* Product / Personalizer Image */}
+                      <div className="flex-shrink-0 w-20 h-20 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-center p-1 relative group overflow-hidden">
+                        {displayImage ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={displayImage} alt={item.title} className="max-w-full max-h-full object-contain" />
+                        ) : (
+                          <Package className="w-8 h-8 text-gray-300" />
+                        )}
+                        {personalizerPreviewUrl && (
+                          <a 
+                            href={personalizerPreviewUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
+                          >
+                            Apri ↗
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Product Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-bold text-gray-900 text-base leading-snug">{item.title}</h4>
+                            {item.variant?.title && item.variant.title !== "Default Title" && (
+                              <p className="text-xs text-indigo-600 font-semibold mt-0.5">
+                                Variante: {item.variant.title}
+                              </p>
+                            )}
+                            {item.variant?.sku && (
+                              <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                                SKU: {item.variant.sku}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Quantity & Price Badge */}
+                          <div className="text-right shrink-0">
+                            <span className="px-2.5 py-1 bg-amber-100 text-amber-900 font-black text-xs rounded-lg inline-block shadow-2xs">
+                              x {item.quantity || 1}
                             </span>
-                          ))}
+                            {price && (
+                              <div className="text-sm font-bold text-gray-900 mt-1">
+                                € {price}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="px-2 py-1 bg-amber-100 text-amber-900 font-extrabold text-xs rounded-md inline-block">
-                        x {item.quantity || 1}
-                      </span>
-                      {price && (
-                        <div className="text-xs font-semibold text-gray-700 mt-1">
-                          {currency === "EUR" ? "€" : currency} {price}
-                        </div>
-                      )}
+
+                        {/* Custom Attributes as Soft Purple Pill Badges */}
+                        {item.customAttributes && item.customAttributes.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {item.customAttributes.map((attr: any, aIdx: number) => {
+                              const isUrl = typeof attr.value === "string" && attr.value.startsWith("http");
+                              return isUrl ? (
+                                <div key={aIdx} className="w-full bg-indigo-50/80 p-2.5 rounded-xl border border-indigo-100 text-xs">
+                                  <span className="font-semibold text-indigo-900 block mb-0.5">{attr.key}:</span>
+                                  <a 
+                                    href={attr.value} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="font-bold text-indigo-600 hover:text-indigo-800 underline break-all text-[11px]"
+                                  >
+                                    {attr.value} ↗
+                                  </a>
+                                </div>
+                              ) : (
+                                <span key={aIdx} className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-100 text-xs font-semibold inline-flex items-center shadow-2xs">
+                                  {attr.key}: {attr.value}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-600">
-              <span>Totale Articoli: {(selectedArticlesOrder.lineItems?.nodes || []).length}</span>
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-600">
+              <span>Totale Articoli nell&apos;Ordine: {(selectedArticlesOrder.lineItems?.nodes || []).reduce((s: number, i: any) => s + (i.quantity || 1), 0)}</span>
               <button
                 onClick={() => setSelectedArticlesOrder(null)}
-                className="px-4 py-1.5 bg-gray-900 hover:bg-black text-white rounded-lg font-bold transition-colors"
+                className="px-5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold transition-colors shadow-sm"
               >
                 Chiudi
               </button>

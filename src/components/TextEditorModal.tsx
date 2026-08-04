@@ -27,6 +27,7 @@ import {
   Upload,
   AlertCircle
 } from "lucide-react";
+import { getProductGraphicPresets, ProductGraphicPreset } from "@/lib/presetStore";
 
 interface TextEditorModalProps {
   open: boolean;
@@ -83,14 +84,30 @@ const PRESET_COLORS = [
   { name: "Blu", hex: "#2563eb" }
 ];
 
-const PRODUCT_PRESETS = [
-  { name: "PROFUMATORE", w: 110, h: 130 },
-  { name: "MINI PROFUMATORE", w: 75, h: 80 },
-  { name: "CANDELA 450", w: 110, h: 80 },
-  { name: "CANDELA 250", w: 75, h: 80 },
-  { name: "LAMPADA", w: 155, h: 150 },
-  { name: "VASO", w: 180, h: 240 }
-];
+const fitGraphicInProductMaxDimensions = (graphicAspect: number, maxW: number, maxH: number) => {
+  if (!graphicAspect || graphicAspect <= 0) {
+    return { w: maxW, h: maxH };
+  }
+
+  const maxAspect = maxW / maxH;
+  let targetW: number;
+  let targetH: number;
+
+  if (graphicAspect >= maxAspect) {
+    // Grafica larga ma bassa -> rispetta la larghezza massima maxW
+    targetW = maxW;
+    targetH = Math.round((maxW / graphicAspect) * 10) / 10;
+  } else {
+    // Grafica alta ma stretta -> rispetta l'altezza massima maxH
+    targetH = maxH;
+    targetW = Math.round((maxH * graphicAspect) * 10) / 10;
+  }
+
+  return {
+    w: Math.max(1, targetW),
+    h: Math.max(1, targetH)
+  };
+};
 
 export default function TextEditorModal({
   open,
@@ -134,35 +151,22 @@ export default function TextEditorModal({
   const [textBBox, setTextBBox] = useState({ x: 900, y: 980, w: 200, h: 40 });
   const isUpdatingFromMmInput = useRef(false);
 
-  const fitGraphicInProduct = (aspect: number, productW: number, productH: number) => {
-    const maxW = productW * 0.9;
-    const maxH = productH * 0.9;
-    let w = maxW;
-    let h = w / aspect;
-    if (h > maxH) {
-      h = maxH;
-      w = h * aspect;
+  const [productPresets, setProductPresets] = useState<ProductGraphicPreset[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      setProductPresets(getProductGraphicPresets());
     }
-    return {
-      w: Math.round(w * 10) / 10,
-      h: Math.round(h * 10) / 10
-    };
-  };
+  }, [open]);
 
   const selectProductPreset = (idx: number) => {
     setSelectedProductIdx(idx);
-    const preset = PRODUCT_PRESETS[idx];
-    const fitted = fitGraphicInProduct(aspectRatio, preset.w, preset.h);
-    
-    isUpdatingFromMmInput.current = true;
-    setGraphicWidth(fitted.w);
-    setGraphicHeight(fitted.h);
-
-    if (activeTab === "text" && text) {
-      const lines = text.split("\n");
-      const scaleFactor = 0.35;
-      const computedSize = fitted.h / (lines.length * 1.25 * scaleFactor);
-      setFontSize(Math.max(8, Math.min(200, Math.round(computedSize))));
+    const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+    const preset = presetsList[idx] || presetsList[0];
+    if (preset) {
+      const fitted = fitGraphicInProductMaxDimensions(aspectRatio, preset.maxGraphicW, preset.maxGraphicH);
+      setGraphicWidth(fitted.w);
+      setGraphicHeight(fitted.h);
     }
   };
 
@@ -337,20 +341,28 @@ export default function TextEditorModal({
             };
             setTextBBox(paddedBBox);
 
-            const aspect = paddedBBox.w / paddedBBox.h;
-            setAspectRatio(aspect);
+            const textAspect = paddedBBox.w / paddedBBox.h;
+            setAspectRatio(textAspect);
+
+            // Auto-dimensioning dinamico: adatta esattamente le dimensioni max memorizzate nelle impostazioni
+            const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+            const currentPreset = presetsList[selectedProductIdx] || presetsList[0];
+            if (currentPreset) {
+              const fitted = fitGraphicInProductMaxDimensions(textAspect, currentPreset.maxGraphicW, currentPreset.maxGraphicH);
+              setGraphicWidth(fitted.w);
+              setGraphicHeight(fitted.h);
+            }
           }
         }
       };
 
-      // Measure only after fonts are fully loaded to get the exact width/height of the specific font
       if (typeof document !== "undefined" && (document as any).fonts) {
         (document as any).fonts.ready.then(measureText);
       } else {
         setTimeout(measureText, 50);
       }
     }
-  }, [text, font, fontSize, letterSpacing, lineHeight, strokeWidth, activeTab]);
+  }, [text, font, fontSize, letterSpacing, lineHeight, strokeWidth, activeTab, selectedProductIdx, productPresets]);
 
   // 2. Monitor image tab aspect ratio changes
   useEffect(() => {
@@ -367,10 +379,13 @@ export default function TextEditorModal({
             setAspectRatio(aspect);
 
             // Auto fit graphic into current preset boundaries on image load
-            const preset = PRODUCT_PRESETS[selectedProductIdx];
-            const fitted = fitGraphicInProduct(aspect, preset.w, preset.h);
-            setGraphicWidth(fitted.w);
-            setGraphicHeight(fitted.h);
+            const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+            const preset = presetsList[selectedProductIdx] || presetsList[0];
+            if (preset) {
+              const fitted = fitGraphicInProductMaxDimensions(aspect, preset.maxGraphicW, preset.maxGraphicH);
+              setGraphicWidth(fitted.w);
+              setGraphicHeight(fitted.h);
+            }
           }
         };
       }
@@ -1059,10 +1074,11 @@ export default function TextEditorModal({
             >
               {/* Box Prodotto con Dimensioni e Proporzioni Reali */}
               {(() => {
-                const preset = PRODUCT_PRESETS[selectedProductIdx];
+                const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+                const preset = presetsList[selectedProductIdx] || presetsList[0] || { name: "PRODOTTO", supportW: 110, supportH: 130 };
                 const maxScreenW = 340;
                 const maxScreenH = 210;
-                const productAspect = preset.w / preset.h;
+                const productAspect = preset.supportW / preset.supportH;
                 
                 let screenW = maxScreenW;
                 let screenH = screenW / productAspect;
@@ -1071,7 +1087,7 @@ export default function TextEditorModal({
                   screenW = screenH * productAspect;
                 }
 
-                const mmToPxRatio = screenW / preset.w;
+                const mmToPxRatio = screenW / preset.supportW;
                 const graphicScreenW = graphicWidth * mmToPxRatio;
                 const graphicScreenH = graphicHeight * mmToPxRatio;
 
@@ -1086,7 +1102,7 @@ export default function TextEditorModal({
                   >
                     {/* Badge Prodotto Bounding Box */}
                     <span className="absolute top-1 left-1.5 text-[8px] font-extrabold text-indigo-800 bg-indigo-50 px-1 py-0.2 rounded border border-indigo-200 select-none z-10 opacity-75">
-                      {preset.name} ({preset.w}x{preset.h} mm)
+                      {preset.name} ({preset.supportW}x{preset.supportH} mm)
                     </span>
 
                     {/* Contorno della Grafica / Testo (Bounding Box) */}
@@ -1175,7 +1191,7 @@ export default function TextEditorModal({
 
               {/* SELETTORE PRODOTTO PRESET - COMPATTO & MINIMALE */}
               <div className="grid grid-cols-3 gap-1.5">
-                {PRODUCT_PRESETS.map((p, idx) => (
+                {(productPresets.length > 0 ? productPresets : getProductGraphicPresets()).map((p, idx) => (
                   <button
                     key={p.name}
                     type="button"
@@ -1187,55 +1203,63 @@ export default function TextEditorModal({
                     }`}
                   >
                     <span className="truncate w-full text-[9px] font-extrabold uppercase tracking-wide">{p.name}</span>
-                    <span className="font-mono text-[8px] text-gray-400 font-bold">{p.w}x{p.h} mm</span>
+                    <span className="font-mono text-[8px] text-gray-400 font-bold">{p.supportW}x{p.supportH} mm</span>
                   </button>
                 ))}
               </div>
 
               {/* GESTIONE LARGHEZZA / ALTEZZA GRAFICA */}
-              <div className="grid grid-cols-2 gap-3 items-end pt-0.5">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-gray-600">Larghezza Grafica (mm)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="1"
-                      max={PRODUCT_PRESETS[selectedProductIdx].w * 1.5}
-                      value={graphicWidth}
-                      onChange={e => handleWidthChange(parseFloat(e.target.value) || 0)}
-                      className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
-                  </div>
-                </div>
+              {(() => {
+                const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+                const activeP = presetsList[selectedProductIdx] || presetsList[0];
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 items-end pt-0.5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-gray-600">Larghezza Grafica (mm)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="1"
+                            max={activeP.supportW * 1.5}
+                            value={graphicWidth}
+                            onChange={e => handleWidthChange(parseFloat(e.target.value) || 0)}
+                            className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
+                        </div>
+                      </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold text-gray-600">Altezza Grafica (mm)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="1"
-                      max={PRODUCT_PRESETS[selectedProductIdx].h * 1.5}
-                      value={graphicHeight}
-                      onChange={e => handleHeightChange(parseFloat(e.target.value) || 0)}
-                      className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* AVVISO DI FUORI BORDO */}
-              {(graphicWidth > PRODUCT_PRESETS[selectedProductIdx].w || graphicHeight > PRODUCT_PRESETS[selectedProductIdx].h) && (
-                <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-1.5 text-rose-800 text-[10px] leading-relaxed">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
-                  <div>
-                    <span className="font-extrabold">Attenzione: Fuori bordo!</span> La grafica supera le dimensioni del prodotto selezionato ({PRODUCT_PRESETS[selectedProductIdx].w}x{PRODUCT_PRESETS[selectedProductIdx].h} mm).
-                  </div>
-                </div>
-              )}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-gray-600">Altezza Grafica (mm)</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="1"
+                            max={activeP.supportH * 1.5}
+                            value={graphicHeight}
+                            onChange={e => handleHeightChange(parseFloat(e.target.value) || 0)}
+                            className="w-full pl-3 pr-8 py-1.5 border border-gray-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <span className="absolute right-3 top-2 text-[10px] font-bold text-gray-400">mm</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* AVVISO DI FUORI BORDO */}
+                    {(graphicWidth > activeP.supportW || graphicHeight > activeP.supportH) && (
+                      <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-1.5 text-rose-800 text-[10px] leading-relaxed">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
+                        <div>
+                          <span className="font-extrabold">Attenzione: Fuori bordo!</span> La grafica supera le dimensioni del supporto selezionato ({activeP.supportW}x{activeP.supportH} mm).
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* PANNELLO CONTROLLI ED EDITOR (LARGHEZZA INTERA DESTRA) */}

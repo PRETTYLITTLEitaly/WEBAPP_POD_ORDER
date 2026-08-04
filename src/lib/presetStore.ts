@@ -9,6 +9,15 @@ export interface PrintPreset {
   isDefault?: boolean;
 }
 
+export interface ProductGraphicPreset {
+  id: string;
+  name: string;
+  supportW: number;
+  supportH: number;
+  maxGraphicW: number;
+  maxGraphicH: number;
+}
+
 export const DEFAULT_PRESETS: PrintPreset[] = [
   {
     id: "preset-300-default",
@@ -32,7 +41,17 @@ export const DEFAULT_PRESETS: PrintPreset[] = [
   }
 ];
 
+export const DEFAULT_PRODUCT_GRAPHIC_PRESETS: ProductGraphicPreset[] = [
+  { id: "profumatore", name: "PROFUMATORE", supportW: 110, supportH: 130, maxGraphicW: 80, maxGraphicH: 100 },
+  { id: "mini-profumatore", name: "MINI PROFUMATORE", supportW: 75, supportH: 80, maxGraphicW: 55, maxGraphicH: 65 },
+  { id: "candela-450", name: "CANDELA 450", supportW: 110, supportH: 80, maxGraphicW: 85, maxGraphicH: 60 },
+  { id: "candela-250", name: "CANDELA 250", supportW: 75, supportH: 80, maxGraphicW: 55, maxGraphicH: 60 },
+  { id: "lampada", name: "LAMPADA", supportW: 155, supportH: 150, maxGraphicW: 120, maxGraphicH: 120 },
+  { id: "vaso", name: "VASO", supportW: 180, supportH: 240, maxGraphicW: 140, maxGraphicH: 180 }
+];
+
 const PRESETS_KEY = "app_print_presets_list";
+const PRODUCT_GRAPHIC_PRESETS_KEY = "app_product_graphic_presets";
 
 export function getPresets(): PrintPreset[] {
   if (typeof window === "undefined") return DEFAULT_PRESETS;
@@ -62,4 +81,25 @@ export function savePresets(presets: PrintPreset[]) {
 export function getDefaultPreset(): PrintPreset {
   const list = getPresets();
   return list.find(p => p.isDefault) || list[0] || DEFAULT_PRESETS[0];
+}
+
+export function getProductGraphicPresets(): ProductGraphicPreset[] {
+  if (typeof window === "undefined") return DEFAULT_PRODUCT_GRAPHIC_PRESETS;
+  const saved = localStorage.getItem(PRODUCT_GRAPHIC_PRESETS_KEY);
+  if (!saved) {
+    localStorage.setItem(PRODUCT_GRAPHIC_PRESETS_KEY, JSON.stringify(DEFAULT_PRODUCT_GRAPHIC_PRESETS));
+    return DEFAULT_PRODUCT_GRAPHIC_PRESETS;
+  }
+  try {
+    const list: ProductGraphicPreset[] = JSON.parse(saved);
+    if (!list || !list.length) return DEFAULT_PRODUCT_GRAPHIC_PRESETS;
+    return list;
+  } catch (e) {
+    return DEFAULT_PRODUCT_GRAPHIC_PRESETS;
+  }
+}
+
+export function saveProductGraphicPresets(presets: ProductGraphicPreset[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PRODUCT_GRAPHIC_PRESETS_KEY, JSON.stringify(presets));
 }

@@ -888,11 +888,11 @@ export default function TextEditorModal({
           </div>
         )}
 
-        {/* CORPO EDITOR SPLITATO: SX ANTEPRIMA PRODOTTO, DX PELLICOLA DTF E CONTROLLI AFFIANCATI */}
-        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 bg-gray-50">
+        {/* CORPO EDITOR SPLITATO IN 3 COLONNE DIRETTE: 1. MOCKUP (3) | 2. SIMULATORE DTF (4) | 3. CONTROLLI ED EDITOR (5) */}
+        <div className="flex-1 overflow-y-auto p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 bg-gray-50">
           
-          {/* COLONNA SINISTRA: ANTEPRIMA PRODOTTO ORIGINALE MOCKUP (4 COLONNE) */}
-          <div className="lg:col-span-4 flex flex-col space-y-3">
+          {/* COLONNA 1: ANTEPRIMA PRODOTTO ORIGINALE MOCKUP (3 COLONNE) */}
+          <div className="lg:col-span-3 flex flex-col space-y-3">
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1.5 text-indigo-700">
                 <Package className="w-4 h-4 text-indigo-500" />
@@ -1014,12 +1014,8 @@ export default function TextEditorModal({
             )}
           </div>
 
-          {/* COLONNA DESTRA: AREA PELLICOLA DTF + PANNELLO CONTROLLI AFFIANCATI (8 COLONNE) */}
-          <div className="lg:col-span-8">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-
-              {/* SUB-COLONNA SINISTRA: SIMULATORE PELLICOLA DTF & DIMENSIONAMENTO (6 COLONNE) */}
-              <div className="md:col-span-6 flex flex-col space-y-4">
+          {/* COLONNA 2: SIMULATORE PELLICOLA DTF & DIMENSIONAMENTO (4 COLONNE) */}
+          <div className="lg:col-span-4 flex flex-col space-y-4">
             
             {/* INTESTAZIONE CANALE PELLICOLA E TOOLBAR SFONDO */}
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
@@ -1264,11 +1260,11 @@ export default function TextEditorModal({
                   </>
                 );
               })()}
-              </div>
+          </div>
 
-              {/* SUB-COLONNA DESTRA: PANNELLO CONTROLLI TESTO, FONT, COLORI & SALVATAGGIO AFFIANCATO A DESTRA DEL SIMULATORE (6 COLONNE) */}
-              <div className="md:col-span-6 space-y-4">
-                <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
+          {/* COLONNA 3: PANNELLO CONTROLLI TESTO, FONT, COLORI & SALVATAGGIO AFFIANCATO A DESTRA (5 COLONNE) */}
+          <div className="lg:col-span-5 flex flex-col space-y-4">
+            <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
             
             {/* SCHEDA 1: TESTO & FONT */}
             {activeTab === "text" && (
@@ -1574,8 +1570,6 @@ export default function TextEditorModal({
       </div>
     </div>
   </div>
-</div>
-</div>
 </div>
 );
 }

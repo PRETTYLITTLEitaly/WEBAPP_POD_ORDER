@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Package, X, ExternalLink } from "lucide-react";
+import { Package, X } from "lucide-react";
 
 export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
   const [zoomImage, setZoomImage] = useState<{ url: string; title: string; type: string } | null>(null);
@@ -36,7 +36,7 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
                 <div 
                   onClick={() => setZoomImage({ url: productImage, title: item.title, type: "Foto Prodotto" })}
                   className="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs cursor-pointer hover:border-indigo-500 hover:scale-105 transition-all"
-                  title="Clicca per aprire il popup foto"
+                  title="Clicca per aprire la foto a schermo intero"
                 >
                   <span className="absolute top-1 left-1 bg-gray-900/80 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10 select-none">
                     Prodotto
@@ -55,7 +55,7 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
                 <div 
                   onClick={() => setZoomImage({ url: customGraphicImage, title: item.title, type: "Grafica SVG" })}
                   className="w-24 h-24 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl overflow-hidden border border-indigo-200 dark:border-indigo-800 relative p-1.5 flex flex-col items-center justify-center group shadow-2xs cursor-pointer hover:border-indigo-600 hover:scale-105 transition-all"
-                  title="Clicca per aprire il popup grafica SVG"
+                  title="Clicca per aprire la grafica SVG a schermo intero"
                 >
                   <span className="absolute top-1 left-1 bg-indigo-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10 select-none">
                     Grafica SVG
@@ -108,60 +108,36 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
         );
       })}
 
-      {/* POPUP SUPER RAPIDO E PULITO INGRANDIMENTO IMMAGINE (CLICCA SULLO SFONDO O SU X PER CHIUDERE) */}
+      {/* POPUP LIGHTBOX SENZA BOX CONTENITORE (FOTO PURA A SCHERMO INTERO) */}
       {zoomImage && (
         <div 
           onClick={() => setZoomImage(null)}
-          className="fixed inset-0 z-[300] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer animate-in fade-in duration-150"
         >
-          {/* Tasto X di chiusura veloce */}
+          {/* Pulsante X in alto a destra */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setZoomImage(null);
             }}
-            className="fixed top-5 right-5 z-[310] text-white bg-black/60 hover:bg-red-600 p-2.5 rounded-full transition-colors cursor-pointer shadow-lg border border-white/20"
+            className="fixed top-5 right-5 z-[10000] text-white bg-black/70 hover:bg-rose-600 p-3 rounded-full transition-colors cursor-pointer shadow-2xl border border-white/20"
             title="Chiudi (oppure clicca ovunque sullo sfondo)"
           >
-            <X className="w-6 h-6" />
+            <X className="w-6 h-6 text-white" />
           </button>
 
+          {/* Immagine ingrandita a schermo intero senza riquadro/box contorno che la limita */}
           <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-gray-900 rounded-3xl max-w-3xl w-full p-4 shadow-2xl relative border border-gray-200 dark:border-gray-800 flex flex-col items-center max-h-[85vh] cursor-default"
+            onClick={(e) => e.stopPropagation()} 
+            className="relative flex items-center justify-center max-w-[92vw] max-h-[92vh]"
           >
-            {/* Header essenziale */}
-            <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
-                  zoomImage.type === "Grafica SVG" ? "bg-indigo-100 text-indigo-800" : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-                }`}>
-                  {zoomImage.type}
-                </span>
-                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate max-w-md">
-                  {zoomImage.title}
-                </span>
-              </div>
-              <a 
-                href={zoomImage.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1"
-              >
-                Apri ↗
-              </a>
-            </div>
-
-            {/* Immagine Ingrandita */}
-            <div className="w-full flex items-center justify-center p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src={zoomImage.url} 
-                alt={zoomImage.title} 
-                className="max-w-full max-h-[72vh] object-contain rounded-xl"
-              />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={zoomImage.url} 
+              alt={zoomImage.title} 
+              className="max-w-[92vw] max-h-[92vh] object-contain rounded-2xl shadow-2xl select-none"
+            />
           </div>
         </div>
       )}

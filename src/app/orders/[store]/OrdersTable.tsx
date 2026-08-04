@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Pencil, Sliders, CheckSquare, Eye, FileText, X, Package } from "lucide-react";
+import { Pencil, Sliders, CheckSquare, Eye, FileText, X, Package, XSquare } from "lucide-react";
 import { getPresets, PrintPreset } from "@/lib/presetStore";
 import TextEditorModal from "@/components/TextEditorModal";
 
@@ -805,6 +805,19 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
               >
                 <CheckSquare className="w-3.5 h-3.5" />
                 {showOnlySelected ? "Mostra Tutti" : `Solo Selezionati (${selected.length})`}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelected([]);
+                  setShowOnlySelected(false);
+                }}
+                className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer shadow-2xs"
+                title="Rimuovi tutte le selezioni delle checkbox"
+              >
+                <XSquare className="w-3.5 h-3.5 text-gray-500" />
+                Deseleziona
               </button>
             </div>
             <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">

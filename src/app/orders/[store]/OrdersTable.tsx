@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Pencil, Sliders, CheckSquare, Eye } from "lucide-react";
+import { Pencil, Sliders, CheckSquare, Eye, FileText, X, Package } from "lucide-react";
 import { getPresets, PrintPreset } from "@/lib/presetStore";
 import TextEditorModal from "@/components/TextEditorModal";
 
@@ -54,9 +54,30 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
   const [printedIds, setPrintedIds] = useState<string[]>(() => getPrintedIdsFromOrders(initialOrders));
   const [togglingPrintedId, setTogglingPrintedId] = useState<string | null>(null);
 
+  // Persistent DDT / PDF History IDs state
+  const [ddtHistoryIds, setDdtHistoryIds] = useState<string[]>([]);
+  // Quick Articles Popup Modal state
+  const [selectedArticlesOrder, setSelectedArticlesOrder] = useState<any | null>(null);
+
   useEffect(() => {
     setPrintedIds(getPrintedIdsFromOrders(initialOrders));
-  }, [initialOrders]);
+
+    // Load persistent DDT history from Shopify Shop Metafields
+    fetch(`/api/pdf/history?store=${store}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.history)) {
+          const ids: string[] = [];
+          data.history.forEach((h: any) => {
+            if (Array.isArray(h.selectedIds)) {
+              ids.push(...h.selectedIds);
+            }
+          });
+          setDdtHistoryIds(Array.from(new Set(ids)));
+        }
+      })
+      .catch((err) => console.error("Error loading persistent DDT history:", err));
+  }, [initialOrders, store]);
   
   // Modal & Editor States
   const [showModal, setShowModal] = useState(false);
@@ -372,6 +393,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       // Save as printed locally (it is also tagged on Shopify by the route)
       const newPrinted = Array.from(new Set([...printedIds, ...selected]));
       setPrintedIds(newPrinted);
+      setDdtHistoryIds(prev => Array.from(new Set([...prev, ...selected])));
 
       // Save to history
       const selectedNames = selected.map(id => {
@@ -732,22 +754,23 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                     checked={filteredOrders.length > 0 && selected.length === filteredOrders.length}
                   />
                 </th>
-                <th scope="col" className="px-4 py-2.5 text-left font-semibold text-gray-700">Ordine</th>
-                <th scope="col" className="px-4 py-2.5 text-left font-semibold text-gray-700">Data</th>
-                <th scope="col" className="px-4 py-2.5 text-left font-semibold text-gray-700">Cliente</th>
-                <th scope="col" className="px-4 py-2.5 text-center font-semibold text-gray-700">Tipo</th>
-                <th scope="col" className="px-4 py-2.5 text-center font-semibold text-gray-700">Articoli</th>
-                <th scope="col" className="px-4 py-2.5 text-center font-semibold text-gray-700">DTF PRINT</th>
-                <th scope="col" className="px-4 py-2.5 text-right font-semibold text-gray-700">Totale</th>
-                <th scope="col" className="px-4 py-2.5 text-left font-semibold text-gray-700">Tag</th>
-                <th scope="col" className="px-4 py-2.5 text-left font-semibold text-gray-700">Stato</th>
-                <th scope="col" className="px-4 py-2.5 text-left font-semibold text-gray-700">Tracking</th>
+                <th scope="col" className="px-3 py-2.5 text-left font-semibold text-gray-700">Ordine</th>
+                <th scope="col" className="px-3 py-2.5 text-left font-semibold text-gray-700">Data</th>
+                <th scope="col" className="px-3 py-2.5 text-left font-semibold text-gray-700">Cliente</th>
+                <th scope="col" className="px-3 py-2.5 text-center font-semibold text-gray-700 w-16">DDT</th>
+                <th scope="col" className="px-3 py-2.5 text-center font-semibold text-gray-700 w-20">Tipo</th>
+                <th scope="col" className="px-3 py-2.5 text-center font-semibold text-gray-700 w-24">Articoli</th>
+                <th scope="col" className="px-3 py-2.5 text-center font-semibold text-gray-700">DTF PRINT</th>
+                <th scope="col" className="px-3 py-2.5 text-right font-semibold text-gray-700">Totale</th>
+                <th scope="col" className="px-3 py-2.5 text-left font-semibold text-gray-700">Tag</th>
+                <th scope="col" className="px-3 py-2.5 text-left font-semibold text-gray-700">Stato</th>
+                <th scope="col" className="px-3 py-2.5 text-left font-semibold text-gray-700">Tracking</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center">
+                  <td colSpan={11} className="px-6 py-16 text-center">
                     <p className="text-gray-500 font-medium">Nessun ordine trovato</p>
                     <p className="text-gray-400 mt-1 text-sm">Prova a cambiare o rimuovere i filtri.</p>
                   </td>
@@ -757,8 +780,9 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                 const date = new Date(order.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
                 const isSelected = selected.includes(order.id);
                 const isEvaso = order.displayFulfillmentStatus === "FULFILLED";
-                const isStampato = printedIds.includes(order.id);
-                const isStampatoEdEvaso = isStampato && isEvaso;
+                const isPrinted = printedIds.includes(order.id);
+                const isStampatoEdEvaso = isPrinted && isEvaso;
+                const hasDdt = ddtHistoryIds.includes(order.id) || isPrinted;
                 const trackingUrl = order.fulfillments?.[0]?.trackingInfo?.[0]?.url;
                 const trackingNumber = order.fulfillments?.[0]?.trackingInfo?.[0]?.number;
                 
@@ -773,7 +797,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                           : "hover:bg-[#f4f6f8]"
                     } transition-colors cursor-default`}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-3 py-2.5 whitespace-nowrap">
                       <input 
                         type="checkbox" 
                         className="w-4 h-4 rounded-[4px] border-gray-400 text-black focus:ring-black cursor-pointer bg-white"
@@ -781,16 +805,29 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                         onChange={() => toggleOne(order.id)}
                       />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-900 hover:underline">
+                    <td className="px-3 py-2.5 whitespace-nowrap font-semibold text-gray-900 hover:underline">
                       <Link href={`/orders/${store}/${order.id.split('/').pop()}`}>
                         {orderNum}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{date}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-900">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{date}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-900 max-w-[170px] truncate" title={order.customer ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}` : "Nessun cliente"}>
                       {order.customer ? `${order.customer.firstName || ''} ${order.customer.lastName || ''}` : "Nessun cliente"}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-center">
+                      {hasDdt ? (
+                        <div 
+                          className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-md font-bold text-[10px] shadow-2xs cursor-pointer hover:bg-red-100 transition-colors"
+                          title="DDT / Stampa PDF Generato per questo ordine"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span className="font-black text-[9px] text-red-600 uppercase tracking-tighter">DDT</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-300 font-mono text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       {(order.tags || []).some((t: string) => t.toLowerCase() === "product_personalizer" || t.toLowerCase() === "product-personalizer") && (
                         <div className="flex items-center justify-center gap-1.5">
                           <button
@@ -818,14 +855,22 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       {(() => {
                         const lineItemsList = order.lineItems?.nodes || [];
                         const totalQty = lineItemsList.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0);
                         return (
-                          <span className="px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-300 font-extrabold text-xs rounded-lg inline-flex items-center gap-1 shadow-2xs" title={`Numero totale articoli su Shopify (${totalQty})`}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedArticlesOrder(order);
+                            }}
+                            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-300 font-extrabold text-xs rounded-lg inline-flex items-center gap-1 shadow-2xs transition-all hover:scale-105 cursor-pointer"
+                            title={`Clicca per vedere tutti gli articoli nell'ordine (${totalQty})`}
+                          >
                             📦 {totalQty} {totalQty === 1 ? "art." : "art."}
-                          </span>
+                          </button>
                         );
                       })()}
                     </td>
@@ -1247,6 +1292,103 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
               <button
                 onClick={() => setPplrModal({ open: false, orderName: "", items: [] })}
                 className="px-4 py-2 bg-gray-900 hover:bg-black text-white font-bold text-xs rounded-lg shadow-sm transition-colors"
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Popup Rapido Articoli dell'Ordine */}
+      {selectedArticlesOrder && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectedArticlesOrder(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                  <Package className="w-5 h-5 text-indigo-600" />
+                  Articoli dell&apos;Ordine {selectedArticlesOrder.name}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Cliente: <span className="font-semibold text-gray-700">{selectedArticlesOrder.customer ? `${selectedArticlesOrder.customer.firstName || ''} ${selectedArticlesOrder.customer.lastName || ''}` : "Nessun cliente"}</span>
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedArticlesOrder(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-full transition-colors"
+                title="Chiudi"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3 flex-1">
+              {(selectedArticlesOrder.lineItems?.nodes || []).map((item: any, idx: number) => {
+                const imgUrl = item.variant?.image?.url || item.product?.featuredImage?.url;
+                const price = item.originalUnitPriceSet?.shopMoney?.amount || item.variant?.price?.amount;
+                const currency = item.originalUnitPriceSet?.shopMoney?.currencyCode || "EUR";
+                
+                return (
+                  <div key={item.id || idx} className="flex items-center gap-3 p-3 bg-gray-50/80 rounded-xl border border-gray-200/80 hover:bg-white transition-colors">
+                    <div className="w-14 h-14 bg-white rounded-lg border border-gray-200 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                      {imgUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={imgUrl} alt={item.title} className="max-w-full max-h-full object-contain" />
+                      ) : (
+                        <Package className="w-7 h-7 text-gray-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-gray-900 text-sm truncate" title={item.title}>
+                        {item.title}
+                      </h4>
+                      {item.variant?.title && item.variant.title !== "Default Title" && (
+                        <p className="text-xs text-indigo-600 font-medium truncate">
+                          Variante: {item.variant.title}
+                        </p>
+                      )}
+                      {item.variant?.sku && (
+                        <p className="text-[11px] text-gray-400 font-mono">
+                          SKU: {item.variant.sku}
+                        </p>
+                      )}
+                      {item.customAttributes && item.customAttributes.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {item.customAttributes.map((attr: any, i: number) => (
+                            <span key={i} className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 font-medium">
+                              {attr.key}: {attr.value}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="px-2 py-1 bg-amber-100 text-amber-900 font-extrabold text-xs rounded-md inline-block">
+                        x {item.quantity || 1}
+                      </span>
+                      {price && (
+                        <div className="text-xs font-semibold text-gray-700 mt-1">
+                          {currency === "EUR" ? "€" : currency} {price}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-600">
+              <span>Totale Articoli: {(selectedArticlesOrder.lineItems?.nodes || []).length}</span>
+              <button
+                onClick={() => setSelectedArticlesOrder(null)}
+                className="px-4 py-1.5 bg-gray-900 hover:bg-black text-white rounded-lg font-bold transition-colors"
               >
                 Chiudi
               </button>

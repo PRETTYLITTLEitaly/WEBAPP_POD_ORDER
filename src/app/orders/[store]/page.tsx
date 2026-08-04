@@ -39,12 +39,19 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
               id
               title
               quantity
+              originalUnitPriceSet { shopMoney { amount currencyCode } }
               customAttributes { key value }
               product {
+                title
+                featuredImage { url altText }
                 pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } } }
                 custom_url: metafield(namespace: "custom", key: "pod_svg_url") { value }
               }
               variant {
+                title
+                sku
+                image { url altText }
+                price { amount currencyCode }
                 pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } } }
                 custom_url: metafield(namespace: "custom", key: "pod_svg_url") { value }
               }

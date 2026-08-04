@@ -180,9 +180,30 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
   const handleOpenTextEditor = (order: any) => {
     const lineItemsNodes = order.lineItems?.nodes || [];
+
+    // Filtra solo i prodotti che hanno attributi di personalizzazione (esclude prodotti classici non personalizzati)
+    const customizedNodes = lineItemsNodes.filter((item: any) => {
+      const attrs = item.customAttributes || [];
+      if (attrs.length === 0) return false;
+      return attrs.some((attr: any) => {
+        const k = (attr.key || "").toLowerCase().trim();
+        const v = String(attr.value || "").trim();
+        if (!v || k.startsWith("_pod_")) return false;
+        if (v.startsWith("http")) return true;
+        const isSystemKey = k.includes("font") || k.includes("align") || k.includes("scegli") || k.includes("modello") || k.includes("stick") || k.includes("colore") || k.includes("vedi") || k.includes("preview");
+        if (!isSystemKey && v.length > 0) {
+          const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
+          if (!isSimpleOption) return true;
+        }
+        if (k.includes("font") || k.includes("colore") || k.includes("color")) return true;
+        return false;
+      });
+    });
+
+    const targetNodes = customizedNodes.length > 0 ? customizedNodes : lineItemsNodes;
     const parsedItems: any[] = [];
 
-    lineItemsNodes.forEach((item: any) => {
+    targetNodes.forEach((item: any) => {
       let foundText = "";
       let foundFont = "Get Show";
       let foundColor = "#38bdf8";

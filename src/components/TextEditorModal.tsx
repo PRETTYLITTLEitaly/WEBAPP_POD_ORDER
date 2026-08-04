@@ -820,9 +820,9 @@ export default function TextEditorModal({
           <button 
             onClick={() => {
               const totalCount = lineItems.length || 1;
-              if (totalCount > 1 && savedItemIndices.length < totalCount) {
+              if (totalCount > 1 && savedItemIndices.length > 0 && savedItemIndices.length < totalCount) {
                 const confirmExit = confirm(
-                  `Attenzione!\nHai salvato le grafiche per solo ${savedItemIndices.length} di ${totalCount} prodotti personalizzati dell'ordine.\n\nSe chiudi ora l'editor, i prodotti non salvati andranno persi.\n\nVuoi davvero uscire?`
+                  `Hai salvato le grafiche per ${savedItemIndices.length} di ${totalCount} prodotti dell'ordine.\n\nLe grafiche già salvate rimangono registrate e valide per la stampa.\n\nVuoi chiudere l'editor adesso?`
                 );
                 if (!confirmExit) return;
               }
@@ -920,21 +920,29 @@ export default function TextEditorModal({
               className="w-full bg-white rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden flex flex-col items-center justify-center p-3 group"
             >
               <span className="absolute top-2 left-2 bg-indigo-100 text-indigo-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-xs z-10">Mockup Prodotto</span>
-              {(backgroundUrl || svgUrl) ? (
-                <img 
-                  src={backgroundUrl || svgUrl} 
-                  alt="Anteprima Ordine" 
-                  crossOrigin="anonymous"
-                  onClick={sampleColorFromImage}
-                  className={`max-w-full max-h-full object-contain p-2 select-none transition-all duration-200 ${
-                    isDropperActive ? "cursor-crosshair border-4 border-indigo-500 rounded-2xl animate-pulse scale-102" : "pointer-events-auto"
-                  }`}
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 to-indigo-50/30 flex items-center justify-center text-gray-300 text-xs font-mono select-none">
-                  [Nessun Mockup Prodotto Disponibile]
-                </div>
-              )}
+              {(() => {
+                const activeItem = lineItems[selectedItemIdx];
+                const activeMockupUrl = activeItem
+                  ? (activeItem.backgroundUrl || activeItem.displayImage || activeItem.svgUrl)
+                  : (backgroundUrl || svgUrl);
+
+                return activeMockupUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img 
+                    src={activeMockupUrl} 
+                    alt="Anteprima Ordine" 
+                    crossOrigin="anonymous"
+                    onClick={sampleColorFromImage}
+                    className={`max-w-full max-h-full object-contain p-2 select-none transition-all duration-200 ${
+                      isDropperActive ? "cursor-crosshair border-4 border-indigo-500 rounded-2xl animate-pulse scale-102" : "pointer-events-auto"
+                    }`}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-tr from-gray-50 to-indigo-50/30 flex items-center justify-center text-gray-300 text-xs font-mono select-none">
+                    [Nessun Mockup Prodotto Disponibile]
+                  </div>
+                );
+              })()}
 
             </div>
 

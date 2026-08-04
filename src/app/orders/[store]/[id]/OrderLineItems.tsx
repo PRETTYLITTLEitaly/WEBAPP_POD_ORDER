@@ -114,7 +114,7 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
         );
       })}
 
-      {/* POPUP LIGHTBOX PORTAL AGGANCIATO A DOCUMENT.BODY (ESCE DA QUALSIASI CONTENITORE CSS PARENTE) */}
+      {/* POPUP LIGHTBOX PORTAL AGGANCIATO A DOCUMENT.BODY CON FORZATURA SCALATURA SVG SCHERMO INTERO */}
       {zoomImage && mounted && createPortal(
         <div 
           onClick={() => setZoomImage(null)}
@@ -133,16 +133,16 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
             <X className="w-7 h-7 text-white" />
           </button>
 
-          {/* Immagine ingrandita a tutto schermo senza riquadri o tagli */}
+          {/* Immagine o Grafica SVG ingrandita a schermo intero (w-[85vw] h-[85vh] per forzare anche gli SVG vettoriali ad espandersi) */}
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className="relative flex items-center justify-center max-w-[95vw] max-h-[95vh]"
+            className="relative flex items-center justify-center w-[85vw] h-[85vh] max-w-[95vw] max-h-[95vh]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={zoomImage.url} 
               alt={zoomImage.title} 
-              className="max-w-[95vw] max-h-[95vh] object-contain rounded-2xl shadow-2xl select-none"
+              className="w-full h-full max-w-[95vw] max-h-[95vh] object-contain rounded-2xl shadow-2xl select-none bg-white/5 p-2"
             />
           </div>
         </div>,

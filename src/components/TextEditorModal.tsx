@@ -888,11 +888,11 @@ export default function TextEditorModal({
           </div>
         )}
 
-        {/* CORPO EDITOR SPLITATO IN 3 PANNELLI FLEX-ROW HORIZONTAL: 1. MOCKUP (260px) | 2. SIMULATORE DTF (370px) | 3. CONTROLLI ED EDITOR (FLEX-1) */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-row items-start gap-4 bg-gray-50">
+        {/* CORPO EDITOR SPLITATO IN 3 PANNELLI EQUILIBRATI (GRID GRID-COLS-3): 1. MOCKUP (1/3) | 2. SIMULATORE DTF (1/3) | 3. CONTROLLI ED EDITOR (1/3) */}
+        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-3 gap-4 bg-gray-50 items-start">
           
-          {/* PANNELLO 1: ANTEPRIMA PRODOTTO ORIGINALE MOCKUP (SINISTRA) */}
-          <div className="w-64 shrink-0 flex flex-col space-y-3">
+          {/* PANNELLO 1: ANTEPRIMA PRODOTTO ORIGINALE MOCKUP (SINISTRA - 1/3) */}
+          <div className="flex flex-col space-y-3 min-w-0">
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
               <span className="flex items-center gap-1.5 text-indigo-700">
                 <Package className="w-4 h-4 text-indigo-500" />
@@ -1014,8 +1014,8 @@ export default function TextEditorModal({
             )}
           </div>
 
-          {/* PANNELLO 2 (CENTRO): SIMULATORE PELLICOLA DTF & DIMENSIONAMENTO REALE (370px) */}
-          <div className="w-[370px] shrink-0 flex flex-col space-y-4">
+          {/* PANNELLO 2 (CENTRO): SIMULATORE PELLICOLA DTF & DIMENSIONAMENTO REALE (CENTRO - 1/3) */}
+          <div className="flex flex-col space-y-4 min-w-0">
             
             {/* INTESTAZIONE CANALE PELLICOLA E TOOLBAR SFONDO */}
             <div className="w-full bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between text-xs font-bold text-gray-700">
@@ -1264,8 +1264,8 @@ export default function TextEditorModal({
 
           </div>
 
-          {/* PANNELLO 3 (DESTRA): CONTROLLI TESTO, FONT, COLORI & SALVATAGGIO (FLEX-1) */}
-          <div className="flex-1 min-w-[340px] flex flex-col space-y-4">
+          {/* PANNELLO 3 (DESTRA): CONTROLLI TESTO, FONT, COLORI & SALVATAGGIO (DESTRA - 1/3) */}
+          <div className="flex flex-col space-y-4 min-w-0">
             <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
             
             {/* SCHEDA 1: TESTO & FONT */}

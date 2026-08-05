@@ -1334,7 +1334,15 @@ export default function TextEditorModal({
                       {fontSize} px
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFontSize(prev => Math.max(8, prev - 1))}
+                      className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-sm flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                      title="Diminuisci dimensione"
+                    >
+                      -
+                    </button>
                     <input 
                       type="range"
                       min={12}
@@ -1343,13 +1351,21 @@ export default function TextEditorModal({
                       onChange={e => setFontSize(parseInt(e.target.value, 10))}
                       className="flex-1 accent-amber-600 cursor-pointer"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setFontSize(prev => Math.min(200, prev + 1))}
+                      className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-sm flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                      title="Aumenta dimensione"
+                    >
+                      +
+                    </button>
                     <input 
                       type="number"
                       min={8}
                       max={200}
                       value={fontSize}
                       onChange={e => setFontSize(parseInt(e.target.value, 10) || 12)}
-                      className="w-16 px-2 py-1 border border-gray-300 rounded-lg text-xs font-mono font-bold text-center"
+                      className="w-14 px-1.5 py-1 border border-gray-300 rounded-lg text-xs font-mono font-bold text-center"
                     />
                   </div>
                 </div>
@@ -1396,15 +1412,33 @@ export default function TextEditorModal({
                         {lineHeight}
                       </span>
                     </div>
-                    <input 
-                      type="range"
-                      min={0.8}
-                      max={2.5}
-                      step={0.05}
-                      value={lineHeight}
-                      onChange={e => setLineHeight(parseFloat(e.target.value))}
-                      className="w-full accent-amber-600 cursor-pointer"
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setLineHeight(prev => Number(Math.max(0.8, prev - 0.05).toFixed(2)))}
+                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                        title="Diminuisci interlinea"
+                      >
+                        -
+                      </button>
+                      <input 
+                        type="range"
+                        min={0.8}
+                        max={2.5}
+                        step={0.05}
+                        value={lineHeight}
+                        onChange={e => setLineHeight(parseFloat(e.target.value))}
+                        className="w-full accent-amber-600 cursor-pointer min-w-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setLineHeight(prev => Number(Math.min(2.5, prev + 0.05).toFixed(2)))}
+                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                        title="Aumenta interlinea"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
 
                   {/* SPESSORE SCRITTA */}
@@ -1418,15 +1452,33 @@ export default function TextEditorModal({
                         +{strokeWidth} px
                       </span>
                     </div>
-                    <input 
-                      type="range"
-                      min={0}
-                      max={8}
-                      step={0.5}
-                      value={strokeWidth}
-                      onChange={e => setStrokeWidth(parseFloat(e.target.value))}
-                      className="w-full accent-amber-600 cursor-pointer"
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setStrokeWidth(prev => Math.max(0, prev - 0.5))}
+                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                        title="Diminuisci spessore"
+                      >
+                        -
+                      </button>
+                      <input 
+                        type="range"
+                        min={0}
+                        max={8}
+                        step={0.5}
+                        value={strokeWidth}
+                        onChange={e => setStrokeWidth(parseFloat(e.target.value))}
+                        className="w-full accent-amber-600 cursor-pointer min-w-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setStrokeWidth(prev => Math.min(8, prev + 0.5))}
+                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                        title="Aumenta spessore"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
 

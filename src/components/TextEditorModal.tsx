@@ -1070,14 +1070,14 @@ export default function TextEditorModal({
 
             {/* CANVAS INTERATTIVO PELLICOLA DTF */}
             <div 
-              className="w-full h-[240px] rounded-2xl border border-gray-200 shadow-inner relative overflow-hidden flex items-center justify-center p-2 bg-gray-150"
+              className="w-full h-[380px] rounded-2xl border border-gray-200 shadow-inner relative overflow-hidden flex items-center justify-center p-3 bg-gray-150"
             >
               {/* Box Prodotto con Dimensioni e Proporzioni Reali */}
               {(() => {
                 const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
                 const preset = presetsList[selectedProductIdx] || presetsList[0] || { name: "PRODOTTO", supportW: 110, supportH: 130 };
-                const maxScreenW = 340;
-                const maxScreenH = 210;
+                const maxScreenW = 380;
+                const maxScreenH = 340;
                 const productAspect = preset.supportW / preset.supportH;
                 
                 let screenW = maxScreenW;

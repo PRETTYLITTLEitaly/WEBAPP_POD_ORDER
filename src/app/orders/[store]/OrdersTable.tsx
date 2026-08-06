@@ -1012,9 +1012,11 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                           const podSvg = 
                             item.product?.pod_svg_url_custom?.value || 
                             item.product?.pod_svg_url_pod?.value || 
+                            item.product?.custom_url?.value || 
                             item.product?.pod_svg?.reference?.url || 
                             item.product?.pod_svg?.reference?.image?.url || 
                             item.variant?.pod_svg_url_custom?.value || 
+                            item.variant?.custom_url?.value || 
                             item.variant?.pod_svg?.reference?.url || 
                             item.variant?.pod_svg?.reference?.image?.url;
 

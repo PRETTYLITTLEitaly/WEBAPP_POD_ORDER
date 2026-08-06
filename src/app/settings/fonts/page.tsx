@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useRef } from "react";
-import { Type, Upload, Trash2, CheckCircle2, AlertCircle, RefreshCw, Sliders, Save } from "lucide-react";
+import { Type, Upload, Trash2, CheckCircle2, AlertCircle, RefreshCw, Sliders, Save, Search } from "lucide-react";
 import { FontMapping, getFontMappings, saveFontMappings, syncFontMappingsFromServer } from "@/lib/presetStore";
 
 interface FontItem {
@@ -18,6 +18,7 @@ interface FontItem {
 
 export default function FontLibraryPage() {
   const [fonts, setFonts] = useState<FontItem[]>([]);
+  const [fontSearchQuery, setFontSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [previewText, setPreviewText] = useState("Giulia & Riccardo 26.09.2026");
@@ -241,22 +242,56 @@ export default function FontLibraryPage() {
       <FontMappingsSection availableFontNames={fonts.map(f => f.name)} />
 
       {/* ELENCO DEI FONT CARICATI */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">Font Installati ({fonts.length})</h2>
-        </div>
+      {(() => {
+        const filteredInstalledFonts = fonts.filter(font => {
+          if (!fontSearchQuery.trim()) return true;
+          const q = fontSearchQuery.toLowerCase();
+          const fontMappings = getFontMappings();
+          const mappedShopifyName = fontMappings.find(m => {
+            const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const normF = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+            return normTarget === normF || normF.includes(normTarget) || normTarget.includes(normF);
+          })?.shopifyName;
 
-        {loading ? (
-          <div className="p-12 text-center text-gray-400 text-sm animate-pulse">
-            Caricamento libreria font...
-          </div>
-        ) : fonts.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">
-            Nessun font installato. Carica il tuo primo file .TTF o .OTF in alto!
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {fonts.map(font => {
+          const matchName = font.name.toLowerCase().includes(q);
+          const matchFile = font.filename.toLowerCase().includes(q);
+          const matchShopify = mappedShopifyName ? mappedShopifyName.toLowerCase().includes(q) : false;
+
+          return matchName || matchFile || matchShopify;
+        });
+
+        return (
+          <div className="space-y-3">
+            {/* BARRA RICERCA FONT IN ALTO */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+              <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                <Type className="w-5 h-5 text-indigo-600" />
+                Font Installati ({filteredInstalledFonts.length} / {fonts.length})
+              </h2>
+
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+                <input 
+                  type="text"
+                  value={fontSearchQuery}
+                  onChange={e => setFontSearchQuery(e.target.value)}
+                  placeholder="🔍 Cerca font per nome o file..."
+                  className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                />
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-12 text-center text-gray-400 text-sm animate-pulse">
+                Caricamento libreria font...
+              </div>
+            ) : filteredInstalledFonts.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">
+                {fontSearchQuery ? `Nessun font trovato per "${fontSearchQuery}".` : "Nessun font installato. Carica il tuo primo file .TTF o .OTF in alto!"}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {filteredInstalledFonts.map(font => {
               const fontMappings = getFontMappings();
               const mappedShopifyName = fontMappings.find(m => {
                 const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -321,6 +356,8 @@ export default function FontLibraryPage() {
           </div>
         )}
       </div>
+    );
+  })()}
 
     </div>
   );

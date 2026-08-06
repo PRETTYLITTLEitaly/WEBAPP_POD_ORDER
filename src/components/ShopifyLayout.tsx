@@ -17,6 +17,7 @@ import {
   Bell, 
   LogOut, 
   Store,
+  Bug,
   ChevronDown,
   User as UserIcon,
   Layers,
@@ -82,6 +83,7 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
         { name: "Impostazioni Bobina", href: "/settings", icon: Settings },
         { name: "Impostazione Grafica", href: "/settings/grafica", icon: Sliders },
         { name: "Libreria Font", href: "/settings/fonts", icon: Type },
+        { name: "BUG FIX", href: "/bug-fix", icon: Bug },
         { name: "Gestione Utenti", href: "/settings/users", icon: Users },
         { name: "Account Utente", href: "/settings/account", icon: UserIcon },
       ]

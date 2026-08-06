@@ -27,7 +27,7 @@ import {
   Upload,
   AlertCircle
 } from "lucide-react";
-import { getProductGraphicPresets, ProductGraphicPreset } from "@/lib/presetStore";
+import { getProductGraphicPresets, ProductGraphicPreset, getColorPresets, resolveColorHex } from "@/lib/presetStore";
 
 interface TextEditorModalProps {
   open: boolean;
@@ -223,7 +223,7 @@ export default function TextEditorModal({
   useEffect(() => {
     setText(initialText);
     setFont(initialFont || "Get Show");
-    setColor(initialColor || "#38bdf8");
+    setColor(resolveColorHex(initialColor || "#000000"));
     setFontSize(initialFontSize || 32);
     setLetterSpacing(initialLetterSpacing || 0);
     
@@ -267,7 +267,7 @@ export default function TextEditorModal({
       const item = lineItems[0];
       setText(item.initialText !== undefined ? item.initialText : initialText);
       setFont(item.initialFont || initialFont || "Get Show");
-      setColor(item.initialColor || initialColor || "#38bdf8");
+      setColor(resolveColorHex(item.initialColor || initialColor || "#000000"));
       setFontSize(item.initialFontSize || initialFontSize || 32);
       const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
       setCurrentImageUrl(imgUrl || "");
@@ -330,7 +330,7 @@ export default function TextEditorModal({
     } else {
       setText(item.initialText !== undefined ? item.initialText : "");
       setFont(item.initialFont || "Get Show");
-      setColor(item.initialColor || "#38bdf8");
+      setColor(resolveColorHex(item.initialColor || "#000000"));
       setFontSize(item.initialFontSize || 32);
 
       const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
@@ -1478,20 +1478,21 @@ export default function TextEditorModal({
                     <Palette className="w-4 h-4 text-amber-600" />
                     Colore Scritta
                   </label>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
                     <input 
                       type="color"
                       value={color}
                       onChange={e => setColor(e.target.value)}
                       className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5 bg-white shrink-0"
                     />
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {PRESET_COLORS.map(c => (
+                    <div className="flex items-center gap-1.5 overflow-x-auto max-w-full p-1 bg-gray-50 rounded-xl border border-gray-200 py-1.5">
+                      {getColorPresets().map(c => (
                         <button
-                          key={c.name}
+                          key={c.id || c.name}
+                          type="button"
                           onClick={() => setColor(c.hex)}
-                          className={`w-6 h-6 rounded-full border transition-all ${
-                            color.toLowerCase() === c.hex.toLowerCase() ? "scale-125 border-amber-600 ring-2 ring-amber-400" : "border-gray-300 hover:scale-110"
+                          className={`w-6 h-6 rounded-full border transition-all shrink-0 cursor-pointer ${
+                            color.toLowerCase() === c.hex.toLowerCase() ? "scale-125 border-amber-600 ring-2 ring-amber-400 z-10" : "border-gray-300 hover:scale-110"
                           }`}
                           style={{ backgroundColor: c.hex }}
                           title={`${c.name} (${c.hex})`}

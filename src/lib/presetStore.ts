@@ -103,3 +103,90 @@ export function saveProductGraphicPresets(presets: ProductGraphicPreset[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(PRODUCT_GRAPHIC_PRESETS_KEY, JSON.stringify(presets));
 }
+
+export interface ColorPreset {
+  id: string;
+  name: string;
+  hex: string;
+}
+
+export const DEFAULT_COLOR_PRESETS: ColorPreset[] = [
+  { id: "nero", name: "Nero", hex: "#000000" },
+  { id: "bianco", name: "Bianco", hex: "#ffffff" },
+  { id: "arancio", name: "Arancio", hex: "#ff6b00" },
+  { id: "arancio-chiaro", name: "Arancio Chiaro", hex: "#ff9900" },
+  { id: "blu", name: "Blu", hex: "#3162d4" },
+  { id: "blu-scuro", name: "Blu Scuro", hex: "#000e9b" },
+  { id: "melenzana", name: "Melenzana", hex: "#910be3" },
+  { id: "viola", name: "Viola", hex: "#6f00fc" },
+  { id: "lilla", name: "Lilla", hex: "#d48cff" },
+  { id: "rosso", name: "Rosso", hex: "#c92222" },
+  { id: "verde-scuro", name: "Verde Scuro", hex: "#1c9100" },
+  { id: "verde", name: "Verde", hex: "#4ad331" },
+  { id: "verde-erba", name: "Verde Erba", hex: "#8bde70" },
+  { id: "magenta", name: "Magenta", hex: "#f50081" },
+  { id: "rosa", name: "Rosa", hex: "#f5b5f2" },
+  { id: "verde-acqua", name: "Verde Acqua", hex: "#33e8b4" },
+  { id: "celeste", name: "Celeste", hex: "#73ebf5" },
+  { id: "giallo", name: "Giallo", hex: "#fff500" },
+  { id: "giallo-stone", name: "Giallo Stone", hex: "#fcff5c" },
+  { id: "marrone", name: "Marrone", hex: "#633b00" },
+  { id: "beige", name: "Beige", hex: "#f7e0b5" },
+  { id: "rosa-fluo", name: "Rosa Fluo", hex: "#ff30c5" },
+  { id: "verde-fluo", name: "Verde Fluo", hex: "#00ff58" }
+];
+
+const COLOR_PRESETS_KEY = "app_color_presets_list";
+
+export function getColorPresets(): ColorPreset[] {
+  if (typeof window === "undefined") return DEFAULT_COLOR_PRESETS;
+  const saved = localStorage.getItem(COLOR_PRESETS_KEY);
+  if (!saved) {
+    localStorage.setItem(COLOR_PRESETS_KEY, JSON.stringify(DEFAULT_COLOR_PRESETS));
+    return DEFAULT_COLOR_PRESETS;
+  }
+  try {
+    const list: ColorPreset[] = JSON.parse(saved);
+    if (!list || !list.length) return DEFAULT_COLOR_PRESETS;
+    return list;
+  } catch (e) {
+    return DEFAULT_COLOR_PRESETS;
+  }
+}
+
+export function saveColorPresets(presets: ColorPreset[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(COLOR_PRESETS_KEY, JSON.stringify(presets));
+}
+
+// Risolve automaticamente un nome colore da Shopify (es. "Rosso", "Verde Scuro", "Celeste") al rispettivo codice HEX
+export function resolveColorHex(inputColorNameOrHex: string): string {
+  if (!inputColorNameOrHex) return "#000000";
+
+  const trimmed = inputColorNameOrHex.trim();
+
+  // Se è già un codice HEX valido (es: #c92222 o c92222)
+  if (trimmed.startsWith("#")) {
+    return trimmed;
+  }
+  if (/^[0-9A-Fa-f]{6}$/.test(trimmed)) {
+    return `#${trimmed}`;
+  }
+
+  // Cerca la corrispondenza con la lista colori configurata (nome exact o normalized)
+  const presets = getColorPresets();
+  const normInput = trimmed.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const match = presets.find(p => {
+    const normP = p.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return normP === normInput || normP.includes(normInput) || normInput.includes(normP);
+  });
+
+  if (match) {
+    return match.hex;
+  }
+
+  // Fallback se non trovato
+  return "#000000";
+}
+

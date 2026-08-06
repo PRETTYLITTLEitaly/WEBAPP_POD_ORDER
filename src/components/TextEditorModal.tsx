@@ -27,7 +27,7 @@ import {
   Upload,
   AlertCircle
 } from "lucide-react";
-import { getProductGraphicPresets, ProductGraphicPreset, getColorPresets, resolveColorHex, extractTextFontAndColorFromAttrs } from "@/lib/presetStore";
+import { getProductGraphicPresets, ProductGraphicPreset, getColorPresets, resolveColorHex, extractTextFontAndColorFromAttrs, resolveFontName, getFontMappings } from "@/lib/presetStore";
 
 interface TextEditorModalProps {
   open: boolean;

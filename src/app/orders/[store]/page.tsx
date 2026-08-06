@@ -14,7 +14,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
 
   const query = `#graphql
     query getOrders {
-      orders(first: 250, sortKey: CREATED_AT, reverse: true) {
+      orders(first: 100, sortKey: CREATED_AT, reverse: true) {
         nodes {
           id
           name
@@ -35,7 +35,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
               url
             }
           }
-          lineItems(first: 20) {
+          lineItems(first: 10) {
             nodes {
               id
               title
@@ -46,7 +46,7 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
                 id
                 title
                 featuredImage { url altText }
-                collections(first: 10) {
+                collections(first: 5) {
                   nodes {
                     id
                     title

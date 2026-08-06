@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Pencil, Sliders, CheckSquare, Eye, FileText, X, Package, XSquare } from "lucide-react";
-import { getPresets, PrintPreset, resolveColorHex, extractTextFontAndColorFromAttrs } from "@/lib/presetStore";
+import { Pencil, Sliders, CheckSquare, Eye, FileText, X, Package, XSquare, AlertTriangle } from "lucide-react";
+import { getPresets, PrintPreset, resolveColorHex, extractTextFontAndColorFromAttrs, getMandatorySvgCollections } from "@/lib/presetStore";
 import TextEditorModal from "@/components/TextEditorModal";
 
 interface SavedView {
@@ -965,43 +965,115 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       {hasDdt ? (
                         <div 
-                          className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-md font-bold text-[10px] shadow-2xs cursor-pointer hover:bg-red-100 transition-colors"
+                          className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 bg-gray-900 text-white border border-gray-700 rounded-md font-bold text-[10px] shadow-2xs cursor-pointer hover:bg-black transition-colors"
                           title="DDT / Stampa PDF Generato per questo ordine"
                         >
-                          <FileText className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                          <span className="font-black text-[9px] text-red-600 uppercase tracking-tighter">DDT</span>
+                          <FileText className="w-3.5 h-3.5 text-white shrink-0" />
+                          <span className="font-black text-[9px] text-white uppercase tracking-tighter">DDT</span>
                         </div>
                       ) : (
                         <span className="text-gray-300 font-mono text-xs">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
-                      {(order.tags || []).some((t: string) => t.toLowerCase() === "product_personalizer" || t.toLowerCase() === "product-personalizer") && (
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenPplrModal(order);
-                            }}
-                            className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 shadow-sm transition-colors cursor-pointer"
-                            title="Vedi Anteprima Product Personalizer (Occhio)"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenTextEditor(order);
-                            }}
-                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg border border-amber-200 shadow-sm transition-all cursor-pointer hover:scale-110 active:scale-95"
-                            title="Apri Editor Interattivo Testo & Font (Matita Gialla)"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
+                      {(() => {
+                        const orderLineItems = order.lineItems?.nodes || [];
+                        const mandatoryCollections = getMandatorySvgCollections();
+
+                        const hasMissingSvgAlert = orderLineItems.some((item: any) => {
+                          const podSvg = 
+                            item.product?.pod_svg_url_custom?.value || 
+                            item.product?.pod_svg_url_pod?.value || 
+                            item.product?.pod_svg?.reference?.url || 
+                            item.product?.pod_svg?.reference?.image?.url || 
+                            item.variant?.pod_svg_url_custom?.value || 
+                            item.variant?.pod_svg?.reference?.url || 
+                            item.variant?.pod_svg?.reference?.image?.url;
+
+                          const customPreviewAttr = item.customAttributes?.find((attr: any) => 
+                            typeof attr.value === "string" && attr.value.startsWith("http") && (
+                              attr.key.toLowerCase().includes("vedi") || 
+                              attr.key.toLowerCase().includes("preview") || 
+                              attr.key.toLowerCase().includes("immagine") || 
+                              attr.key.toLowerCase().includes("grafica") || 
+                              attr.key.toLowerCase().includes("_pplr") || 
+                              attr.key.toLowerCase().includes("design")
+                            )
+                          ) || item.customAttributes?.find((attr: any) => typeof attr.value === "string" && attr.value.startsWith("http"));
+
+                          const customGraphicImage = customPreviewAttr?.value || podSvg;
+                          const isMissingSvg = !customGraphicImage || customGraphicImage.trim().length === 0;
+
+                          const hasColoreBase = !!(
+                            item.product?.colore_base?.value || 
+                            item.product?.colore_base_alt?.value || 
+                            item.product?.colore_base_underscore?.value
+                          );
+
+                          const productCollections = item.product?.collections?.nodes || [];
+                          const titleLower = (item.title || "").toLowerCase();
+
+                          const matchingCol = mandatoryCollections.find(mc => {
+                            if (!mc.trim()) return false;
+                            const mcLower = mc.toLowerCase().trim();
+                            return titleLower.includes(mcLower) || productCollections.some((c: any) => c.title.toLowerCase().includes(mcLower) || mcLower.includes(c.title.toLowerCase()));
+                          });
+
+                          const isMandatory = hasColoreBase || !!matchingCol;
+                          return isMandatory && isMissingSvg;
+                        });
+
+                        const hasPersonalizer = (order.tags || []).some((t: string) => t.toLowerCase() === "product_personalizer" || t.toLowerCase() === "product-personalizer");
+
+                        if (!hasMissingSvgAlert && !hasPersonalizer) {
+                          return <span className="text-gray-300 font-mono text-xs">—</span>;
+                        }
+
+                        return (
+                          <div className="flex items-center justify-center gap-1.5">
+                            {/* 1. TRIANGOLO ROSSO ALLARME GRAFICA SVG MANCANTE */}
+                            {hasMissingSvgAlert && (
+                              <Link
+                                href={`/orders/${store}/${order.id.split('/').pop()}`}
+                                className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg border border-rose-700 shadow-xs transition-all cursor-pointer hover:scale-110 active:scale-95 animate-pulse flex items-center justify-center"
+                                title="⚠️ Attenzione: Grafica SVG Mancante per questo ordine! Clicca per verificare gli articoli."
+                              >
+                                <AlertTriangle className="w-4 h-4 text-white" />
+                              </Link>
+                            )}
+
+                            {/* 2. OCCHIO ANTEPRIMA PRODUCT PERSONALIZER */}
+                            {hasPersonalizer && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenPplrModal(order);
+                                }}
+                                className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 shadow-sm transition-colors cursor-pointer"
+                                title="Vedi Anteprima Product Personalizer (Occhio)"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* 3. MATITA CONFIGURATORE TESTO */}
+                            {hasPersonalizer && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenTextEditor(order);
+                                }}
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg border border-amber-200 shadow-sm transition-all cursor-pointer hover:scale-110 active:scale-95"
+                                title="Apri Editor Interattivo Testo & Font (Matita Gialla)"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-center">
                       {(() => {

@@ -58,15 +58,52 @@ export default function BugFixPage() {
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.role === "admin" || (currentUser?.email ? currentUser.email.toLowerCase().includes("admin") : true);
 
+  const LOCAL_CACHE_KEY = "pod_client_bug_tickets_v1";
+
+  const updateAndSaveTickets = (newTicketsList: Ticket[]) => {
+    setTickets(newTicketsList);
+    try {
+      localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(newTicketsList));
+    } catch (e) {}
+  };
+
   const fetchTickets = async () => {
     setLoading(true);
+    let localList: Ticket[] = [];
+    try {
+      const raw = localStorage.getItem(LOCAL_CACHE_KEY);
+      if (raw) localList = JSON.parse(raw);
+    } catch (e) {}
+
+    if (localList.length > 0) {
+      setTickets(localList);
+      if (!selectedTicketId) setSelectedTicketId(localList[0].id);
+    }
+
     try {
       const res = await fetch("/api/tickets");
       const data = await res.json();
-      if (data.success) {
-        setTickets(data.tickets || []);
-        if (!selectedTicketId && data.tickets?.length > 0) {
-          setSelectedTicketId(data.tickets[0].id);
+      if (data.success && Array.isArray(data.tickets)) {
+        const serverTickets: Ticket[] = data.tickets;
+        
+        // Merge server and local tickets so NO ticket is ever lost!
+        const map = new Map<string, Ticket>();
+        serverTickets.forEach(t => map.set(t.id, t));
+        localList.forEach(t => {
+          if (!map.has(t.id)) {
+            map.set(t.id, t);
+          } else {
+            const existing = map.get(t.id)!;
+            if ((t.messages?.length || 0) > (existing.messages?.length || 0)) {
+              map.set(t.id, t);
+            }
+          }
+        });
+
+        const merged = Array.from(map.values());
+        updateAndSaveTickets(merged);
+        if (!selectedTicketId && merged.length > 0) {
+          setSelectedTicketId(merged[0].id);
         }
       }
     } catch (e) {
@@ -124,7 +161,7 @@ export default function BugFixPage() {
 
       const data = await res.json();
       if (data.success) {
-        setTickets(data.tickets);
+        updateAndSaveTickets(data.tickets);
         if (data.ticket?.id) {
           setSelectedTicketId(data.ticket.id);
         }
@@ -165,7 +202,7 @@ export default function BugFixPage() {
 
       const data = await res.json();
       if (data.success) {
-        setTickets(data.tickets);
+        updateAndSaveTickets(data.tickets);
         setNewMessageText("");
       } else {
         alert("Errore invio messaggio: " + (data.error || "Impossibile inviare."));
@@ -198,7 +235,7 @@ export default function BugFixPage() {
 
       const data = await res.json();
       if (data.success) {
-        setTickets(data.tickets);
+        updateAndSaveTickets(data.tickets);
         setResolutionNote("");
       }
     } catch (err) {
@@ -214,7 +251,7 @@ export default function BugFixPage() {
       const res = await fetch(`/api/tickets?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        setTickets(data.tickets);
+        updateAndSaveTickets(data.tickets);
         if (selectedTicketId === id) {
           setSelectedTicketId(data.tickets[0]?.id || null);
         }

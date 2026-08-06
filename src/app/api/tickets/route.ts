@@ -125,6 +125,20 @@ async function saveTicketsToStorage(tickets: Ticket[]) {
     const shopId = shopRes.data?.shop?.id;
 
     if (shopId) {
+      // Streamline attachments if payload is huge to ensure Shopify Metafield acceptance
+      const sanitizedTickets = tickets.map(t => ({
+        ...t,
+        attachments: (t.attachments || []).map(att => {
+          if (att.length > 500000) {
+            // Keep first 500KB or compressed base64 prefix
+            return att.substring(0, 500000);
+          }
+          return att;
+        })
+      }));
+
+      const payloadStr = JSON.stringify(sanitizedTickets);
+
       const mutation = `#graphql
         mutation setBugTicketsMetafield($metafields: [MetafieldsSetInput!]!) {
           metafieldsSet(metafields: $metafields) {
@@ -134,7 +148,7 @@ async function saveTicketsToStorage(tickets: Ticket[]) {
         }
       `;
 
-      await shopifyFetch({
+      const setRes = await shopifyFetch({
         store: "b2c",
         query: mutation,
         variables: {
@@ -144,11 +158,16 @@ async function saveTicketsToStorage(tickets: Ticket[]) {
               namespace: "pod_settings",
               key: "bug_tickets",
               type: "json",
-              value: JSON.stringify(tickets)
+              value: payloadStr
             }
           ]
         }
       });
+
+      const userErrors = setRes.data?.metafieldsSet?.userErrors || [];
+      if (userErrors.length > 0) {
+        console.error("Shopify metafieldsSet userErrors:", userErrors);
+      }
     }
   } catch (err: any) {
     console.error("Errore salvataggio bug_tickets su Shopify:", err.message);

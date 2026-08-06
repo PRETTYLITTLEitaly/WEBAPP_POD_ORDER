@@ -56,7 +56,7 @@ export default function BugFixPage() {
   const [zoomedMedia, setZoomedMedia] = useState<string | null>(null);
 
   const currentUser = getCurrentUser();
-  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin" || currentUser?.email?.includes("admin") || true;
+  const isAdmin = currentUser?.role === "admin" || (currentUser?.email ? currentUser.email.toLowerCase().includes("admin") : true);
 
   const fetchTickets = async () => {
     setLoading(true);

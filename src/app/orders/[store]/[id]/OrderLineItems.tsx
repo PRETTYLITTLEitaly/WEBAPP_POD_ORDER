@@ -44,7 +44,13 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
         const personalizerPreviewUrl = customPreviewAttr?.value;
         const customGraphicImage = personalizerPreviewUrl || podSvg;
 
-        // Controllo Obbligatorietà SVG
+        // Controllo Obbligatorietà SVG basato sul metafield custom_colore.base o collezione obbligatoria
+        const hasColoreBase = !!(
+          item.product?.colore_base?.value || 
+          item.product?.colore_base_alt?.value || 
+          item.product?.colore_base_underscore?.value
+        );
+
         const productCollections = item.product?.collections?.nodes || [];
         const titleLower = (item.title || "").toLowerCase();
 
@@ -56,8 +62,10 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
           return matchInTitle || matchInCol;
         });
 
-        const isMandatory = !!matchingCol;
+        // Il prodotto richiede SVG se possiede il campo Colore Base o se appartiene ad una collezione obbligatoria
+        const isMandatory = hasColoreBase || !!matchingCol;
         const isMissingSvg = !customGraphicImage || customGraphicImage.trim().length === 0;
+        const showAlert = isMandatory && isMissingSvg;
         
         return (
           <div key={item.id} className="py-4 flex gap-4 items-start">
@@ -137,7 +145,7 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
               )}
 
               {/* WARNING BANNER GRAPHICA SVG MANCANTE */}
-              {isMandatory && isMissingSvg && (
+              {showAlert && (
                 <div className="mt-2.5 p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2.5 text-rose-900 text-xs font-bold shadow-2xs">
                   <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
                   <div>
@@ -145,7 +153,11 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
                       ⚠️ Attenzione: Grafica SVG Mancante!
                     </span>
                     <p className="font-semibold text-[11px] text-rose-800 mt-0.5 leading-relaxed">
-                      Questo prodotto appartiene alla collezione <strong>"{matchingCol}"</strong> per cui è obbligatoria la grafica SVG di stampa. Carica il file SVG prima di inviare l&apos;ordine in stampa.
+                      {hasColoreBase ? (
+                        <>Questo prodotto possiede il metafield <strong>Colore Base</strong> e richiede un file SVG fisso abbinato per la stampa.</>
+                      ) : (
+                        <>Questo prodotto appartiene alla collezione <strong>"{matchingCol}"</strong> per cui è obbligatoria la grafica SVG di stampa.</>
+                      )}
                     </p>
                   </div>
                 </div>

@@ -1418,7 +1418,7 @@ export default function TextEditorModal({
               const currentAttrs = currentLineItem.customAttributes || customAttributes || [];
 
               const extracted = extractTextFontAndColorFromAttrs(currentAttrs);
-              const rawFontAttr = extracted.font || currentLineItem.initialFont || initialFont;
+              const rawFontAttr = extracted.rawFont || currentLineItem.rawFont || extracted.font || currentLineItem.initialFont || initialFont;
               const rawColorAttr = extracted.colorName || currentLineItem.initialColor || initialColor;
 
               return (

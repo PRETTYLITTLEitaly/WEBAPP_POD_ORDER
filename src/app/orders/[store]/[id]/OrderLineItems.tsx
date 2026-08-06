@@ -2,21 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Package, X } from "lucide-react";
+import { Package, X, AlertTriangle } from "lucide-react";
+import { getMandatorySvgCollections } from "@/lib/presetStore";
 
 export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
   const [zoomImage, setZoomImage] = useState<{ url: string; title: string; type: string } | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [mandatoryCollections, setMandatoryCollections] = useState<string[]>([]);
 
   useEffect(() => {
     setMounted(true);
+    setMandatoryCollections(getMandatorySvgCollections());
   }, []);
 
   return (
     <div className="divide-y divide-gray-200 dark:divide-gray-800">
       {lineItems.map((item: any) => {
         const productImage = item.image?.url || item.variant?.image?.url || item.product?.featuredImage?.url;
-        const podSvg = item.product?.pod_svg?.reference?.url || item.product?.pod_svg?.reference?.image?.url || item.variant?.pod_svg?.reference?.url || item.variant?.pod_svg?.reference?.image?.url;
+        
+        const podSvg = 
+          item.product?.pod_svg_url_custom?.value || 
+          item.product?.pod_svg_url_pod?.value || 
+          item.product?.pod_svg?.reference?.url || 
+          item.product?.pod_svg?.reference?.image?.url || 
+          item.variant?.pod_svg_url_custom?.value || 
+          item.variant?.pod_svg?.reference?.url || 
+          item.variant?.pod_svg?.reference?.image?.url;
         
         // Estrarre anteprima generata dall'app Product Personalizer
         const customPreviewAttr = item.customAttributes?.find((attr: any) => 
@@ -32,6 +43,21 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
 
         const personalizerPreviewUrl = customPreviewAttr?.value;
         const customGraphicImage = personalizerPreviewUrl || podSvg;
+
+        // Controllo Obbligatorietà SVG
+        const productCollections = item.product?.collections?.nodes || [];
+        const titleLower = (item.title || "").toLowerCase();
+
+        const matchingCol = mandatoryCollections.find(mc => {
+          if (!mc.trim()) return false;
+          const mcLower = mc.toLowerCase().trim();
+          const matchInTitle = titleLower.includes(mcLower);
+          const matchInCol = productCollections.some((c: any) => c.title.toLowerCase().includes(mcLower) || mcLower.includes(c.title.toLowerCase()));
+          return matchInTitle || matchInCol;
+        });
+
+        const isMandatory = !!matchingCol;
+        const isMissingSvg = !customGraphicImage || customGraphicImage.trim().length === 0;
         
         return (
           <div key={item.id} className="py-4 flex gap-4 items-start">
@@ -107,6 +133,21 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* WARNING BANNER GRAPHICA SVG MANCANTE */}
+              {isMandatory && isMissingSvg && (
+                <div className="mt-2.5 p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2.5 text-rose-900 text-xs font-bold shadow-2xs">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 animate-pulse" />
+                  <div>
+                    <span className="font-black text-rose-700 uppercase tracking-wide flex items-center gap-1">
+                      ⚠️ Attenzione: Grafica SVG Mancante!
+                    </span>
+                    <p className="font-semibold text-[11px] text-rose-800 mt-0.5 leading-relaxed">
+                      Questo prodotto appartiene alla collezione <strong>"{matchingCol}"</strong> per cui è obbligatoria la grafica SVG di stampa. Carica il file SVG prima di inviare l&apos;ordine in stampa.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

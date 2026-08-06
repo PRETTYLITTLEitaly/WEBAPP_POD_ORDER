@@ -104,6 +104,41 @@ export function saveProductGraphicPresets(presets: ProductGraphicPreset[]) {
   localStorage.setItem(PRODUCT_GRAPHIC_PRESETS_KEY, JSON.stringify(presets));
 }
 
+export const MANDATORY_SVG_COLLECTIONS_KEY = "pod_mandatory_svg_collections_v1";
+
+export const DEFAULT_MANDATORY_SVG_COLLECTIONS: string[] = [
+  "Profumatori",
+  "Mini Profumatori",
+  "Candele",
+  "Lampade",
+  "Vasi"
+];
+
+export function getMandatorySvgCollections(): string[] {
+  if (typeof window === "undefined") return DEFAULT_MANDATORY_SVG_COLLECTIONS;
+  try {
+    const raw = localStorage.getItem(MANDATORY_SVG_COLLECTIONS_KEY);
+    if (!raw) return DEFAULT_MANDATORY_SVG_COLLECTIONS;
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return DEFAULT_MANDATORY_SVG_COLLECTIONS;
+    return list;
+  } catch (e) {
+    return DEFAULT_MANDATORY_SVG_COLLECTIONS;
+  }
+}
+
+export function saveMandatorySvgCollections(collections: string[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(MANDATORY_SVG_COLLECTIONS_KEY, JSON.stringify(collections));
+  try {
+    fetch("/api/fonts/mappings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save_mandatory_collections", collections })
+    });
+  } catch (e) {}
+}
+
 export interface ColorPreset {
   id: string;
   name: string;

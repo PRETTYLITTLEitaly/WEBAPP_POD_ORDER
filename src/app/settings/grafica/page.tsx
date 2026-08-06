@@ -3,30 +3,36 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
-import { Sliders, Save, CheckCircle, Palette, Plus, Trash2 } from "lucide-react";
+import { Sliders, Save, CheckCircle, Palette, Plus, Trash2, AlertTriangle, X } from "lucide-react";
 import { 
   getProductGraphicPresets, 
   saveProductGraphicPresets, 
   ProductGraphicPreset,
   getColorPresets,
   saveColorPresets,
-  ColorPreset
+  ColorPreset,
+  getMandatorySvgCollections,
+  saveMandatorySvgCollections
 } from "@/lib/presetStore";
 
 export default function ImpostazioneGraficaPage() {
   const [productGraphicPresets, setProductGraphicPresets] = useState<ProductGraphicPreset[]>([]);
   const [colorPresets, setColorPresets] = useState<ColorPreset[]>([]);
+  const [mandatoryCollections, setMandatoryCollections] = useState<string[]>([]);
+  const [newCollectionInput, setNewCollectionInput] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setProductGraphicPresets(getProductGraphicPresets());
     setColorPresets(getColorPresets());
+    setMandatoryCollections(getMandatorySvgCollections());
   }, []);
 
   const handleSave = () => {
     saveProductGraphicPresets(productGraphicPresets);
     saveColorPresets(colorPresets);
-    setMessage("Impostazioni grafiche e mappatura colori salvate con successo!");
+    saveMandatorySvgCollections(mandatoryCollections);
+    setMessage("Impostazioni grafiche, collezioni SVG obbligatorie e mappatura colori salvate con successo!");
     setTimeout(() => setMessage(null), 3000);
   };
 
@@ -82,6 +88,69 @@ export default function ImpostazioneGraficaPage() {
             {message}
           </div>
         )}
+
+        {/* SEZIONE 0: COLLEZIONI CON GRAFICA SVG OBBLIGATORIA */}
+        <div className="bg-white rounded-2xl border border-rose-200 p-6 shadow-sm space-y-4">
+          <div className="border-b border-rose-100 pb-3">
+            <h2 className="font-extrabold text-base text-gray-900 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              Collezioni con Grafica SVG Obbligatoria per la Stampa
+            </h2>
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              Seleziona o digita i nomi delle Collezioni Shopify dei prodotti che <strong className="text-rose-700 font-extrabold">devono avere obbligatoriamente</strong> un file SVG di stampa abbinato. Se un ordine contiene un prodotto appartenente a queste collezioni ma senza file SVG, il sistema mostrerà all&apos;operatore il triangolo d&apos;allarme <span className="font-extrabold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">⚠️ Grafica SVG Mancante</span>.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 items-center">
+              {mandatoryCollections.map((col, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-900 px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-2xs">
+                  <span>{col}</span>
+                  <button
+                    type="button"
+                    onClick={() => setMandatoryCollections(prev => prev.filter((_, i) => i !== idx))}
+                    className="text-rose-400 hover:text-rose-800 p-0.5 rounded-full hover:bg-rose-100 transition-all cursor-pointer"
+                    title="Rimuovi collezione"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 max-w-md">
+              <input
+                type="text"
+                value={newCollectionInput}
+                onChange={e => setNewCollectionInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newCollectionInput.trim()) {
+                    e.preventDefault();
+                    if (!mandatoryCollections.includes(newCollectionInput.trim())) {
+                      setMandatoryCollections(prev => [...prev, newCollectionInput.trim()]);
+                    }
+                    setNewCollectionInput("");
+                  }
+                }}
+                placeholder="Aggiungi nome collezione (es. Profumatori, Mini Profumatori)..."
+                className="flex-1 px-3.5 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newCollectionInput.trim() && !mandatoryCollections.includes(newCollectionInput.trim())) {
+                    setMandatoryCollections(prev => [...prev, newCollectionInput.trim()]);
+                    setNewCollectionInput("");
+                  }
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Aggiungi</span>
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* SEZIONE 1: GRIGLIA PRODOTTI */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">

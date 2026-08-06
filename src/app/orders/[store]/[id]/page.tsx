@@ -30,9 +30,20 @@ export default async function OrderDetail({ params }: { params: Promise<{ store:
             customAttributes { key value }
             image { url }
             product {
+              id
+              title
+              collections(first: 10) {
+                nodes {
+                  id
+                  title
+                }
+              }
+              pod_svg_url_custom: metafield(namespace: "custom", key: "pod_svg_url") { value }
+              pod_svg_url_pod: metafield(namespace: "pod", key: "svg_url") { value }
               pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } ... on MediaImage { image { url } } } }
             }
             variant {
+              pod_svg_url_custom: metafield(namespace: "custom", key: "pod_svg_url") { value }
               pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } ... on MediaImage { image { url } } } }
             }
           }

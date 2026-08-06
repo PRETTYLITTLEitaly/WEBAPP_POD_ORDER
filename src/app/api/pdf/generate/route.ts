@@ -3,6 +3,7 @@ import { shopifyFetch } from "@/lib/shopify";
 import { generatePodPdf } from "@/lib/pod.server";
 import { editedImageMemoryCache } from "@/app/api/orders/save-graphic/route";
 import { syncFontsFromShopify } from "@/app/api/fonts/route";
+import { extractTextFontAndColorFromAttrs } from "@/lib/presetStore";
 
 function escapeXml(unsafe: string): string {
   return (unsafe || "").replace(/[<>&'"]/g, (c) => {
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest) {
             tags
             status: metafield(namespace: "pod", key: "status") { value }
             edited_image: metafield(namespace: "pod", key: "edited_image") { value }
+            pod_metafields: metafields(first: 30, namespace: "pod") { nodes { key value } }
             order_width: metafield(namespace: "pod", key: "width") { value }
             order_height: metafield(namespace: "pod", key: "height") { value }
             lineItems(first: 20) {
@@ -115,11 +117,15 @@ export async function POST(req: NextRequest) {
       if (!order) continue;
       
       const isZeptoOrder = (order.tags || []).some((t: string) => t.toLowerCase().includes("personalizer"));
-      const editedImageMeta = editedImageMemoryCache.get(order.id) || order.edited_image?.value;
       const orderWidth = order.order_width?.value;
       const orderHeight = order.order_height?.value;
+      const podMetaNodes = order.pod_metafields?.nodes || [];
+
+      let globalPieceIndex = 0;
 
       for (const item of order.lineItems.nodes) {
+        const itemQty = item.quantity || 1;
+
         const metafields = [
           item.product?.pod_width, item.product?.pod_height, item.product?.pod_svg,
           item.product?.custom_url, item.product?.custom_width, item.product?.custom_height,
@@ -127,14 +133,14 @@ export async function POST(req: NextRequest) {
           item.variant?.custom_url, item.variant?.custom_width, item.variant?.custom_height
         ].filter(Boolean);
         
-        let widthVal = metafields.find((m: any) => m.key === "width")?.value;
-        let heightVal = metafields.find((m: any) => m.key === "height")?.value;
+        let baseWidthVal = metafields.find((m: any) => m.key === "width")?.value;
+        let baseHeightVal = metafields.find((m: any) => m.key === "height")?.value;
         
-        if (!widthVal || !heightVal) {
+        if (!baseWidthVal || !baseHeightVal) {
           const attrWidth = item.customAttributes?.find((a: any) => ["Width", "Larghezza", "_pplr_width"].includes(a.key))?.value;
           const attrHeight = item.customAttributes?.find((a: any) => ["Height", "Altezza", "_pplr_height"].includes(a.key))?.value;
-          if (attrWidth) widthVal = attrWidth;
-          if (attrHeight) heightVal = attrHeight;
+          if (attrWidth) baseWidthVal = attrWidth;
+          if (attrHeight) baseHeightVal = attrHeight;
         }
 
         // Estrazione dati di personalizzazione da customAttributes
@@ -144,6 +150,10 @@ export async function POST(req: NextRequest) {
         let fontSizePx = 32;
 
         const attrs = item.customAttributes || [];
+        const fontAndColor = extractTextFontAndColorFromAttrs(attrs);
+        if (fontAndColor.font) fontName = fontAndColor.font;
+        if (fontAndColor.color) fontColor = fontAndColor.color;
+
         attrs.forEach((a: any) => {
           const rawKey = a.key || "";
           const k = rawKey.toLowerCase().trim();
@@ -157,15 +167,9 @@ export async function POST(req: NextRequest) {
               if (!customText || v.length > customText.length) customText = v;
             }
           }
-          if (k.includes("font") && !k.includes("colore") && !k.includes("color") && !rawKey.startsWith("_")) fontName = v;
           if (k.includes("font size") || k.includes("_font_size")) {
             const p = parseFloat(v);
             if (!isNaN(p) && p > 0) fontSizePx = Math.round(p);
-          }
-          if (k.includes("colore") || k.includes("color")) {
-            if (v.startsWith("#")) fontColor = v;
-            else if (v.toLowerCase().includes("celeste") || v.toLowerCase().includes("azzurro")) fontColor = "#38bdf8";
-            else if (v.toLowerCase().includes("tiffany")) fontColor = "#0d9488";
           }
         });
 
@@ -174,120 +178,124 @@ export async function POST(req: NextRequest) {
           a.key.startsWith("_design") || a.key.includes("_pplr_original") || a.key.includes("_pplr_pdf") || (a.key.toLowerCase().includes("immagine") && String(a.value).startsWith("http"))
         );
         const mockupAttr = attrs.find((a: any) => a.key.includes("Vedi ora") || a.key.includes("preview") || String(a.value).startsWith("http"));
-
         const zeptoAttrUrl = isolatedDesignAttr?.value || mockupAttr?.value;
-
-        // Imposta dimensioni standard per stampa DTF se non specificate nei metafield
-        if (!widthVal) widthVal = orderWidth || "80";
-        if (!heightVal) heightVal = orderHeight || "100";
 
         const svgMeta = metafields.find((m: any) => m.key === "svg");
         const svgTextUrl = metafields.find((m: any) => m.key === "pod_svg_url" || m.key === "pod_url")?.value;
-        
-        let svgUrl = editedImageMeta;
 
-        // Se abbiamo sia il testo personalizzato che un URL immagine mockup salvato (PNG/JPG),
-        // ignoriamo il mockup in favore della generazione vettoriale del testo!
-        if (svgUrl && customText) {
-          const isPngJpg = svgUrl.toLowerCase().endsWith(".png") || svgUrl.toLowerCase().endsWith(".jpg") || svgUrl.toLowerCase().endsWith(".jpeg") || svgUrl.includes("/uploads/");
-          if (isPngJpg) {
-            svgUrl = "";
+        const productPreassociatedSvg = 
+          svgTextUrl || 
+          svgMeta?.reference?.url || 
+          svgMeta?.reference?.image?.url || 
+          attrs.find((a: any) => String(a.value).endsWith(".svg"))?.value ||
+          zeptoAttrUrl;
+
+        // Imposta dimensioni standard per stampa DTF se non specificate nei metafield
+        if (!baseWidthVal) baseWidthVal = orderWidth || "80";
+        if (!baseHeightVal) baseHeightVal = orderHeight || "100";
+
+        // Ciclo per ciascun pezzo dell'articolo dell'ordine
+        for (let q = 0; q < itemQty; q++) {
+          const pieceIdx = globalPieceIndex;
+          globalPieceIndex++;
+
+          // 1. Cerca se c'è una grafica modificata e salvata specificamente per questo pezzo dell'ordine
+          const pieceEditedImage = 
+            editedImageMemoryCache.get(`${order.id}_${pieceIdx}`) ||
+            podMetaNodes.find((m: any) => m.key === `edited_image_${pieceIdx}`)?.value ||
+            (pieceIdx === 0 ? (editedImageMemoryCache.get(order.id) || order.edited_image?.value) : null);
+
+          let svgUrl = "";
+
+          if (pieceEditedImage) {
+            svgUrl = pieceEditedImage;
+          } else if (customText && customText.length > 0) {
+            svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;
+          } else if (productPreassociatedSvg) {
+            svgUrl = productPreassociatedSvg;
           }
-        }
 
-        // Se l'ordine ha testo personalizzato e non ha una grafica modificata salvata, genera l'SVG trasparente del solo testo!
-        if (!svgUrl && customText) {
-          svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;
-        }
+          if (svgUrl) {
+            if (svgUrl.startsWith("//")) svgUrl = "https:" + svgUrl;
+            
+            let cacheItem = svgCache.get(svgUrl);
 
-        if (!svgUrl) {
-          svgUrl = zeptoAttrUrl || svgTextUrl || svgMeta?.reference?.url || svgMeta?.reference?.image?.url;
-        }
-
-        if (svgUrl) {
-          if (svgUrl.startsWith("//")) svgUrl = "https:" + svgUrl;
-          
-          let cacheItem = svgCache.get(svgUrl);
-
-          if (!cacheItem) {
-            try {
-              if (svgUrl.startsWith("data:image/svg+xml")) {
-                let svgRaw = svgUrl.replace(/^data:image\/svg\+xml;(utf8|base64),/, "");
-                if (svgUrl.includes("utf8,")) {
-                  try { svgRaw = decodeURIComponent(svgRaw); } catch (e) {}
-                } else if (svgUrl.includes("base64,")) {
-                  try { svgRaw = Buffer.from(svgRaw, "base64").toString("utf-8"); } catch (e) {}
-                }
-                cacheItem = {
-                  content: svgRaw,
-                  isImage: false,
-                  mimeType: "image/svg+xml"
-                };
-              } else if (svgUrl.startsWith("data:")) {
-                const parts = svgUrl.split(",");
-                const mime = parts[0].split(";")[0].replace("data:", "");
-                cacheItem = {
-                  content: parts[1],
-                  isImage: true,
-                  mimeType: mime || "image/png"
-                };
-              } else {
-                const mediaRes = await fetch(svgUrl);
-                if (mediaRes.ok) {
-                  const contentType = (mediaRes.headers.get("content-type") || "").toLowerCase();
-                  const isSvg = contentType.includes("svg") || /\.svg(\?.*)?$/i.test(svgUrl);
-                  
-                  if (isSvg) {
-                    const text = await mediaRes.text();
-                    cacheItem = {
-                      content: text,
-                      isImage: false,
-                      mimeType: "image/svg+xml"
-                    };
-                  } else {
-                    const buffer = await mediaRes.arrayBuffer();
-                    const b64 = Buffer.from(buffer).toString("base64");
-                    const mime = contentType.split(";")[0].trim() || "image/png";
-                    cacheItem = {
-                      content: b64,
-                      isImage: true,
-                      mimeType: mime
-                    };
+            if (!cacheItem) {
+              try {
+                if (svgUrl.startsWith("data:image/svg+xml")) {
+                  let svgRaw = svgUrl.replace(/^data:image\/svg\+xml;(utf8|base64),/, "");
+                  if (svgUrl.includes("utf8,")) {
+                    try { svgRaw = decodeURIComponent(svgRaw); } catch (e) {}
+                  } else if (svgUrl.includes("base64,")) {
+                    try { svgRaw = Buffer.from(svgRaw, "base64").toString("utf-8"); } catch (e) {}
+                  }
+                  cacheItem = {
+                    content: svgRaw,
+                    isImage: false,
+                    mimeType: "image/svg+xml"
+                  };
+                } else if (svgUrl.startsWith("data:")) {
+                  const parts = svgUrl.split(",");
+                  const mime = parts[0].split(";")[0].replace("data:", "");
+                  cacheItem = {
+                    content: parts[1],
+                    isImage: true,
+                    mimeType: mime || "image/png"
+                  };
+                } else {
+                  const mediaRes = await fetch(svgUrl);
+                  if (mediaRes.ok) {
+                    const contentType = (mediaRes.headers.get("content-type") || "").toLowerCase();
+                    const isSvg = contentType.includes("svg") || /\.svg(\?.*)?$/i.test(svgUrl);
+                    
+                    if (isSvg) {
+                      const text = await mediaRes.text();
+                      cacheItem = {
+                        content: text,
+                        isImage: false,
+                        mimeType: "image/svg+xml"
+                      };
+                    } else {
+                      const buffer = await mediaRes.arrayBuffer();
+                      const b64 = Buffer.from(buffer).toString("base64");
+                      const mime = contentType.split(";")[0].trim() || "image/png";
+                      cacheItem = {
+                        content: b64,
+                        isImage: true,
+                        mimeType: mime
+                      };
+                    }
                   }
                 }
+                if (cacheItem) svgCache.set(svgUrl, cacheItem);
+              } catch (e: any) {
+                console.error("Fetch error:", e.message);
               }
-              if (cacheItem) svgCache.set(svgUrl, cacheItem);
-            } catch (e: any) {
-              console.error("Fetch error:", e.message);
-            }
-          }
-
-          if (cacheItem && cacheItem.content) {
-            let cleanSvgContent = null;
-            if (!cacheItem.isImage) {
-              cleanSvgContent = cacheItem.content
-                .replace(/<\?xml[\s\S]*?\?>/i, "")
-                .replace(/<!DOCTYPE[\s\S]*?>/i, "")
-                .trim();
             }
 
-            let previewUrl = "";
-            if (cacheItem.isImage) {
-              previewUrl = `data:${cacheItem.mimeType};base64,${cacheItem.content}`;
-            } else {
-              const base64Svg = Buffer.from(cacheItem.content).toString("base64");
-              previewUrl = `data:image/svg+xml;base64,${base64Svg}`;
-            }
+            if (cacheItem && cacheItem.content) {
+              let cleanSvgContent = null;
+              if (!cacheItem.isImage) {
+                cleanSvgContent = cacheItem.content
+                  .replace(/<\?xml[\s\S]*?\?>/i, "")
+                  .replace(/<!DOCTYPE[\s\S]*?>/i, "")
+                  .trim();
+              }
 
-            const itemQty = item.quantity || 1;
+              let previewUrl = "";
+              if (cacheItem.isImage) {
+                previewUrl = `data:${cacheItem.mimeType};base64,${cacheItem.content}`;
+              } else {
+                const base64Svg = Buffer.from(cacheItem.content).toString("base64");
+                previewUrl = `data:image/svg+xml;base64,${base64Svg}`;
+              }
 
-            for (let i = 0; i < itemQty; i++) {
               itemsToPack.push({
-                id: `${order.id}_${item.id}_${i}`,
+                id: `${order.id}_${item.id}_${q}`,
                 orderName: order.name,
                 itemTitle: item.title,
-                widthMm: parseFloat(widthVal),
-                heightMm: parseFloat(heightVal),
+                widthMm: parseFloat(baseWidthVal),
+                heightMm: parseFloat(baseHeightVal),
                 svgContent: cleanSvgContent,
                 imageContent: cacheItem.isImage ? cacheItem.content : null,
                 previewUrl: previewUrl,

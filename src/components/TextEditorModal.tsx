@@ -259,11 +259,45 @@ export default function TextEditorModal({
     setGraphicHeight(savedH);
     setAspectRatio(savedW / savedH);
 
-    setSavedItemIndices([]);
-    setItemsState({});
+    let loadedState: Record<number, any> = {};
+    let loadedSavedIndices: number[] = [];
+
+    if (orderId && typeof window !== "undefined") {
+      const storageKey = `pod_saved_order_editor_${orderId}`;
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed.itemsState) loadedState = parsed.itemsState;
+          if (parsed.savedItemIndices) loadedSavedIndices = parsed.savedItemIndices;
+        } catch (e) {
+          console.error("Errore caricamento stato editor locale:", e);
+        }
+      }
+    }
+
+    setItemsState(loadedState);
+    setSavedItemIndices(loadedSavedIndices);
     setSaveNotice(null);
 
-    if (lineItems && lineItems.length > 0 && lineItems[0]) {
+    if (loadedState[0]) {
+      const s = loadedState[0];
+      setText(s.text);
+      setFont(s.font);
+      setColor(s.color);
+      setFontSize(s.fontSize);
+      setLetterSpacing(s.letterSpacing);
+      setLineHeight(s.lineHeight);
+      setStrokeWidth(s.strokeWidth);
+      setGraphicWidth(s.graphicWidth);
+      setGraphicHeight(s.graphicHeight);
+      setProcessedImageUrl(s.processedImageUrl);
+      setIsRemoveBgApplied(s.isRemoveBgApplied);
+      setIsVectorized(s.isVectorized);
+      setVectorSvgContent(s.vectorSvgContent);
+      setCurrentImageUrl(s.currentImageUrl);
+      setActiveTab(s.activeTab);
+    } else if (lineItems && lineItems.length > 0 && lineItems[0]) {
       const item = lineItems[0];
       setText(item.initialText !== undefined ? item.initialText : initialText);
       setFont(item.initialFont || initialFont || "Get Show");
@@ -278,7 +312,7 @@ export default function TextEditorModal({
         setActiveTab("text");
       }
     }
-  }, [open, initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, customAttributes, lineItems]);
+  }, [open, initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, customAttributes, lineItems, orderId]);
 
   const handleSelectLineItem = (idx: number) => {
     if (idx === selectedItemIdx) return;
@@ -727,27 +761,12 @@ export default function TextEditorModal({
       }
     }
 
-    if (onSave) {
-      onSave({
-        text,
-        font,
-        fontSize,
-        color,
-        letterSpacing,
-        x: posX,
-        y: posY,
-        processedGraphicUrl: finalGraphicToSave,
-        width: graphicWidth,
-        height: graphicHeight
-      });
-    }
-
     // Aggiunge l'indice del prodotto salvato e aggiorna il dizionario di stato
     const updatedSaved = Array.from(new Set([...savedItemIndices, selectedItemIdx]));
     setSavedItemIndices(updatedSaved);
 
-    setItemsState(prev => ({
-      ...prev,
+    const updatedState = {
+      ...itemsState,
       [selectedItemIdx]: {
         text,
         font,
@@ -765,7 +784,16 @@ export default function TextEditorModal({
         currentImageUrl,
         activeTab
       }
-    }));
+    };
+    setItemsState(updatedState);
+
+    if (orderId && typeof window !== "undefined") {
+      const storageKey = `pod_saved_order_editor_${orderId}`;
+      localStorage.setItem(storageKey, JSON.stringify({
+        itemsState: updatedState,
+        savedItemIndices: updatedSaved
+      }));
+    }
 
     setIsSaving(false);
 
@@ -775,8 +803,22 @@ export default function TextEditorModal({
 
     const totalCount = lineItems.length || 1;
 
-    // Chiudi il modale solo se richiesto esplicitamente o se l'ordine ha un solo prodotto
+    // Chiudi il modale e notifica il parent SOLO se richiesto esplicitamente o se c'è un solo prodotto
     if (closeModalAfter || (totalCount <= 1)) {
+      if (onSave) {
+        onSave({
+          text,
+          font,
+          fontSize,
+          color,
+          letterSpacing,
+          x: posX,
+          y: posY,
+          processedGraphicUrl: finalGraphicToSave,
+          width: graphicWidth,
+          height: graphicHeight
+        });
+      }
       onClose();
     }
   };

@@ -292,38 +292,46 @@ export default function FontLibraryPage() {
             ) : (
               <div className="grid grid-cols-1 gap-4">
                 {filteredInstalledFonts.map(font => {
-              const fontMappings = getFontMappings();
-              const mappedShopifyName = fontMappings.find(m => {
-                const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
-                const normF = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-                return normTarget === normF || normF.includes(normTarget) || normTarget.includes(normF);
-              })?.shopifyName;
+                  const fontMappings = getFontMappings();
+                  const normF = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                  const normFile = font.filename.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
 
-              return (
-                <div 
-                  key={font.id}
-                  className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:border-gray-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  {/* Meta Info */}
-                  <div className="space-y-1 shrink-0 md:w-64">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-extrabold text-indigo-950 text-base">
-                        {mappedShopifyName || font.name}
-                      </h3>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800">
-                        {font.format}
-                      </span>
-                      {mappedShopifyName && (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                          Nome Shopify
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500 font-mono truncate">
-                      File Server: <strong className="font-semibold text-gray-700">{font.filename}</strong>
-                    </div>
-                    <div className="text-[11px] text-gray-400 font-medium">Dimensione: {formatFileSize(font.sizeBytes)}</div>
-                  </div>
+                  const match = fontMappings.find(m => {
+                    const normTarget = m.targetFont.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+                    return normTarget === normF || normTarget === normFile || (normTarget.length >= 4 && (normF.startsWith(normTarget) || normFile.startsWith(normTarget)));
+                  });
+
+                  const mappedShopifyName = match ? match.shopifyName : null;
+
+                  return (
+                    <div 
+                      key={font.id}
+                      className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:border-gray-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                      {/* Meta Info */}
+                      <div className="space-y-1 shrink-0 md:w-64">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className={`font-extrabold text-base ${mappedShopifyName ? "text-indigo-950" : "text-gray-400 font-mono"}`}>
+                            {mappedShopifyName ? mappedShopifyName : "-------"}
+                          </h3>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800">
+                            {font.format}
+                          </span>
+                          {mappedShopifyName ? (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              ✓ Shopify Alias
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200">
+                              Nessun Alias
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 font-mono truncate">
+                          File Server: <strong className="font-semibold text-gray-700">{font.filename}</strong>
+                        </div>
+                        <div className="text-[11px] text-gray-400 font-medium">Dimensione: {formatFileSize(font.sizeBytes)}</div>
+                      </div>
 
                 {/* Live Preview Box */}
                 <div className="flex-1 bg-gray-50/70 p-4 rounded-xl border border-gray-100 overflow-hidden flex items-center min-h-[64px]">

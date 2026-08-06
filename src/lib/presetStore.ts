@@ -267,10 +267,15 @@ export interface FontMapping {
 export const FONT_MAPPINGS_KEY = "pod_font_mappings_v1";
 
 export const DEFAULT_FONT_MAPPINGS: FontMapping[] = [
-  { id: "1", shopifyName: "Save", targetFont: "Outfit" },
-  { id: "2", shopifyName: "Get Show", targetFont: "Outfit" },
-  { id: "3", shopifyName: "Cursive", targetFont: "Dancing Script" },
-  { id: "4", shopifyName: "Handwriting", targetFont: "Dancing Script" }
+  { id: "m-1", shopifyName: "Broadway", targetFont: "Broadw" },
+  { id: "m-2", shopifyName: "Cheese", targetFont: "Cheese-market" },
+  { id: "m-3", shopifyName: "Chocolate", targetFont: "Chocolate-otf" },
+  { id: "m-4", shopifyName: "Cinzel", targetFont: "Cinzeldecorative" },
+  { id: "m-5", shopifyName: "College", targetFont: "College" },
+  { id: "m-6", shopifyName: "Comical", targetFont: "Comical-sound" },
+  { id: "m-7", shopifyName: "Comm", targetFont: "Commercial-script" },
+  { id: "m-8", shopifyName: "Save", targetFont: "Saveur-sans-semi-bold" },
+  { id: "m-9", shopifyName: "Get Show", targetFont: "Get_Show" }
 ];
 
 export function getFontMappings(): FontMapping[] {

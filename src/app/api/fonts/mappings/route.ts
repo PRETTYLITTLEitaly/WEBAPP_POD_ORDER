@@ -5,6 +5,7 @@ import path from "path";
 import os from "os";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const LOCAL_MAPPINGS_FILE = path.join(os.tmpdir(), "font_mappings.json");
 

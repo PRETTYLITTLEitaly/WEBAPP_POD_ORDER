@@ -5,6 +5,7 @@ import os from "os";
 import { shopifyFetch } from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const PUBLIC_FONTS_DIR = path.join(process.cwd(), "public", "fonts");
 const TMP_FONTS_DIR = path.join(os.tmpdir(), "pod_fonts");

@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
                     }
                   }
                   custom_url: metafield(namespace: "custom", key: "pod_svg_url") { namespace key value }
+                  pod_svg_url_pod: metafield(namespace: "pod", key: "svg_url") { namespace key value }
                   custom_width: metafield(namespace: "custom", key: "width") { namespace key value }
                   custom_height: metafield(namespace: "custom", key: "height") { namespace key value }
                 }
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
                     }
                   }
                   custom_url: metafield(namespace: "custom", key: "pod_svg_url") { namespace key value }
+                  pod_svg_url_pod: metafield(namespace: "pod", key: "svg_url") { namespace key value }
                   custom_width: metafield(namespace: "custom", key: "width") { namespace key value }
                   custom_height: metafield(namespace: "custom", key: "height") { namespace key value }
                 }
@@ -128,9 +130,9 @@ export async function POST(req: NextRequest) {
 
         const metafields = [
           item.product?.pod_width, item.product?.pod_height, item.product?.pod_svg,
-          item.product?.custom_url, item.product?.custom_width, item.product?.custom_height,
+          item.product?.custom_url, item.product?.pod_svg_url_pod, item.product?.custom_width, item.product?.custom_height,
           item.variant?.pod_width, item.variant?.pod_height, item.variant?.pod_svg,
-          item.variant?.custom_url, item.variant?.custom_width, item.variant?.custom_height
+          item.variant?.custom_url, item.variant?.pod_svg_url_pod, item.variant?.custom_width, item.variant?.custom_height
         ].filter(Boolean);
         
         let baseWidthVal = metafields.find((m: any) => m.key === "width")?.value;
@@ -154,41 +156,46 @@ export async function POST(req: NextRequest) {
         if (fontAndColor.font) fontName = fontAndColor.font;
         if (fontAndColor.color) fontColor = fontAndColor.color;
 
-        attrs.forEach((a: any) => {
-          const rawKey = a.key || "";
-          const k = rawKey.toLowerCase().trim();
-          const v = String(a.value || "").trim();
-
-          const isSystemKey = rawKey.startsWith("_") || k.includes("font") || k.includes("align") || k.includes("scegli") || k.includes("modello") || k.includes("stick") || k.includes("colore") || k.includes("vedi");
-
-          if (!isSystemKey && !v.startsWith("http")) {
-            const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
-            if (v && (!isSimpleOption || !customText)) {
-              if (!customText || v.length > customText.length) customText = v;
-            }
-          }
-          if (k.includes("font size") || k.includes("_font_size")) {
-            const p = parseFloat(v);
-            if (!isNaN(p) && p > 0) fontSizePx = Math.round(p);
-          }
+        const isPplrItem = isZeptoOrder || attrs.some((a: any) => {
+          const k = (a.key || "").toLowerCase();
+          return k.includes("_pplr") || k.includes("il tuo testo") || k.includes("scegli il font");
         });
 
-        // Trova qualsiasi file grafico associato (con o senza prefisso)
+        if (isPplrItem) {
+          attrs.forEach((a: any) => {
+            const rawKey = a.key || "";
+            const k = rawKey.toLowerCase().trim();
+            const v = String(a.value || "").trim();
+
+            const isSystemKey = rawKey.startsWith("_") || k.includes("font") || k.includes("align") || k.includes("scegli") || k.includes("modello") || k.includes("stick") || k.includes("colore") || k.includes("vedi");
+
+            if (!isSystemKey && !v.startsWith("http")) {
+              const isSimpleOption = ["frase", "iniziale", "ammaccato", "liscio", "nero", "bianco", "azzurro"].includes(v.toLowerCase());
+              if (v && (!isSimpleOption || !customText)) {
+                if (!customText || v.length > customText.length) customText = v;
+              }
+            }
+            if (k.includes("font size") || k.includes("_font_size")) {
+              const p = parseFloat(v);
+              if (!isNaN(p) && p > 0) fontSizePx = Math.round(p);
+            }
+          });
+        }
+
+        // Trova qualsiasi file grafico di stampa associato (NON le foto del prodotto o anteprime fisiche JPG/PNG mockup!)
         const isolatedDesignAttr = attrs.find((a: any) => 
-          a.key.startsWith("_design") || a.key.includes("_pplr_original") || a.key.includes("_pplr_pdf") || (a.key.toLowerCase().includes("immagine") && String(a.value).startsWith("http"))
+          a.key.startsWith("_design") || a.key.includes("_pplr_original") || a.key.includes("_pplr_pdf") || a.key.includes("_pplr_svg")
         );
-        const mockupAttr = attrs.find((a: any) => a.key.includes("Vedi ora") || a.key.includes("preview") || String(a.value).startsWith("http"));
-        const zeptoAttrUrl = isolatedDesignAttr?.value || mockupAttr?.value;
 
         const svgMeta = metafields.find((m: any) => m.key === "svg");
-        const svgTextUrl = metafields.find((m: any) => m.key === "pod_svg_url" || m.key === "pod_url")?.value;
+        const svgTextUrl = metafields.find((m: any) => m.key === "pod_svg_url" || m.key === "pod_url" || m.key === "svg_url")?.value;
 
         const productPreassociatedSvg = 
           svgTextUrl || 
           svgMeta?.reference?.url || 
           svgMeta?.reference?.image?.url || 
-          attrs.find((a: any) => String(a.value).endsWith(".svg"))?.value ||
-          zeptoAttrUrl;
+          attrs.find((a: any) => typeof a.value === "string" && a.value.toLowerCase().includes(".svg"))?.value ||
+          isolatedDesignAttr?.value;
 
         // Imposta dimensioni standard per stampa DTF se non specificate nei metafield
         if (!baseWidthVal) baseWidthVal = orderWidth || "80";

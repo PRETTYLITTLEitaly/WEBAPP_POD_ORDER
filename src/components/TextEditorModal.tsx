@@ -303,8 +303,14 @@ export default function TextEditorModal({
       const extracted = extractTextFontAndColorFromAttrs(itemAttrs || []);
       setText(item.initialText !== undefined ? item.initialText : initialText);
 
-      const resolvedFontName = resolveFontName(extracted.rawFont || item.initialFont || initialFont || "Outfit");
-      setFont(resolvedFontName);
+      const rawInput = extracted.rawFont || item.initialFont || initialFont || "Outfit";
+      const resolvedFontName = resolveFontName(rawInput);
+      const normResolved = resolvedFontName.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+      const matchedFont = availableFonts.find(f => {
+        const normName = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+        return normName === normResolved || normName.includes(normResolved) || normResolved.includes(normName);
+      });
+      setFont(matchedFont ? matchedFont.name : resolvedFontName);
       setColor(extracted.color || resolveColorHex(item.initialColor || initialColor || "#000000"));
       setFontSize(item.initialFontSize || initialFontSize || 32);
       const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
@@ -316,7 +322,7 @@ export default function TextEditorModal({
         setActiveTab("text");
       }
     }
-  }, [open, initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, customAttributes, lineItems, orderId]);
+  }, [open, initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, customAttributes, lineItems, orderId, availableFonts]);
 
   const handleSelectLineItem = (idx: number) => {
     if (idx === selectedItemIdx) return;
@@ -369,8 +375,14 @@ export default function TextEditorModal({
       const fontAndColor = extractTextFontAndColorFromAttrs(item.customAttributes || []);
       setText(item.initialText !== undefined ? item.initialText : "");
       
-      const resolvedFontName = resolveFontName(fontAndColor.rawFont || fontAndColor.font || item.initialFont || "Outfit");
-      setFont(resolvedFontName);
+      const rawInput = fontAndColor.rawFont || fontAndColor.font || item.initialFont || "Outfit";
+      const resolvedFontName = resolveFontName(rawInput);
+      const normResolved = resolvedFontName.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+      const matchedFont = availableFonts.find(f => {
+        const normName = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+        return normName === normResolved || normName.includes(normResolved) || normResolved.includes(normName);
+      });
+      setFont(matchedFont ? matchedFont.name : resolvedFontName);
       setColor(fontAndColor.color || resolveColorHex(item.initialColor || "#000000"));
       setFontSize(item.initialFontSize || 32);
 
@@ -532,13 +544,35 @@ export default function TextEditorModal({
           }));
 
           setAvailableFonts(customList);
+
+          // Auto-aggancia subito il font consigliato dal cliente con i font del server installati
+          const currentItem = (lineItems && lineItems[selectedItemIdx]) || {};
+          const currentAttrs = (currentItem.customAttributes && currentItem.customAttributes.length > 0) ? currentItem.customAttributes : customAttributes;
+          const extracted = extractTextFontAndColorFromAttrs(currentAttrs || []);
+          const rawFontInput = extracted.rawFont || currentItem.initialFont || initialFont || "Outfit";
+
+          if (rawFontInput) {
+            const resolvedTarget = resolveFontName(rawFontInput);
+            const normResolved = resolvedTarget.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+
+            const matchedFont = customList.find((f: any) => {
+              const normName = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+              return normName === normResolved || normName.includes(normResolved) || normResolved.includes(normName);
+            });
+
+            if (matchedFont) {
+              setFont(matchedFont.name);
+            } else if (resolvedTarget) {
+              setFont(resolvedTarget);
+            }
+          }
         }
       } catch (e) {
         console.error("Errore fetch font:", e);
       }
     };
     fetchFonts();
-  }, [open]);
+  }, [open, selectedItemIdx, lineItems, customAttributes, initialFont]);
 
   // COLOR SAMPLER FROM ORIGINAL IMAGE (CONTAGOCCE)
   const sampleColorFromImage = (e: React.MouseEvent<HTMLImageElement>) => {

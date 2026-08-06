@@ -20,30 +20,7 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
       {lineItems.map((item: any) => {
         const productImage = item.image?.url || item.variant?.image?.url || item.product?.featuredImage?.url;
         
-        const metaNodes = item.product?.metafields?.nodes || [];
-        let podSvgFromMeta: string | null = null;
-        let hasColoreBaseFromMeta = false;
-
-        metaNodes.forEach((m: any) => {
-          const k = (m.key || "").toLowerCase();
-          const ns = (m.namespace || "").toLowerCase();
-          const val = m.value;
-
-          if (k.includes("colore") || k.includes("base") || ns.includes("colore")) {
-            if (val && typeof val === "string" && val.trim().length > 0) hasColoreBaseFromMeta = true;
-          }
-
-          if (k === "pod_svg_url" || k === "svg_url" || k === "svg" || k === "pod_svg") {
-            const refUrl = m.reference?.url || m.reference?.image?.url;
-            if (val && typeof val === "string" && val.startsWith("http")) {
-              podSvgFromMeta = val;
-            } else if (refUrl) {
-              podSvgFromMeta = refUrl;
-            }
-          }
-        });
-
-        const podSvg = podSvgFromMeta || 
+        const podSvg = 
           item.product?.pod_svg_url_custom?.value || 
           item.product?.pod_svg_url_pod?.value || 
           item.product?.pod_svg?.reference?.url || 
@@ -68,9 +45,8 @@ export default function OrderLineItems({ lineItems }: { lineItems: any[] }) {
         const customGraphicImage = personalizerPreviewUrl || podSvg;
 
         // Controllo Obbligatorietà SVG basato sul metafield custom_colore.base o collezione obbligatoria
-        const hasColoreBase = hasColoreBaseFromMeta || !!(
+        const hasColoreBase = !!(
           item.product?.colore_base?.value || 
-          item.product?.colore_base_alt?.value || 
           item.product?.colore_base_underscore?.value
         );
 

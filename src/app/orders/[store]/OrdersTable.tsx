@@ -1036,7 +1036,6 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
                           const hasColoreBase = !!(
                             item.product?.colore_base?.value || 
-                            item.product?.colore_base_alt?.value || 
                             item.product?.colore_base_underscore?.value
                           );
 

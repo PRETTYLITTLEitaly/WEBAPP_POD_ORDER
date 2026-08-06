@@ -192,6 +192,7 @@ export default function BugFixPage() {
         body: JSON.stringify({
           action: "add_message",
           ticketId: targetTicketId,
+          ticket: selectedTicket,
           message: {
             authorName,
             authorRole,

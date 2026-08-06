@@ -214,7 +214,14 @@ export async function POST(req: NextRequest) {
 
     // 2. AGGIUNTA MESSAGGIO A UN TICKET ESISTENTE
     if (action === "add_message" && ticketId && message) {
-      const targetIdx = tickets.findIndex(t => t.id === ticketId);
+      let targetIdx = tickets.findIndex(t => t.id === ticketId);
+      
+      // Se il ticket non esiste ancora sul server (es. creato sul client), effettua l'upsert
+      if (targetIdx === -1 && ticket) {
+        tickets = [ticket, ...tickets];
+        targetIdx = 0;
+      }
+
       if (targetIdx === -1) {
         return NextResponse.json({ success: false, error: "Ticket non trovato." }, { status: 404 });
       }

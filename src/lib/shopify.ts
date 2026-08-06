@@ -34,6 +34,7 @@ export async function shopifyFetch({
       "X-Shopify-Access-Token": token
     },
     body: JSON.stringify({ query, variables }),
+    cache: "no-store",
     ...(dispatcher ? { dispatcher } : {})
   } as any);
 

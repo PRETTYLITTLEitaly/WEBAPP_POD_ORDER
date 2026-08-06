@@ -939,8 +939,30 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                   return (
                     <tr>
                       <td colSpan={11} className="px-6 py-16 text-center">
-                        <p className="text-gray-500 font-medium">Nessun ordine trovato</p>
-                        <p className="text-gray-400 mt-1 text-sm">Prova a cambiare o rimuovere i filtri.</p>
+                        <p className="text-gray-700 font-bold text-base">
+                          {initialOrders.length > 0
+                            ? `Nessun ordine corrisponde ai filtri attivi (${initialOrders.length} ordini caricati da Shopify)`
+                            : "Nessun ordine caricato da Shopify"}
+                        </p>
+                        <p className="text-gray-500 mt-1 text-sm">
+                          {initialOrders.length > 0
+                            ? "Ci sono filtri o ricerche attive salvate nel browser che nascondono gli ordini."
+                            : "Verifica che ci siano ordini aperti sullo store Shopify."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery("");
+                            setTagFilter("all");
+                            setStatusFilter("all");
+                            setShowOnlySelected(false);
+                            setActiveViewId("default");
+                            sessionStorage.removeItem(`ordersState_${store}`);
+                          }}
+                          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
+                        >
+                          🔄 Ripristina e mostra tutti gli ordini ({initialOrders.length})
+                        </button>
                       </td>
                     </tr>
                   );

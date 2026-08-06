@@ -212,23 +212,21 @@ export function extractTextFontAndColorFromAttrs(attrs: any[]) {
     foundColorName = String(specificColorAttr.value).trim();
   }
 
-  // 2. Cerca l'attributo Font: "Scegli il font", "Font", ecc.
-  const fontAttrIdx = attrs.findIndex((a: any) => {
-    const k = (a.key || "").toLowerCase();
-    return k.includes("font") && !k.includes("colore") && !k.includes("color") && !a.key.startsWith("_");
+  // 2. Cerca l'attributo Font: prioritariamente "Scegli il font", "Scegli font", "Tipo di carattere"
+  const specificFontAttr = attrs.find((a: any) => {
+    const k = (a.key || "").toLowerCase().trim();
+    return (k.includes("scegli") && k.includes("font")) || 
+           k === "scegli il font" || 
+           k.includes("tipo di carattere") || 
+           k.includes("font testo") ||
+           k.includes("font_testo");
+  }) || attrs.find((a: any) => {
+    const k = (a.key || "").toLowerCase().trim();
+    return k.includes("font") && !k.includes("colore") && !k.includes("color") && !k.includes("size") && !a.key.startsWith("_");
   });
 
-  if (fontAttrIdx !== -1) {
-    foundFont = String(attrs[fontAttrIdx].value || "").trim();
-
-    // Se il colore non è stato ancora trovato con una chiave specifica, controlla l'attributo immediatamente successivo a "Scegli il font"
-    if (!foundColorName && fontAttrIdx + 1 < attrs.length) {
-      const nextAttr = attrs[fontAttrIdx + 1];
-      const nextK = (nextAttr.key || "").toLowerCase();
-      if (nextK.includes("color") || nextK.includes("colore")) {
-        foundColorName = String(nextAttr.value || "").trim();
-      }
-    }
+  if (specificFontAttr && specificFontAttr.value) {
+    foundFont = String(specificFontAttr.value).trim();
   }
 
   // 3. Fallback se ancora non trovato: cerca chiavi che contengono "colore" ma escludi il semplice "Colore:" di prodotto se c'è un'altra opzione

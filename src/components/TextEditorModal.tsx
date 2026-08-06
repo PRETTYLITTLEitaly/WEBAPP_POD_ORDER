@@ -362,9 +362,10 @@ export default function TextEditorModal({
       setCurrentImageUrl(s.currentImageUrl);
       setActiveTab(s.activeTab);
     } else {
+      const fontAndColor = extractTextFontAndColorFromAttrs(item.customAttributes || []);
       setText(item.initialText !== undefined ? item.initialText : "");
-      setFont(item.initialFont || "Get Show");
-      setColor(resolveColorHex(item.initialColor || "#000000"));
+      setFont(fontAndColor.font || item.initialFont || "Outfit");
+      setColor(fontAndColor.color || resolveColorHex(item.initialColor || "#000000"));
       setFontSize(item.initialFontSize || 32);
 
       const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;

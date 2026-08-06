@@ -1461,7 +1461,6 @@ export default function TextEditorModal({
                       onChange={e => setFont(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                     >
-                      <option value={font}>-- Font dell'ordine: {font} --</option>
                       {availableFonts.map(f => (
                         <option key={f.name} value={f.name}>
                           {f.name}
@@ -1533,6 +1532,18 @@ export default function TextEditorModal({
                       <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
                         <Palette className="w-4 h-4 text-amber-600" />
                         Colore Scritta
+                        {(() => {
+                          const matchedPreset = getColorPresets().find(c => c.hex.toLowerCase() === color.toLowerCase());
+                          return matchedPreset ? (
+                            <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 ml-1">
+                              {matchedPreset.name}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-mono font-extrabold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200 ml-1">
+                              {color}
+                            </span>
+                          );
+                        })()}
                       </label>
                       {rawColorAttr && (
                         <span className="text-[11px] font-black text-amber-950 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs flex items-center gap-1.5">
@@ -1544,20 +1555,21 @@ export default function TextEditorModal({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-start gap-2">
                       <input 
                         type="color"
                         value={color}
                         onChange={e => setColor(e.target.value)}
-                        className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5 bg-white shrink-0"
+                        className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5 bg-white shrink-0 mt-0.5"
+                        title="Seleziona colore personalizzato"
                       />
-                      <div className="flex items-center gap-1.5 overflow-x-auto max-w-full p-1 bg-gray-50 rounded-xl border border-gray-200 py-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-200 max-h-36 overflow-y-auto flex-1">
                         {getColorPresets().map(c => (
                           <button
                             key={c.id || c.name}
                             type="button"
                             onClick={() => setColor(c.hex)}
-                            className={`w-6 h-6 rounded-full border transition-all shrink-0 cursor-pointer ${
+                            className={`w-6 h-6 rounded-full border transition-all shrink-0 cursor-pointer relative group ${
                               color.toLowerCase() === c.hex.toLowerCase() ? "scale-125 border-amber-600 ring-2 ring-amber-400 z-10" : "border-gray-300 hover:scale-110"
                             }`}
                             style={{ backgroundColor: c.hex }}

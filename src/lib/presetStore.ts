@@ -246,11 +246,70 @@ export function extractTextFontAndColorFromAttrs(attrs: any[]) {
     }
   }
 
+  const resolvedFont = foundFont ? resolveFontName(foundFont) : null;
+
   return {
-    font: foundFont,
+    font: resolvedFont,
+    rawFont: foundFont,
     colorName: foundColorName,
     color: foundColorName ? resolveColorHex(foundColorName) : null
   };
+}
+
+// ----------------------------------------------------
+// SYSTEM DELEGA / MAPPATURA FONT (Shopify → Server DTF)
+// ----------------------------------------------------
+
+export interface FontMapping {
+  id: string;
+  shopifyName: string; // Es. "Save", "Get Show", "Cursive"
+  targetFont: string;  // Es. "Outfit", "Helvetica", "Dancing Script"
+}
+
+export const FONT_MAPPINGS_KEY = "pod_font_mappings_v1";
+
+export const DEFAULT_FONT_MAPPINGS: FontMapping[] = [
+  { id: "1", shopifyName: "Save", targetFont: "Outfit" },
+  { id: "2", shopifyName: "Get Show", targetFont: "Outfit" },
+  { id: "3", shopifyName: "Cursive", targetFont: "Dancing Script" },
+  { id: "4", shopifyName: "Handwriting", targetFont: "Dancing Script" }
+];
+
+export function getFontMappings(): FontMapping[] {
+  if (typeof window === "undefined") return DEFAULT_FONT_MAPPINGS;
+  try {
+    const raw = localStorage.getItem(FONT_MAPPINGS_KEY);
+    if (!raw) return DEFAULT_FONT_MAPPINGS;
+    const list = JSON.parse(raw);
+    if (!list || !list.length) return DEFAULT_FONT_MAPPINGS;
+    return list;
+  } catch (e) {
+    return DEFAULT_FONT_MAPPINGS;
+  }
+}
+
+export function saveFontMappings(mappings: FontMapping[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(FONT_MAPPINGS_KEY, JSON.stringify(mappings));
+}
+
+// Risolve automaticamente un nome font da Shopify (es. "Save") al font reale installato sul server DTF (es. "Outfit")
+export function resolveFontName(inputShopifyFont: string): string {
+  if (!inputShopifyFont) return "Outfit";
+  const trimmed = inputShopifyFont.trim();
+  const mappings = getFontMappings();
+  const normInput = trimmed.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const match = mappings.find(m => {
+    const normM = m.shopifyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return normM === normInput || normM.includes(normInput) || normInput.includes(normM);
+  });
+
+  if (match) {
+    return match.targetFont;
+  }
+
+  return trimmed;
 }
 
 

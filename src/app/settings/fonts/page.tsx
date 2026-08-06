@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useRef } from "react";
 import { Type, Upload, Trash2, CheckCircle2, AlertCircle, RefreshCw, Sliders } from "lucide-react";
+import { FontMapping, getFontMappings, saveFontMappings } from "@/lib/presetStore";
 
 interface FontItem {
   id: string;
@@ -236,6 +237,9 @@ export default function FontLibraryPage() {
         />
       </div>
 
+      {/* MAPPATURA AUTOMATICA FONT SHOPIFY -> SERVER DTF */}
+      <FontMappingsSection availableFontNames={fonts.map(f => f.name)} />
+
       {/* ELENCO DEI FONT CARICATI */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -300,6 +304,153 @@ export default function FontLibraryPage() {
         )}
       </div>
 
+    </div>
+  );
+}
+
+// SEZIONE MAPPATURA NOMI FONT SHOPIFY -> FONT SERVER DTF
+function FontMappingsSection({ availableFontNames }: { availableFontNames: string[] }) {
+  const [mappings, setMappings] = useState<FontMapping[]>([]);
+  const [newShopifyName, setNewShopifyName] = useState("");
+  const [newTargetFont, setNewTargetFont] = useState("");
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setMappings(getFontMappings());
+  }, []);
+
+  const handleAddMapping = () => {
+    if (!newShopifyName.trim() || !newTargetFont.trim()) return;
+    const updated = [
+      ...mappings,
+      {
+        id: Date.now().toString(),
+        shopifyName: newShopifyName.trim(),
+        targetFont: newTargetFont.trim()
+      }
+    ];
+    setMappings(updated);
+    saveFontMappings(updated);
+    setNewShopifyName("");
+    setNewTargetFont("");
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const handleDeleteMapping = (id: string) => {
+    const updated = mappings.filter(m => m.id !== id);
+    setMappings(updated);
+    saveFontMappings(updated);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const handleUpdateMapping = (id: string, field: "shopifyName" | "targetFont", value: string) => {
+    const updated = mappings.map(m => (m.id === id ? { ...m, [field]: value } : m));
+    setMappings(updated);
+    saveFontMappings(updated);
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-indigo-600" />
+            Mappatura Automatica Nomi Font (Shopify → Server DTF)
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Collega i titoli dei font scritti su Shopify (es. <span className="font-mono font-bold text-gray-700">"Save"</span>) al font reale installato sul server DTF (es. <span className="font-mono font-bold text-gray-700">"Outfit"</span>).
+          </p>
+        </div>
+        {savedSuccess && (
+          <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 animate-pulse">
+            ✓ Salvato con successo!
+          </span>
+        )}
+      </div>
+
+      {/* FORM AGGIUNTA NUOVA MAPPATURA FONT */}
+      <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+        <div>
+          <label className="block text-xs font-extrabold text-gray-700 mb-1">Nome Font su Shopify</label>
+          <input 
+            type="text"
+            placeholder='Es: "Save", "Get Show"'
+            value={newShopifyName}
+            onChange={e => setNewShopifyName(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-extrabold text-gray-700 mb-1">Font Reale Server DTF</label>
+          <input 
+            type="text"
+            list="fonts-datalist"
+            placeholder='Es: "Outfit", "Helvetica"'
+            value={newTargetFont}
+            onChange={e => setNewTargetFont(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+          />
+          <datalist id="fonts-datalist">
+            {availableFontNames.map(f => (
+              <option key={f} value={f} />
+            ))}
+          </datalist>
+        </div>
+        <button
+          onClick={handleAddMapping}
+          disabled={!newShopifyName.trim() || !newTargetFont.trim()}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all"
+        >
+          + Aggiungi Mappatura Font
+        </button>
+      </div>
+
+      {/* TABELLA MAPPATURE ESISTENTI */}
+      <div className="overflow-hidden border border-gray-200 rounded-xl">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-extrabold text-gray-600 uppercase">
+              <th className="py-2.5 px-4">Nome su Shopify</th>
+              <th className="py-2.5 px-4">Abbinato a Font Server DTF</th>
+              <th className="py-2.5 px-4 text-right">Azione</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-xs">
+            {mappings.map(m => (
+              <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                <td className="py-2 px-4 font-mono font-bold text-indigo-900">
+                  <input 
+                    type="text"
+                    value={m.shopifyName}
+                    onChange={e => handleUpdateMapping(m.id, "shopifyName", e.target.value)}
+                    className="px-2 py-1 border border-transparent hover:border-gray-300 focus:border-indigo-500 rounded text-xs font-bold w-full bg-transparent"
+                  />
+                </td>
+                <td className="py-2 px-4 font-bold text-gray-900">
+                  <input 
+                    type="text"
+                    list="fonts-datalist"
+                    value={m.targetFont}
+                    onChange={e => handleUpdateMapping(m.id, "targetFont", e.target.value)}
+                    className="px-2 py-1 border border-transparent hover:border-gray-300 focus:border-indigo-500 rounded text-xs font-bold w-full bg-transparent"
+                  />
+                </td>
+                <td className="py-2 px-4 text-right">
+                  <button
+                    onClick={() => handleDeleteMapping(m.id)}
+                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                    title="Elimina Mappatura"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

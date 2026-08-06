@@ -299,9 +299,13 @@ export default function TextEditorModal({
       setActiveTab(s.activeTab);
     } else if (lineItems && lineItems.length > 0 && lineItems[0]) {
       const item = lineItems[0];
+      const itemAttrs = (item.customAttributes && item.customAttributes.length > 0) ? item.customAttributes : customAttributes;
+      const extracted = extractTextFontAndColorFromAttrs(itemAttrs || []);
       setText(item.initialText !== undefined ? item.initialText : initialText);
-      setFont(item.initialFont || initialFont || "Get Show");
-      setColor(resolveColorHex(item.initialColor || initialColor || "#000000"));
+
+      const resolvedFontName = resolveFontName(extracted.rawFont || item.initialFont || initialFont || "Outfit");
+      setFont(resolvedFontName);
+      setColor(extracted.color || resolveColorHex(item.initialColor || initialColor || "#000000"));
       setFontSize(item.initialFontSize || initialFontSize || 32);
       const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
       setCurrentImageUrl(imgUrl || "");
@@ -364,7 +368,9 @@ export default function TextEditorModal({
     } else {
       const fontAndColor = extractTextFontAndColorFromAttrs(item.customAttributes || []);
       setText(item.initialText !== undefined ? item.initialText : "");
-      setFont(fontAndColor.font || item.initialFont || "Outfit");
+      
+      const resolvedFontName = resolveFontName(fontAndColor.rawFont || fontAndColor.font || item.initialFont || "Outfit");
+      setFont(resolvedFontName);
       setColor(fontAndColor.color || resolveColorHex(item.initialColor || "#000000"));
       setFontSize(item.initialFontSize || 32);
 
@@ -1462,11 +1468,22 @@ export default function TextEditorModal({
                       onChange={e => setFont(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                     >
-                      {availableFonts.map(f => (
-                        <option key={f.name} value={f.name}>
-                          {f.name}
-                        </option>
-                      ))}
+                      {availableFonts.map(f => {
+                        const fontMappings = getFontMappings();
+                        const mapping = fontMappings.find(m => {
+                          const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
+                          const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                          return normTarget === normF || normF.includes(normTarget) || normTarget.includes(normF);
+                        });
+
+                        const optionLabel = mapping ? `${f.name} (${mapping.shopifyName})` : f.name;
+
+                        return (
+                          <option key={f.name} value={f.name}>
+                            {optionLabel}
+                          </option>
+                        );
+                      })}
                     </select>
                     
                     {font && !availableFonts.some(f => f.name.toLowerCase() === font.toLowerCase()) && 

@@ -51,22 +51,24 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
                     title
                   }
                 }
-                colore_base: metafield(namespace: "custom", key: "colore_base") { value }
-                colore_base_alt: metafield(namespace: "custom", key: "colore.base") { value }
-                colore_base_underscore: metafield(namespace: "custom_colore", key: "base") { value }
-                pod_svg_url_custom: metafield(namespace: "custom", key: "pod_svg_url") { value }
-                pod_svg_url_pod: metafield(namespace: "pod", key: "svg_url") { value }
-                pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } ... on MediaImage { image { url } } } }
-                custom_url: metafield(namespace: "custom", key: "pod_svg_url") { value }
+                metafields(first: 20) {
+                  nodes {
+                    id
+                    namespace
+                    key
+                    value
+                    reference {
+                      ... on GenericFile { url }
+                      ... on MediaImage { image { url } }
+                    }
+                  }
+                }
               }
               variant {
                 title
                 sku
                 image { url altText }
                 price
-                pod_svg_url_custom: metafield(namespace: "custom", key: "pod_svg_url") { value }
-                pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } ... on MediaImage { image { url } } } }
-                custom_url: metafield(namespace: "custom", key: "pod_svg_url") { value }
               }
             }
           }

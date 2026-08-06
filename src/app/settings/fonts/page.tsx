@@ -351,9 +351,61 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
     saveFontMappings(updated);
   };
 
+  const csvInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCsvUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+      const newMappings: FontMapping[] = [];
+
+      lines.forEach((line, idx) => {
+        if (idx === 0 && (line.toLowerCase().includes("shopify") || line.toLowerCase().includes("file") || line.toLowerCase().includes("nome"))) {
+          return;
+        }
+
+        const parts = line.split(/[,;\t]/).map(p => p.trim().replace(/^["']|["']$/g, ""));
+        if (parts.length >= 2) {
+          const shopifyName = parts[0];
+          const targetFont = parts[1].replace(/\.(ttf|otf|woff|woff2)$/i, "");
+          if (shopifyName && targetFont) {
+            newMappings.push({
+              id: Date.now().toString() + "_" + idx,
+              shopifyName,
+              targetFont
+            });
+          }
+        }
+      });
+
+      if (newMappings.length > 0) {
+        const existing = getFontMappings();
+        const merged = [...existing];
+
+        newMappings.forEach(newItem => {
+          const existsIdx = merged.findIndex(m => m.shopifyName.toLowerCase() === newItem.shopifyName.toLowerCase());
+          if (existsIdx !== -1) {
+            merged[existsIdx] = newItem;
+          } else {
+            merged.push(newItem);
+          }
+        });
+
+        setMappings(merged);
+        saveFontMappings(merged);
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 4000);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
             <Sliders className="w-5 h-5 text-indigo-600" />
@@ -363,11 +415,51 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
             Collega i titoli dei font scritti su Shopify (es. <span className="font-mono font-bold text-gray-700">"Save"</span>) al font reale installato sul server DTF (es. <span className="font-mono font-bold text-gray-700">"Outfit"</span>).
           </p>
         </div>
-        {savedSuccess && (
-          <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 animate-pulse">
-            ✓ Salvato con successo!
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <input 
+            type="file"
+            ref={csvInputRef}
+            accept=".csv,.txt"
+            onChange={e => e.target.files?.[0] && handleCsvUpload(e.target.files[0])}
+            className="hidden"
+          />
+          <button
+            onClick={() => csvInputRef.current?.click()}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Importa Mappature da CSV</span>
+          </button>
+          {savedSuccess && (
+            <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 animate-pulse">
+              ✓ Salvato con successo!
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* STATISTICHE CONTEGGIO FONT & COPERTURA */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+        <div className="space-y-0.5">
+          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Font Installati Server</span>
+          <div className="text-lg font-black text-gray-900">{availableFontNames.length}</div>
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Mappature Configurate</span>
+          <div className="text-lg font-black text-indigo-600">{mappings.length}</div>
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Nomi Shopify Unici</span>
+          <div className="text-lg font-black text-amber-600">
+            {new Set(mappings.map(m => m.shopifyName.toLowerCase())).size}
+          </div>
+        </div>
+        <div className="space-y-0.5">
+          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Font Server Mappati</span>
+          <div className="text-lg font-black text-emerald-600">
+            {new Set(mappings.map(m => m.targetFont.toLowerCase())).size}
+          </div>
+        </div>
       </div>
 
       {/* FORM AGGIUNTA NUOVA MAPPATURA FONT */}

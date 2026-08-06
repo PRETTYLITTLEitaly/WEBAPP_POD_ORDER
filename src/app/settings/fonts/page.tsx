@@ -351,6 +351,18 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
     saveFontMappings(updated);
   };
 
+  const isFontInstalledOnServer = (targetName: string) => {
+    if (!targetName) return false;
+    const normTarget = targetName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return availableFontNames.some(f => {
+      const normF = f.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return normF === normTarget || normF.includes(normTarget) || normTarget.includes(normF);
+    });
+  };
+
+  const installedMappingsCount = mappings.filter(m => isFontInstalledOnServer(m.targetFont)).length;
+  const missingMappings = mappings.filter(m => !isFontInstalledOnServer(m.targetFont));
+
   const csvInputRef = useRef<HTMLInputElement>(null);
 
   const handleCsvUpload = (file: File) => {
@@ -370,12 +382,22 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
         const parts = line.split(/[,;\t]/).map(p => p.trim().replace(/^["']|["']$/g, ""));
         if (parts.length >= 2) {
           const shopifyName = parts[0];
-          const targetFont = parts[1].replace(/\.(ttf|otf|woff|woff2)$/i, "");
-          if (shopifyName && targetFont) {
+          let targetFontRaw = parts[1].replace(/\.(ttf|otf|woff|woff2)$/i, "").trim();
+
+          // Cerca se esiste già tra i font installati sul server per fare l'abbinamento esatto
+          const normTarget = targetFontRaw.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const matchedInstalled = availableFontNames.find(f => {
+            const normF = f.toLowerCase().replace(/[^a-z0-9]/g, "");
+            return normF === normTarget || normF.includes(normTarget) || normTarget.includes(normF);
+          });
+
+          const finalTargetFont = matchedInstalled || targetFontRaw;
+
+          if (shopifyName && finalTargetFont) {
             newMappings.push({
               id: Date.now().toString() + "_" + idx,
               shopifyName,
-              targetFont
+              targetFont: finalTargetFont
             });
           }
         }
@@ -449,18 +471,38 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
           <div className="text-lg font-black text-indigo-600">{mappings.length}</div>
         </div>
         <div className="space-y-0.5">
-          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Nomi Shopify Unici</span>
-          <div className="text-lg font-black text-amber-600">
-            {new Set(mappings.map(m => m.shopifyName.toLowerCase())).size}
+          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Mappature Pronte</span>
+          <div className="text-lg font-black text-emerald-600">
+            {installedMappingsCount} / {mappings.length}
           </div>
         </div>
         <div className="space-y-0.5">
-          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Font Server Mappati</span>
-          <div className="text-lg font-black text-emerald-600">
-            {new Set(mappings.map(m => m.targetFont.toLowerCase())).size}
+          <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">Font Mancanti da Caricare</span>
+          <div className={`text-lg font-black ${missingMappings.length > 0 ? "text-rose-600 animate-pulse" : "text-gray-400"}`}>
+            {missingMappings.length}
           </div>
         </div>
       </div>
+
+      {/* BOX AVVISO FONT MANCANTI SUL SERVER */}
+      {missingMappings.length > 0 && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5 text-rose-900 text-xs">
+          <div className="flex items-center gap-1.5 font-extrabold text-rose-800">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>Attenzione: {missingMappings.length} font mappati non risultano ancora caricati sul server!</span>
+          </div>
+          <p className="text-[11px] leading-relaxed text-rose-700">
+            I seguenti font sono stati associati nei titoli Shopify ma manca il relativo file <strong className="font-bold font-mono">.ttf / .otf</strong> nella libreria in alto:
+          </p>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {missingMappings.map(m => (
+              <span key={m.id} className="bg-rose-100 border border-rose-300 text-rose-900 px-2 py-0.5 rounded-md font-mono font-bold text-[10px]">
+                {m.shopifyName} → {m.targetFont} (Mancante)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* FORM AGGIUNTA NUOVA MAPPATURA FONT */}
       <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
@@ -499,47 +541,64 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
         </button>
       </div>
 
-      {/* TABELLA MAPPATURE ESISTENTI */}
+      {/* TABELLA MAPPATURE ESISTENTI CON STATO INSTALLAZIONE */}
       <div className="overflow-hidden border border-gray-200 rounded-xl">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-extrabold text-gray-600 uppercase">
               <th className="py-2.5 px-4">Nome su Shopify</th>
               <th className="py-2.5 px-4">Abbinato a Font Server DTF</th>
+              <th className="py-2.5 px-4">Stato Installazione</th>
               <th className="py-2.5 px-4 text-right">Azione</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-xs">
-            {mappings.map(m => (
-              <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
-                <td className="py-2 px-4 font-mono font-bold text-indigo-900">
-                  <input 
-                    type="text"
-                    value={m.shopifyName}
-                    onChange={e => handleUpdateMapping(m.id, "shopifyName", e.target.value)}
-                    className="px-2 py-1 border border-transparent hover:border-gray-300 focus:border-indigo-500 rounded text-xs font-bold w-full bg-transparent"
-                  />
-                </td>
-                <td className="py-2 px-4 font-bold text-gray-900">
-                  <input 
-                    type="text"
-                    list="fonts-datalist"
-                    value={m.targetFont}
-                    onChange={e => handleUpdateMapping(m.id, "targetFont", e.target.value)}
-                    className="px-2 py-1 border border-transparent hover:border-gray-300 focus:border-indigo-500 rounded text-xs font-bold w-full bg-transparent"
-                  />
-                </td>
-                <td className="py-2 px-4 text-right">
-                  <button
-                    onClick={() => handleDeleteMapping(m.id)}
-                    className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                    title="Elimina Mappatura"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {mappings.map(m => {
+              const installed = isFontInstalledOnServer(m.targetFont);
+              return (
+                <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                  <td className="py-2 px-4 font-mono font-bold text-indigo-900">
+                    <input 
+                      type="text"
+                      value={m.shopifyName}
+                      onChange={e => handleUpdateMapping(m.id, "shopifyName", e.target.value)}
+                      className="px-2 py-1 border border-transparent hover:border-gray-300 focus:border-indigo-500 rounded text-xs font-bold w-full bg-transparent"
+                    />
+                  </td>
+                  <td className="py-2 px-4 font-bold text-gray-900">
+                    <input 
+                      type="text"
+                      list="fonts-datalist"
+                      value={m.targetFont}
+                      onChange={e => handleUpdateMapping(m.id, "targetFont", e.target.value)}
+                      className="px-2 py-1 border border-transparent hover:border-gray-300 focus:border-indigo-500 rounded text-xs font-bold w-full bg-transparent"
+                    />
+                  </td>
+                  <td className="py-2 px-4">
+                    {installed ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        Installato su Server
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200 inline-flex items-center gap-1 animate-pulse">
+                        <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+                        Non installato (Mancante)
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 px-4 text-right">
+                    <button
+                      onClick={() => handleDeleteMapping(m.id)}
+                      className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Elimina Mappatura"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

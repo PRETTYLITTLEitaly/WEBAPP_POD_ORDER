@@ -12,9 +12,13 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
     redirect("/");
   }
 
-  const query = `#graphql
-    query getOrders {
-      orders(first: 100, sortKey: CREATED_AT, reverse: true) {
+  const queryPage1 = `#graphql
+    query getOrdersPage1 {
+      orders(first: 250, sortKey: CREATED_AT, reverse: true) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         nodes {
           id
           name
@@ -46,12 +50,59 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
                 id
                 title
                 featuredImage { url altText }
-                collections(first: 5) {
-                  nodes {
-                    id
-                    title
-                  }
-                }
+                colore_base: metafield(namespace: "custom", key: "colore_base") { value }
+                colore_base_underscore: metafield(namespace: "custom_colore", key: "base") { value }
+                pod_svg_url_custom: metafield(namespace: "custom", key: "pod_svg_url") { value }
+                pod_svg_url_pod: metafield(namespace: "pod", key: "svg_url") { value }
+                pod_svg: metafield(namespace: "pod", key: "svg") { reference { ... on GenericFile { url } ... on MediaImage { image { url } } } }
+              }
+              variant {
+                title
+                sku
+                image { url altText }
+                price
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const queryPage2 = `#graphql
+    query getOrdersPage2($after: String!) {
+      orders(first: 250, after: $after, sortKey: CREATED_AT, reverse: true) {
+        nodes {
+          id
+          name
+          createdAt
+          displayFulfillmentStatus
+          totalPriceSet {
+            shopMoney { amount currencyCode }
+          }
+          tags
+          pod_status: metafield(namespace: "pod", key: "status") { id value }
+          customer {
+            firstName
+            lastName
+          }
+          fulfillments {
+            trackingInfo {
+              number
+              url
+            }
+          }
+          lineItems(first: 10) {
+            nodes {
+              id
+              title
+              quantity
+              originalUnitPriceSet { shopMoney { amount currencyCode } }
+              customAttributes { key value }
+              product {
+                id
+                title
+                featuredImage { url altText }
                 colore_base: metafield(namespace: "custom", key: "colore_base") { value }
                 colore_base_underscore: metafield(namespace: "custom_colore", key: "base") { value }
                 pod_svg_url_custom: metafield(namespace: "custom", key: "pod_svg_url") { value }
@@ -73,10 +124,18 @@ export default async function OrdersPage({ params }: { params: Promise<{ store: 
 
   let orders: any[] = [];
   try {
-    const res = await shopifyFetch({ store: store as "b2b" | "b2c", query });
-    orders = res.data?.orders?.nodes || [];
+    const res1 = await shopifyFetch({ store: store as "b2b" | "b2c", query: queryPage1 });
+    const nodes1 = res1.data?.orders?.nodes || [];
+    const pageInfo = res1.data?.orders?.pageInfo;
+    orders = [...nodes1];
+
+    if (pageInfo?.hasNextPage && pageInfo?.endCursor) {
+      const res2 = await shopifyFetch({ store: store as "b2b" | "b2c", query: queryPage2, variables: { after: pageInfo.endCursor } });
+      const nodes2 = res2.data?.orders?.nodes || [];
+      orders = [...orders, ...nodes2];
+    }
   } catch (error) {
-    console.error(error);
+    console.error("Errore caricamento 500 ordini:", error);
   }
 
   return (

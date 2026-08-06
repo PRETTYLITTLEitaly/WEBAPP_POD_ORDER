@@ -140,21 +140,21 @@ export default function BugFixPage() {
     }
   };
 
-  const handleAddMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessageText.trim() || !selectedTicket) return;
+  const handleAddMessageDirectly = async (overrideTicketId?: string) => {
+    const targetTicketId = overrideTicketId || selectedTicketId || selectedTicket?.id;
+    if (!newMessageText.trim() || !targetTicketId) return;
 
     setSendingMessage(true);
     try {
       const authorRole = isAdmin ? "Admin" : "Operatore";
-      const authorName = currentUser?.email ? currentUser.email.split("@")[0] : "Operatore";
+      const authorName = currentUser?.email ? currentUser.email.split("@")[0] : (isAdmin ? "Admin" : "Operatore");
 
       const res = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "add_message",
-          ticketId: selectedTicket.id,
+          ticketId: targetTicketId,
           message: {
             authorName,
             authorRole,
@@ -167,9 +167,11 @@ export default function BugFixPage() {
       if (data.success) {
         setTickets(data.tickets);
         setNewMessageText("");
+      } else {
+        alert("Errore invio messaggio: " + (data.error || "Impossibile inviare."));
       }
-    } catch (err) {
-      console.error("Errore invio messaggio:", err);
+    } catch (err: any) {
+      alert("Errore di connessione: " + err.message);
     } finally {
       setSendingMessage(false);
     }
@@ -556,23 +558,38 @@ export default function BugFixPage() {
                 </div>
 
                 {/* INPUT AGGIUNTA NUOVO MESSAGGIO */}
-                <form onSubmit={handleAddMessage} className="mt-3 space-y-2">
-                  <div className="relative">
+                <form 
+                  onSubmit={e => {
+                    e.preventDefault();
+                    handleAddMessageDirectly();
+                  }} 
+                  className="mt-3 space-y-2"
+                >
+                  <div className="relative flex flex-col gap-2">
                     <textarea
                       value={newMessageText}
                       onChange={e => setNewMessageText(e.target.value)}
-                      placeholder="Scrivi un messaggio di aggiornamento o risposta..."
-                      rows={2}
-                      className="w-full p-3 border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                      onKeyDown={e => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddMessageDirectly();
+                        }
+                      }}
+                      placeholder="Scrivi una risposta o chiarimento (Premi Invio per inviare)..."
+                      rows={3}
+                      className="w-full p-3 border border-gray-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white resize-none"
                     />
-                    <button
-                      type="submit"
-                      disabled={sendingMessage || !newMessageText.trim()}
-                      className="absolute right-2.5 bottom-2.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>{sendingMessage ? "Invio..." : "Invia Messaggio"}</span>
-                    </button>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleAddMessageDirectly()}
+                        disabled={sendingMessage || !newMessageText.trim()}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>{sendingMessage ? "Invio in corso..." : "Invia Messaggio"}</span>
+                      </button>
+                    </div>
                   </div>
                 </form>
 

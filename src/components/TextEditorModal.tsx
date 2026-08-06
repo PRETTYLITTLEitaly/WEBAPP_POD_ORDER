@@ -1413,222 +1413,253 @@ export default function TextEditorModal({
             <div className="w-full space-y-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between h-full">
             
             {/* SCHEDA 1: TESTO & FONT */}
-            {activeTab === "text" && (
-              <div className="space-y-4">
-                
-                {/* 1. INPUT TESTO PERSONALIZZATO */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-gray-800 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Type className="w-4 h-4 text-amber-600" />
-                      Testo dell'Ordine
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-normal">Modifica parole o spazi</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={text}
-                    onChange={e => setText(e.target.value)}
-                    placeholder="Scrivi qui il testo dell'ordine..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50/50"
-                  />
-                </div>
+            {activeTab === "text" && (() => {
+              const currentLineItem = lineItems[selectedItemIdx] || {};
+              const currentAttrs = currentLineItem.customAttributes || customAttributes || [];
 
-                {/* 2. SELETTORE FONT */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-gray-800 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Type className="w-4 h-4 text-amber-600" />
-                      Tipo di Carattere (Font)
-                    </span>
-                    <span className="text-[10px] text-indigo-600 font-bold">{font}</span>
-                  </label>
-                  <select
-                    value={font}
-                    onChange={e => setFont(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                  >
-                    <option value={font}>-- Font dell'ordine: {font} --</option>
-                    {availableFonts.map(f => (
-                      <option key={f.name} value={f.name}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
+              const rawFontAttr = currentAttrs.find((a: any) => {
+                const k = a.key.toLowerCase();
+                return k.includes("font") && !k.includes("colore") && !k.includes("color") && !a.key.startsWith("_");
+              })?.value || currentLineItem.initialFont || initialFont;
+
+              const rawColorAttr = currentAttrs.find((a: any) => {
+                const k = a.key.toLowerCase();
+                return k.includes("colore") || k.includes("color");
+              })?.value || currentLineItem.initialColor || initialColor;
+
+              return (
+                <div className="space-y-4">
                   
-                  {font && !availableFonts.some(f => f.name.toLowerCase() === font.toLowerCase()) && 
-                    !["outfit", "dancing script", "montserrat"].includes(font.toLowerCase()) && (
-                      <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-1.5 text-amber-800 text-[10px] leading-relaxed">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-extrabold">Font non installato sul server!</span> Il PDF di stampa userà il font di default (Helvetica). Per risolvere, scarica il font sul tuo computer e caricalo in <a href="/settings/fonts" target="_blank" className="underline font-bold text-indigo-700 hover:text-indigo-900">Impostazioni &gt; Font</a>.
-                        </div>
-                      </div>
-                  )}
-                </div>
-
-                {/* 3. DIMENSIONE FONT */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
-                      <ZoomIn className="w-4 h-4 text-amber-600" />
-                      Dimensione Testo
-                    </label>
-                    <span className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                      {fontSize} px
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFontSize(prev => Math.max(8, prev - 1))}
-                      className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-sm flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
-                      title="Diminuisci dimensione"
-                    >
-                      -
-                    </button>
-                    <input 
-                      type="range"
-                      min={12}
-                      max={120}
-                      value={fontSize}
-                      onChange={e => setFontSize(parseInt(e.target.value, 10))}
-                      className="flex-1 accent-amber-600 cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFontSize(prev => Math.min(200, prev + 1))}
-                      className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-sm flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
-                      title="Aumenta dimensione"
-                    >
-                      +
-                    </button>
-                    <input 
-                      type="number"
-                      min={8}
-                      max={200}
-                      value={fontSize}
-                      onChange={e => setFontSize(parseInt(e.target.value, 10) || 12)}
-                      className="w-14 px-1.5 py-1 border border-gray-300 rounded-lg text-xs font-mono font-bold text-center"
-                    />
-                  </div>
-                </div>
-
-                {/* 4. COLORE DEL FONT */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
-                    <Palette className="w-4 h-4 text-amber-600" />
-                    Colore Scritta
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="color"
-                      value={color}
-                      onChange={e => setColor(e.target.value)}
-                      className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5 bg-white shrink-0"
-                    />
-                    <div className="flex items-center gap-1.5 overflow-x-auto max-w-full p-1 bg-gray-50 rounded-xl border border-gray-200 py-1.5">
-                      {getColorPresets().map(c => (
-                        <button
-                          key={c.id || c.name}
-                          type="button"
-                          onClick={() => setColor(c.hex)}
-                          className={`w-6 h-6 rounded-full border transition-all shrink-0 cursor-pointer ${
-                            color.toLowerCase() === c.hex.toLowerCase() ? "scale-125 border-amber-600 ring-2 ring-amber-400 z-10" : "border-gray-300 hover:scale-110"
-                          }`}
-                          style={{ backgroundColor: c.hex }}
-                          title={`${c.name} (${c.hex})`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. INTERLINEA E SPESSORE */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* INTERLINEA */}
+                  {/* 1. INPUT TESTO PERSONALIZZATO */}
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
-                        <List className="w-4 h-4 text-amber-600" />
-                        Interlinea
-                      </label>
-                      <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                        {lineHeight}
+                    <label className="text-xs font-extrabold text-gray-800 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Type className="w-4 h-4 text-amber-600" />
+                        Testo dell'Ordine
                       </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setLineHeight(prev => Number(Math.max(0.8, prev - 0.05).toFixed(2)))}
-                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
-                        title="Diminuisci interlinea"
-                      >
-                        -
-                      </button>
-                      <input 
-                        type="range"
-                        min={0.8}
-                        max={2.5}
-                        step={0.05}
-                        value={lineHeight}
-                        onChange={e => setLineHeight(parseFloat(e.target.value))}
-                        className="w-full accent-amber-600 cursor-pointer min-w-0"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setLineHeight(prev => Number(Math.min(2.5, prev + 0.05).toFixed(2)))}
-                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
-                        title="Aumenta interlinea"
-                      >
-                        +
-                      </button>
-                    </div>
+                      <span className="text-[10px] text-gray-400 font-normal">Modifica parole o spazi</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={text}
+                      onChange={e => setText(e.target.value)}
+                      placeholder="Scrivi qui il testo dell'ordine..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 bg-gray-50/50"
+                    />
                   </div>
 
-                  {/* SPESSORE SCRITTA */}
+                  {/* 2. SELETTORE FONT CON EVIDENZIAZIONE SCELTA CLIENTE */}
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
                         <Type className="w-4 h-4 text-amber-600" />
-                        Spessore Scritta
+                        Tipo di Carattere (Font)
                       </label>
-                      <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                        +{strokeWidth} px
+                      {rawFontAttr && (
+                        <span className="text-[11px] font-black text-indigo-900 bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-300 shadow-2xs flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          Scelta Cliente: <span className="underline font-black text-xs uppercase">{rawFontAttr}</span>
+                        </span>
+                      )}
+                    </div>
+                    <select
+                      value={font}
+                      onChange={e => setFont(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                    >
+                      <option value={font}>-- Font dell'ordine: {font} --</option>
+                      {availableFonts.map(f => (
+                        <option key={f.name} value={f.name}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                    
+                    {font && !availableFonts.some(f => f.name.toLowerCase() === font.toLowerCase()) && 
+                      !["outfit", "dancing script", "montserrat"].includes(font.toLowerCase()) && (
+                        <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-1.5 text-amber-800 text-[10px] leading-relaxed">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-extrabold">Font non installato sul server!</span> Il PDF di stampa userà il font di default (Helvetica). Per risolvere, scarica il font sul tuo computer e caricalo in <a href="/settings/fonts" target="_blank" className="underline font-bold text-indigo-700 hover:text-indigo-900">Impostazioni &gt; Font</a>.
+                          </div>
+                        </div>
+                    )}
+                  </div>
+
+                  {/* 3. DIMENSIONE FONT */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                        <ZoomIn className="w-4 h-4 text-amber-600" />
+                        Dimensione Testo
+                      </label>
+                      <span className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        {fontSize} px
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setStrokeWidth(prev => Math.max(0, prev - 0.5))}
-                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
-                        title="Diminuisci spessore"
+                        onClick={() => setFontSize(prev => Math.max(8, prev - 1))}
+                        className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-sm flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                        title="Diminuisci dimensione"
                       >
                         -
                       </button>
                       <input 
                         type="range"
-                        min={0}
-                        max={8}
-                        step={0.5}
-                        value={strokeWidth}
-                        onChange={e => setStrokeWidth(parseFloat(e.target.value))}
-                        className="w-full accent-amber-600 cursor-pointer min-w-0"
+                        min={12}
+                        max={120}
+                        value={fontSize}
+                        onChange={e => setFontSize(parseInt(e.target.value, 10))}
+                        className="flex-1 accent-amber-600 cursor-pointer"
                       />
                       <button
                         type="button"
-                        onClick={() => setStrokeWidth(prev => Math.min(8, prev + 0.5))}
-                        className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
-                        title="Aumenta spessore"
+                        onClick={() => setFontSize(prev => Math.min(200, prev + 1))}
+                        className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-sm flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                        title="Aumenta dimensione"
                       >
                         +
                       </button>
+                      <input 
+                        type="number"
+                        min={8}
+                        max={200}
+                        value={fontSize}
+                        onChange={e => setFontSize(parseInt(e.target.value, 10) || 12)}
+                        className="w-14 px-1.5 py-1 border border-gray-300 rounded-lg text-xs font-mono font-bold text-center"
+                      />
                     </div>
                   </div>
-                </div>
 
-              </div>
-            )}
+                  {/* 4. COLORE DEL FONT CON EVIDENZIAZIONE SCELTA CLIENTE */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                        <Palette className="w-4 h-4 text-amber-600" />
+                        Colore Scritta
+                      </label>
+                      {rawColorAttr && (
+                        <span className="text-[11px] font-black text-amber-950 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs flex items-center gap-1.5">
+                          <span 
+                            className="w-3.5 h-3.5 rounded-full border border-black/30 shadow-xs shrink-0" 
+                            style={{ backgroundColor: resolveColorHex(rawColorAttr) }} 
+                          />
+                          Scelta Cliente: <span className="underline font-black text-xs uppercase">{rawColorAttr}</span> ({resolveColorHex(rawColorAttr)})
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="color"
+                        value={color}
+                        onChange={e => setColor(e.target.value)}
+                        className="w-9 h-9 rounded-lg border border-gray-300 cursor-pointer p-0.5 bg-white shrink-0"
+                      />
+                      <div className="flex items-center gap-1.5 overflow-x-auto max-w-full p-1 bg-gray-50 rounded-xl border border-gray-200 py-1.5">
+                        {getColorPresets().map(c => (
+                          <button
+                            key={c.id || c.name}
+                            type="button"
+                            onClick={() => setColor(c.hex)}
+                            className={`w-6 h-6 rounded-full border transition-all shrink-0 cursor-pointer ${
+                              color.toLowerCase() === c.hex.toLowerCase() ? "scale-125 border-amber-600 ring-2 ring-amber-400 z-10" : "border-gray-300 hover:scale-110"
+                            }`}
+                            style={{ backgroundColor: c.hex }}
+                            title={`${c.name} (${c.hex})`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. INTERLINEA E SPESSORE */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* INTERLINEA */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                          <List className="w-4 h-4 text-amber-600" />
+                          Interlinea
+                        </label>
+                        <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          {lineHeight}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setLineHeight(prev => Number(Math.max(0.8, prev - 0.05).toFixed(2)))}
+                          className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                          title="Diminuisci interlinea"
+                        >
+                          -
+                        </button>
+                        <input 
+                          type="range"
+                          min={0.8}
+                          max={2.5}
+                          step={0.05}
+                          value={lineHeight}
+                          onChange={e => setLineHeight(parseFloat(e.target.value))}
+                          className="w-full accent-amber-600 cursor-pointer min-w-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setLineHeight(prev => Number(Math.min(2.5, prev + 0.05).toFixed(2)))}
+                          className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                          title="Aumenta interlinea"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* SPESSORE SCRITTA */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-extrabold text-gray-800 flex items-center gap-1.5">
+                          <Type className="w-4 h-4 text-amber-600" />
+                          Spessore Scritta
+                        </label>
+                        <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          +{strokeWidth} px
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setStrokeWidth(prev => Math.max(0, prev - 0.5))}
+                          className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                          title="Diminuisci spessore"
+                        >
+                          -
+                        </button>
+                        <input 
+                          type="range"
+                          min={0}
+                          max={8}
+                          step={0.5}
+                          value={strokeWidth}
+                          onChange={e => setStrokeWidth(parseFloat(e.target.value))}
+                          className="w-full accent-amber-600 cursor-pointer min-w-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setStrokeWidth(prev => Math.min(8, prev + 0.5))}
+                          className="w-6 h-6 rounded-lg bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 font-extrabold text-xs flex items-center justify-center border border-gray-200 transition-all shrink-0 select-none active:scale-95"
+                          title="Aumenta spessore"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })()}
 
             {/* SCHEDA 2: REMOVE BG & VETTORIALIZZA IMMAGINE HD */}
             {activeTab === "image" && (

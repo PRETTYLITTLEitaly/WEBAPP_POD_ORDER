@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Pencil, Sliders, CheckSquare, Eye, FileText, X, Package, XSquare } from "lucide-react";
-import { getPresets, PrintPreset } from "@/lib/presetStore";
+import { getPresets, PrintPreset, resolveColorHex } from "@/lib/presetStore";
 import TextEditorModal from "@/components/TextEditorModal";
 
 interface SavedView {
@@ -275,20 +275,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
 
         // 4. Estrazione Colore
         if (k.includes("colore") || k.includes("color")) {
-          if (v.startsWith("#")) {
-            foundColor = v;
-          } else {
-            const lowerColor = v.toLowerCase();
-            if (lowerColor.includes("celeste") || lowerColor.includes("azzurro")) foundColor = "#38bdf8";
-            else if (lowerColor.includes("tiffany")) foundColor = "#0d9488";
-            else if (lowerColor.includes("bianco")) foundColor = "#ffffff";
-            else if (lowerColor.includes("nero")) foundColor = "#000000";
-            else if (lowerColor.includes("oro") || lowerColor.includes("giallo")) foundColor = "#d97706";
-            else if (lowerColor.includes("rosso")) foundColor = "#dc2626";
-            else if (lowerColor.includes("rosa")) foundColor = "#ec4899";
-            else if (lowerColor.includes("verde")) foundColor = "#16a34a";
-            else if (lowerColor.includes("blu")) foundColor = "#2563eb";
-          }
+          foundColor = resolveColorHex(v);
         }
 
         // 5. URL Immagine / Anteprima / Vedi ora / Carica file

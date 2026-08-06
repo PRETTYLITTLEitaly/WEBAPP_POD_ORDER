@@ -19,6 +19,7 @@ interface FontItem {
 export default function FontLibraryPage() {
   const [fonts, setFonts] = useState<FontItem[]>([]);
   const [fontSearchQuery, setFontSearchQuery] = useState("");
+  const [aliasFilter, setAliasFilter] = useState<"all" | "with_alias" | "without_alias">("all");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [previewText, setPreviewText] = useState("Giulia & Riccardo 26.09.2026");
@@ -243,33 +244,111 @@ export default function FontLibraryPage() {
 
       {/* ELENCO DEI FONT CARICATI */}
       {(() => {
+        const fontMappings = getFontMappings();
+
+        const getFontShopifyAlias = (font: FontItem) => {
+          const normF = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const normFile = font.filename.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+
+          const match = fontMappings.find(m => {
+            const normTarget = m.targetFont.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+            return normTarget === normF || normTarget === normFile || (normTarget.length >= 4 && (normF.startsWith(normTarget) || normFile.startsWith(normTarget)));
+          });
+
+          return match ? match.shopifyName : null;
+        };
+
+        const fontsWithAliasCount = fonts.filter(f => getFontShopifyAlias(f) !== null).length;
+        const fontsWithoutAliasCount = fonts.filter(f => getFontShopifyAlias(f) === null).length;
+
         const filteredInstalledFonts = fonts.filter(font => {
-          if (!fontSearchQuery.trim()) return true;
-          const q = fontSearchQuery.toLowerCase();
-          const fontMappings = getFontMappings();
-          const mappedShopifyName = fontMappings.find(m => {
-            const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
-            const normF = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-            return normTarget === normF || normF.includes(normTarget) || normTarget.includes(normF);
-          })?.shopifyName;
+          const alias = getFontShopifyAlias(font);
 
-          const matchName = font.name.toLowerCase().includes(q);
-          const matchFile = font.filename.toLowerCase().includes(q);
-          const matchShopify = mappedShopifyName ? mappedShopifyName.toLowerCase().includes(q) : false;
+          if (aliasFilter === "with_alias" && !alias) return false;
+          if (aliasFilter === "without_alias" && alias) return false;
 
-          return matchName || matchFile || matchShopify;
+          if (fontSearchQuery.trim()) {
+            const q = fontSearchQuery.toLowerCase();
+            const matchName = font.name.toLowerCase().includes(q);
+            const matchFile = font.filename.toLowerCase().includes(q);
+            const matchShopify = alias ? alias.toLowerCase().includes(q) : false;
+            return matchName || matchFile || matchShopify;
+          }
+
+          return true;
         });
 
         return (
           <div className="space-y-3">
-            {/* BARRA RICERCA FONT IN ALTO */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
-              <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                <Type className="w-5 h-5 text-indigo-600" />
-                Font Installati ({filteredInstalledFonts.length} / {fonts.length})
-              </h2>
+            {/* BARRA RICERCA FONT E PULSANTI FILTRO */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                  <Type className="w-5 h-5 text-indigo-600" />
+                  Font Installati ({filteredInstalledFonts.length} / {fonts.length})
+                </h2>
 
-              <div className="relative w-full sm:w-80">
+                {/* FILTRI PULSANTI: CON SHOPIFY ALIAS / SENZA SHOPIFY ALIAS / RESET */}
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-bold flex-wrap">
+                  <button
+                    onClick={() => setAliasFilter("all")}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      aliasFilter === "all"
+                        ? "bg-white text-gray-900 shadow-xs"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Tutti ({fonts.length})
+                  </button>
+
+                  <button
+                    onClick={() => setAliasFilter("with_alias")}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                      aliasFilter === "with_alias"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "text-emerald-700 hover:bg-emerald-50"
+                    }`}
+                  >
+                    <span>Con Shopify Alias</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      aliasFilter === "with_alias" ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"
+                    }`}>
+                      {fontsWithAliasCount}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setAliasFilter("without_alias")}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                      aliasFilter === "without_alias"
+                        ? "bg-rose-600 text-white shadow-xs"
+                        : "text-rose-700 hover:bg-rose-50"
+                    }`}
+                  >
+                    <span>Senza Shopify Alias</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      aliasFilter === "without_alias" ? "bg-rose-700 text-white" : "bg-rose-100 text-rose-800"
+                    }`}>
+                      {fontsWithoutAliasCount}
+                    </span>
+                  </button>
+
+                  {(aliasFilter !== "all" || fontSearchQuery) && (
+                    <button
+                      onClick={() => {
+                        setAliasFilter("all");
+                        setFontSearchQuery("");
+                      }}
+                      className="px-2.5 py-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-all text-[11px] underline"
+                      title="Deseleziona tutti i filtri"
+                    >
+                      Reset Filtri ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative w-full md:w-72 shrink-0">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
                 <input 
                   type="text"

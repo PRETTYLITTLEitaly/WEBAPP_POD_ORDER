@@ -200,6 +200,26 @@ export default function TextEditorModal({
   const [canvasBgColor, setCanvasBgColor] = useState("#ffffff");
   const [isDropperActive, setIsDropperActive] = useState(false);
 
+  // Per-item state map to preserve user edits across item switches in multi-item orders
+  const [itemsState, setItemsState] = useState<Record<number, {
+    text: string;
+    font: string;
+    color: string;
+    fontSize: number;
+    letterSpacing: number;
+    lineHeight: number;
+    strokeWidth: number;
+    graphicWidth: number;
+    graphicHeight: number;
+    processedImageUrl: string | null;
+    isRemoveBgApplied: boolean;
+    isVectorized: boolean;
+    vectorSvgContent: string | null;
+    currentImageUrl: string;
+    activeTab: "text" | "image";
+  }>>({});
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+
   useEffect(() => {
     setText(initialText);
     setFont(initialFont || "Get Show");
@@ -240,6 +260,8 @@ export default function TextEditorModal({
     setAspectRatio(savedW / savedH);
 
     setSavedItemIndices([]);
+    setItemsState({});
+    setSaveNotice(null);
 
     if (lineItems && lineItems.length > 0 && lineItems[0]) {
       const item = lineItems[0];
@@ -259,21 +281,65 @@ export default function TextEditorModal({
   }, [open, initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, customAttributes, lineItems]);
 
   const handleSelectLineItem = (idx: number) => {
+    if (idx === selectedItemIdx) return;
+
+    // Preserva lo stato modificato dell'articolo corrente nel dizionario prima dello switch
+    setItemsState(prev => ({
+      ...prev,
+      [selectedItemIdx]: {
+        text,
+        font,
+        color,
+        fontSize,
+        letterSpacing,
+        lineHeight,
+        strokeWidth,
+        graphicWidth,
+        graphicHeight,
+        processedImageUrl,
+        isRemoveBgApplied,
+        isVectorized,
+        vectorSvgContent,
+        currentImageUrl,
+        activeTab
+      }
+    }));
+
     setSelectedItemIdx(idx);
     const item = lineItems[idx];
     if (!item) return;
 
-    setText(item.initialText !== undefined ? item.initialText : "");
-    setFont(item.initialFont || "Get Show");
-    setColor(item.initialColor || "#38bdf8");
-    setFontSize(item.initialFontSize || 32);
+    // Se l'articolo ha già modifiche salvate localmente, ricarica esattamente quelle
+    if (itemsState[idx]) {
+      const s = itemsState[idx];
+      setText(s.text);
+      setFont(s.font);
+      setColor(s.color);
+      setFontSize(s.fontSize);
+      setLetterSpacing(s.letterSpacing);
+      setLineHeight(s.lineHeight);
+      setStrokeWidth(s.strokeWidth);
+      setGraphicWidth(s.graphicWidth);
+      setGraphicHeight(s.graphicHeight);
+      setProcessedImageUrl(s.processedImageUrl);
+      setIsRemoveBgApplied(s.isRemoveBgApplied);
+      setIsVectorized(s.isVectorized);
+      setVectorSvgContent(s.vectorSvgContent);
+      setCurrentImageUrl(s.currentImageUrl);
+      setActiveTab(s.activeTab);
+    } else {
+      setText(item.initialText !== undefined ? item.initialText : "");
+      setFont(item.initialFont || "Get Show");
+      setColor(item.initialColor || "#38bdf8");
+      setFontSize(item.initialFontSize || 32);
 
-    const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
-    setCurrentImageUrl(imgUrl || "");
-    setProcessedImageUrl(null);
-    setIsRemoveBgApplied(false);
-    setIsVectorized(false);
-    setVectorSvgContent(null);
+      const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
+      setCurrentImageUrl(imgUrl || "");
+      setProcessedImageUrl(null);
+      setIsRemoveBgApplied(false);
+      setIsVectorized(false);
+      setVectorSvgContent(null);
+    }
   };
 
   // Helper to generate a tight fitting SVG for text to keep the bounds accurate
@@ -628,7 +694,7 @@ export default function TextEditorModal({
   };
 
   // CONFERMA E SALVA LA GRAFICA PER LA STAMPA DTF
-  const handleConfirmSave = async () => {
+  const handleConfirmSave = async (closeModalAfter = false) => {
     setIsSaving(true);
 
     let finalGraphicToSave = "";
@@ -676,24 +742,43 @@ export default function TextEditorModal({
       });
     }
 
+    // Aggiunge l'indice del prodotto salvato e aggiorna il dizionario di stato
     const updatedSaved = Array.from(new Set([...savedItemIndices, selectedItemIdx]));
     setSavedItemIndices(updatedSaved);
 
-    const totalCount = lineItems.length || 1;
-    setTimeout(() => {
-      setIsSaving(false);
-      if (totalCount > 1 && updatedSaved.length < totalCount) {
-        // Switch to next unsaved item if available
-        const nextUnsavedIdx = lineItems.findIndex((_, i) => !updatedSaved.includes(i));
-        if (nextUnsavedIdx !== -1) {
-          handleSelectLineItem(nextUnsavedIdx);
-        }
-        alert(`✓ Grafica per il Prodotto #${selectedItemIdx + 1} salvata!\n\nAttenzione: Mancano ancora ${totalCount - updatedSaved.length} prodotti personalizzati da completare nell'ordine. Seleziona l'icona del prossimo prodotto in alto.`);
-      } else {
-        alert(`✓ Tutte le grafiche dell'ordine (${totalCount}/${totalCount}) sono state salvate con successo!`);
-        onClose();
+    setItemsState(prev => ({
+      ...prev,
+      [selectedItemIdx]: {
+        text,
+        font,
+        color,
+        fontSize,
+        letterSpacing,
+        lineHeight,
+        strokeWidth,
+        graphicWidth,
+        graphicHeight,
+        processedImageUrl,
+        isRemoveBgApplied,
+        isVectorized,
+        vectorSvgContent,
+        currentImageUrl,
+        activeTab
       }
-    }, 400);
+    }));
+
+    setIsSaving(false);
+
+    // Mostra banner di notifica di conferma salvataggio senza uscire
+    setSaveNotice(`✓ Grafica per il Prodotto #${selectedItemIdx + 1} salvata con successo!`);
+    setTimeout(() => setSaveNotice(null), 3500);
+
+    const totalCount = lineItems.length || 1;
+
+    // Chiudi il modale solo se richiesto esplicitamente o se l'ordine ha un solo prodotto
+    if (closeModalAfter || (totalCount <= 1)) {
+      onClose();
+    }
   };
 
   if (!open) return null;
@@ -821,6 +906,23 @@ export default function TextEditorModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* BANNER DI NOTIFICA SALVATAGGIO SINGOLO PRODOTTO */}
+        {saveNotice && (
+          <div className="bg-emerald-600 text-white px-6 py-2.5 text-xs font-extrabold flex items-center justify-between shadow-md animate-in slide-in-from-top duration-200 shrink-0">
+            <span className="flex items-center gap-2">
+              <Check className="w-4 h-4 stroke-[3]" />
+              {saveNotice}
+            </span>
+            <button 
+              type="button"
+              onClick={() => setSaveNotice(null)} 
+              className="text-emerald-200 hover:text-white text-xs font-bold px-2 py-0.5 rounded bg-emerald-700/50"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* CONTROLLO MULTI-ARTICOLI CON ICONE ANTEPRIMA E BORDO VERDE AL SALVATAGGIO */}
         {lineItems.length > 1 && (
@@ -1602,22 +1704,51 @@ export default function TextEditorModal({
               </div>
             )}
 
-            {/* BOTTONI CONFERMA */}
-            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3 mt-4">
+            {/* BOTTONI CONFERMA SALVATAGGIO */}
+            <div className="pt-4 border-t border-gray-100 flex items-center justify-between gap-2 mt-4 flex-wrap">
               <button
-                onClick={onClose}
-                className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={handleConfirmSave}
+                type="button"
+                onClick={() => handleConfirmSave(false)}
                 disabled={isSaving}
-                className="px-5 py-2.5 text-xs font-extrabold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                className={`px-4 py-2.5 text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center gap-1.5 ${
+                  savedItemIndices.includes(selectedItemIdx)
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    : "bg-amber-600 hover:bg-amber-700 text-white"
+                } disabled:opacity-50`}
               >
                 <Save className={`w-4 h-4 ${isSaving ? "animate-spin" : ""}`} />
-                <span>{isSaving ? "Salvataggio..." : "Conferma Grafica & Salva per Stampa"}</span>
+                <span>
+                  {isSaving 
+                    ? "Salvataggio..." 
+                    : savedItemIndices.includes(selectedItemIdx)
+                      ? `✓ Modifica Salvata (Prodotto #${selectedItemIdx + 1})`
+                      : lineItems.length > 1
+                        ? `💾 Salva Grafica Prodotto #${selectedItemIdx + 1}`
+                        : "Conferma Grafica & Salva per Stampa"
+                  }
+                </span>
               </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
+                >
+                  Chiudi
+                </button>
+                {lineItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmSave(true)}
+                    disabled={isSaving}
+                    className="px-4 py-2.5 text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Concludi & Salva Tutti</span>
+                  </button>
+                )}
+              </div>
             </div>
             </div>
           </div>

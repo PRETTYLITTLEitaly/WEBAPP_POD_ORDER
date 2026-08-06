@@ -1760,29 +1760,39 @@ export default function TextEditorModal({
               </div>
             )}
 
-            {/* ATTRIBUTI DETTAGLIATI ORDINE */}
-            {customAttributes.length > 0 && (
-              <div className="pt-2 border-t border-gray-100">
-                <button
-                  onClick={() => setShowAttributes(!showAttributes)}
-                  className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
-                >
-                  <List className="w-3.5 h-3.5" />
-                  {showAttributes ? "Nascondi attributi dell'ordine" : `Mostra tutti i ${customAttributes.length} attributi dell'ordine`}
-                </button>
+            {/* ATTRIBUTI DETTAGLIATI ORDINE SPECIFICI PER L'ARTICOLO SELEZIONATO */}
+            {(() => {
+              const currentItem = lineItems[selectedItemIdx] || {};
+              const activeAttrs = (currentItem.customAttributes && currentItem.customAttributes.length > 0)
+                ? currentItem.customAttributes
+                : customAttributes;
 
-                {showAttributes && (
-                  <div className="mt-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-[11px] font-mono space-y-1 max-h-36 overflow-y-auto">
-                    {customAttributes.map((attr: any, idx: number) => (
-                      <div key={idx} className="flex justify-between gap-2 border-b border-gray-100 pb-0.5">
-                        <span className="font-bold text-gray-700">{attr.key}:</span>
-                        <span className="text-gray-900 truncate max-w-[200px]">{attr.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+              if (!activeAttrs || activeAttrs.length === 0) return null;
+
+              return (
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttributes(!showAttributes)}
+                    className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    {showAttributes ? "Nascondi attributi dell'articolo" : `Mostra tutti i ${activeAttrs.length} attributi dell'articolo #${selectedItemIdx + 1}`}
+                  </button>
+
+                  {showAttributes && (
+                    <div className="mt-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200 text-[11px] font-mono space-y-1 max-h-36 overflow-y-auto">
+                      {activeAttrs.map((attr: any, idx: number) => (
+                        <div key={idx} className="flex justify-between gap-2 border-b border-gray-100 pb-0.5">
+                          <span className="font-bold text-gray-700">{attr.key}:</span>
+                          <span className="text-gray-900 truncate max-w-[200px]">{attr.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* BOTTONI CONFERMA SALVATAGGIO */}
             <div className="pt-4 border-t border-gray-100 flex items-center justify-between gap-2 mt-4 flex-wrap">

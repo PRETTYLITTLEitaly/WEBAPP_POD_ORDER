@@ -313,10 +313,10 @@ export default function FontLibraryPage() {
                   >
                     <Trash2 className="w-4 h-4" />
                     <span>Elimina</span>
-                  </button>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         )}
       </div>

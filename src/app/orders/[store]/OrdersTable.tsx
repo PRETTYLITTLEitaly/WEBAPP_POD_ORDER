@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Pencil, Sliders, CheckSquare, Eye, FileText, X, Package, XSquare } from "lucide-react";
-import { getPresets, PrintPreset, resolveColorHex } from "@/lib/presetStore";
+import { getPresets, PrintPreset, resolveColorHex, extractTextFontAndColorFromAttrs } from "@/lib/presetStore";
 import TextEditorModal from "@/components/TextEditorModal";
 
 interface SavedView {
@@ -297,6 +297,10 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         }
       });
 
+      const fontAndColor = extractTextFontAndColorFromAttrs(attrs);
+      if (fontAndColor.font) foundFont = fontAndColor.font;
+      if (fontAndColor.color) foundColor = fontAndColor.color;
+
       const baseItem = {
         id: item.id,
         title: item.title || "Prodotto Personalizzato",
@@ -305,7 +309,7 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
         displayImage: displayImage || foundImage,
         initialText: foundText || "",
         initialFont: foundFont || "Get Show",
-        initialColor: foundColor || "#38bdf8",
+        initialColor: foundColor || "#000000",
         initialFontSize: foundFontSize || 32,
         backgroundUrl: foundImage || displayImage,
         uploadedImageUrl: foundUploadedImage,

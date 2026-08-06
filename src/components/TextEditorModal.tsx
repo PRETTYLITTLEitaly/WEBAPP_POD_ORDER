@@ -27,7 +27,7 @@ import {
   Upload,
   AlertCircle
 } from "lucide-react";
-import { getProductGraphicPresets, ProductGraphicPreset, getColorPresets, resolveColorHex } from "@/lib/presetStore";
+import { getProductGraphicPresets, ProductGraphicPreset, getColorPresets, resolveColorHex, extractTextFontAndColorFromAttrs } from "@/lib/presetStore";
 
 interface TextEditorModalProps {
   open: boolean;
@@ -1417,15 +1417,9 @@ export default function TextEditorModal({
               const currentLineItem = lineItems[selectedItemIdx] || {};
               const currentAttrs = currentLineItem.customAttributes || customAttributes || [];
 
-              const rawFontAttr = currentAttrs.find((a: any) => {
-                const k = a.key.toLowerCase();
-                return k.includes("font") && !k.includes("colore") && !k.includes("color") && !a.key.startsWith("_");
-              })?.value || currentLineItem.initialFont || initialFont;
-
-              const rawColorAttr = currentAttrs.find((a: any) => {
-                const k = a.key.toLowerCase();
-                return k.includes("colore") || k.includes("color");
-              })?.value || currentLineItem.initialColor || initialColor;
+              const extracted = extractTextFontAndColorFromAttrs(currentAttrs);
+              const rawFontAttr = extracted.font || currentLineItem.initialFont || initialFont;
+              const rawColorAttr = extracted.colorName || currentLineItem.initialColor || initialColor;
 
               return (
                 <div className="space-y-4">

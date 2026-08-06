@@ -190,3 +190,67 @@ export function resolveColorHex(inputColorNameOrHex: string): string {
   return "#000000";
 }
 
+// Estrattore di precisione per il Font e il Colore del Testo dagli attributi dell'ordine
+export function extractTextFontAndColorFromAttrs(attrs: any[]) {
+  if (!attrs || !Array.isArray(attrs)) return { font: null, color: null, colorName: null };
+
+  let foundFont: string | null = null;
+  let foundColorName: string | null = null;
+
+  // 1. Cerca il colore specifico del testo: "Scegli il colore", "Colore testo", "Colore scritta", "Colore font"
+  const specificColorAttr = attrs.find((a: any) => {
+    const k = (a.key || "").toLowerCase();
+    return (k.includes("scegli") && k.includes("color")) || 
+           k.includes("colore testo") || 
+           k.includes("colore scritta") || 
+           k.includes("colore font") ||
+           k.includes("colore_testo") ||
+           k.includes("colore_scritta");
+  });
+
+  if (specificColorAttr && specificColorAttr.value) {
+    foundColorName = String(specificColorAttr.value).trim();
+  }
+
+  // 2. Cerca l'attributo Font: "Scegli il font", "Font", ecc.
+  const fontAttrIdx = attrs.findIndex((a: any) => {
+    const k = (a.key || "").toLowerCase();
+    return k.includes("font") && !k.includes("colore") && !k.includes("color") && !a.key.startsWith("_");
+  });
+
+  if (fontAttrIdx !== -1) {
+    foundFont = String(attrs[fontAttrIdx].value || "").trim();
+
+    // Se il colore non è stato ancora trovato con una chiave specifica, controlla l'attributo immediatamente successivo a "Scegli il font"
+    if (!foundColorName && fontAttrIdx + 1 < attrs.length) {
+      const nextAttr = attrs[fontAttrIdx + 1];
+      const nextK = (nextAttr.key || "").toLowerCase();
+      if (nextK.includes("color") || nextK.includes("colore")) {
+        foundColorName = String(nextAttr.value || "").trim();
+      }
+    }
+  }
+
+  // 3. Fallback se ancora non trovato: cerca chiavi che contengono "colore" ma escludi il semplice "Colore:" di prodotto se c'è un'altra opzione
+  if (!foundColorName) {
+    const fallbackColorAttr = attrs.find((a: any) => {
+      const k = (a.key || "").toLowerCase().trim();
+      return (k.includes("colore") || k.includes("color")) && k !== "colore";
+    }) || attrs.find((a: any) => {
+      const k = (a.key || "").toLowerCase().trim();
+      return k.includes("colore") || k.includes("color");
+    });
+
+    if (fallbackColorAttr && fallbackColorAttr.value) {
+      foundColorName = String(fallbackColorAttr.value).trim();
+    }
+  }
+
+  return {
+    font: foundFont,
+    colorName: foundColorName,
+    color: foundColorName ? resolveColorHex(foundColorName) : null
+  };
+}
+
+

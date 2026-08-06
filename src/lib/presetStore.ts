@@ -286,9 +286,29 @@ export function getFontMappings(): FontMapping[] {
   }
 }
 
+export async function syncFontMappingsFromServer(): Promise<FontMapping[]> {
+  if (typeof window === "undefined") return DEFAULT_FONT_MAPPINGS;
+  try {
+    const res = await fetch("/api/fonts/mappings");
+    const data = await res.json();
+    if (data.success && Array.isArray(data.mappings) && data.mappings.length > 0) {
+      localStorage.setItem(FONT_MAPPINGS_KEY, JSON.stringify(data.mappings));
+      return data.mappings;
+    }
+  } catch (e) {}
+  return getFontMappings();
+}
+
 export function saveFontMappings(mappings: FontMapping[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(FONT_MAPPINGS_KEY, JSON.stringify(mappings));
+  try {
+    fetch("/api/fonts/mappings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mappings })
+    });
+  } catch (e) {}
 }
 
 // Risolve automaticamente un nome font da Shopify (es. "Save") al font reale installato sul server DTF (es. "Outfit")

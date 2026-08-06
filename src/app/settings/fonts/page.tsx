@@ -3,8 +3,8 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useRef } from "react";
-import { Type, Upload, Trash2, CheckCircle2, AlertCircle, RefreshCw, Sliders } from "lucide-react";
-import { FontMapping, getFontMappings, saveFontMappings } from "@/lib/presetStore";
+import { Type, Upload, Trash2, CheckCircle2, AlertCircle, RefreshCw, Sliders, Save } from "lucide-react";
+import { FontMapping, getFontMappings, saveFontMappings, syncFontMappingsFromServer } from "@/lib/presetStore";
 
 interface FontItem {
   id: string;
@@ -256,22 +256,39 @@ export default function FontLibraryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {fonts.map(font => (
-              <div 
-                key={font.id}
-                className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:border-gray-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                {/* Meta Info */}
-                <div className="space-y-1 shrink-0 md:w-56">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-gray-900 text-base">{font.name}</h3>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800">
-                      {font.format}
-                    </span>
+            {fonts.map(font => {
+              const fontMappings = getFontMappings();
+              const mappedShopifyName = fontMappings.find(m => {
+                const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
+                const normF = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                return normTarget === normF || normF.includes(normTarget) || normTarget.includes(normF);
+              })?.shopifyName;
+
+              return (
+                <div 
+                  key={font.id}
+                  className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:border-gray-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  {/* Meta Info */}
+                  <div className="space-y-1 shrink-0 md:w-64">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-extrabold text-indigo-950 text-base">
+                        {mappedShopifyName || font.name}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800">
+                        {font.format}
+                      </span>
+                      {mappedShopifyName && (
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                          Nome Shopify
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 font-mono truncate">
+                      File Server: <strong className="font-semibold text-gray-700">{font.filename}</strong>
+                    </div>
+                    <div className="text-[11px] text-gray-400 font-medium">Dimensione: {formatFileSize(font.sizeBytes)}</div>
                   </div>
-                  <div className="text-xs text-gray-400 font-mono truncate">{font.filename}</div>
-                  <div className="text-[11px] text-gray-500 font-medium">Dimensione: {formatFileSize(font.sizeBytes)}</div>
-                </div>
 
                 {/* Live Preview Box */}
                 <div className="flex-1 bg-gray-50/70 p-4 rounded-xl border border-gray-100 overflow-hidden flex items-center min-h-[64px]">
@@ -316,8 +333,20 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
-    setMappings(getFontMappings());
+    syncFontMappingsFromServer().then(serverMappings => {
+      if (serverMappings && serverMappings.length > 0) {
+        setMappings(serverMappings);
+      } else {
+        setMappings(getFontMappings());
+      }
+    });
   }, []);
+
+  const handleSaveToPlatform = () => {
+    saveFontMappings(mappings);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3500);
+  };
 
   const handleAddMapping = () => {
     if (!newShopifyName.trim() || !newTargetFont.trim()) return;
@@ -334,7 +363,7 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
     setNewShopifyName("");
     setNewTargetFont("");
     setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setTimeout(() => setSavedSuccess(false), 3500);
   };
 
   const handleDeleteMapping = (id: string) => {
@@ -342,7 +371,7 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
     setMappings(updated);
     saveFontMappings(updated);
     setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setTimeout(() => setSavedSuccess(false), 3500);
   };
 
   const handleUpdateMapping = (id: string, field: "shopifyName" | "targetFont", value: string) => {
@@ -437,7 +466,7 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
             Collega i titoli dei font scritti su Shopify (es. <span className="font-mono font-bold text-gray-700">"Save"</span>) al font reale installato sul server DTF (es. <span className="font-mono font-bold text-gray-700">"Outfit"</span>).
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input 
             type="file"
             ref={csvInputRef}
@@ -452,9 +481,19 @@ function FontMappingsSection({ availableFontNames }: { availableFontNames: strin
             <Upload className="w-4 h-4" />
             <span>Importa Mappature da CSV</span>
           </button>
+
+          <button
+            onClick={handleSaveToPlatform}
+            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+            title="Salva permanentemente in piattaforma Shopify per tutti gli utenti ed operatori"
+          >
+            <Save className="w-4 h-4" />
+            <span>Salva in Piattaforma (Per Tutti)</span>
+          </button>
+
           {savedSuccess && (
             <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 animate-pulse">
-              ✓ Salvato con successo!
+              ✓ Mappature salvate in Piattaforma!
             </span>
           )}
         </div>

@@ -323,9 +323,19 @@ export default function ProductMetafieldsPage() {
     setAddingCollectionForProduct(null);
   };
 
+  const [savedProductIds, setSavedProductIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const calculateProductStatus = (m: ProductItem["metafields"]): "complete" | "partial" | "missing" => {
+    const vals = Object.values(m || {});
+    const filled = vals.filter(v => v && String(v).trim().length > 0).length;
+    if (filled === vals.length && vals.length > 0) return "complete";
+    if (filled > 0) return "partial";
+    return "missing";
+  };
+
   const handleSaveProduct = async (product: ProductItem) => {
     setSavingId(product.id);
-    setMessage(null);
 
     const currentMetafields = editedMetafields[product.id];
     const currentTags = editedTags[product.id];
@@ -354,13 +364,36 @@ export default function ProductMetafieldsPage() {
       const data = await res.json();
 
       if (data.success) {
-        setMessage({ type: "success", text: "Prodotto, Tag e Metafield salvati con successo su Shopify!" });
-        fetchProductsData();
+        // Aggiorna lo stato in memoria SENZA ricaricare la pagina o perdere lo scroll!
+        setProducts(prev => prev.map(p => {
+          if (p.id === product.id) {
+            return {
+              ...p,
+              metafields: { ...currentMetafields },
+              tags: [...(currentTags || [])],
+              collections: [...currentCollections],
+              status: calculateProductStatus(currentMetafields)
+            };
+          }
+          return p;
+        }));
+
+        setSavedProductIds(prev => new Set(prev).add(product.id));
+
+        setToast({
+          type: "success",
+          text: `✓ Metafield e dati per "${product.title}" salvati con successo!`
+        });
+
+        setTimeout(() => {
+          setToast(null);
+        }, 3500);
+
       } else {
-        setMessage({ type: "error", text: data.error || "Errore durante il salvataggio." });
+        setToast({ type: "error", text: data.error || "Errore durante il salvataggio." });
       }
     } catch (e: any) {
-      setMessage({ type: "error", text: e.message });
+      setToast({ type: "error", text: e.message });
     } finally {
       setSavingId(null);
     }
@@ -386,7 +419,25 @@ export default function ProductMetafieldsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      
+      {/* POPUP NOTIFICA FLUTTUANTE (TOAST BACKGROUND SAVE) */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
+          <div className={`px-5 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 text-xs font-black backdrop-blur-md transition-all ${
+            toast.type === "success" 
+              ? "bg-gray-950/90 border-emerald-500/50 text-white shadow-emerald-950/40" 
+              : "bg-rose-950/90 border-rose-500/50 text-white shadow-rose-950/40"
+          }`}>
+            {toast.type === "success" ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 animate-pulse" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 animate-pulse" />
+            )}
+            <span className="tracking-wide">{toast.text}</span>
+          </div>
+        </div>
+      )}
       
       {/* Header Page */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -802,6 +853,13 @@ export default function ProductMetafieldsPage() {
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800">
                           <XCircle className="w-3.5 h-3.5 text-red-600" />
                           Nessun Metafield
+                        </span>
+                      )}
+
+                      {savedProductIds.has(product.id) && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          ✓ Salvato
                         </span>
                       )}
 

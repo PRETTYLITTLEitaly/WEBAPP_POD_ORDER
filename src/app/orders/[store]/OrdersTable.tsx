@@ -37,10 +37,16 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
     }[];
   }>({ open: false, orderName: "", items: [] });
 
-  // Filter States
+  // Filter & Pagination States
   const [searchQuery, setSearchQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, tagFilter, statusFilter, showOnlySelected, pageSize]);
 
   // Saved Views States
   const [views, setViews] = useState<SavedView[]>([]);
@@ -715,6 +721,17 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
               ))}
             </select>
 
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
+              className="py-1.5 pl-3 pr-8 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white hover:bg-gray-50 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-bold cursor-pointer"
+              title="Seleziona quanti ordini mostrare contemporaneamente per pagina"
+            >
+              <option value={50}>50 per pagina</option>
+              <option value={100}>100 per pagina</option>
+              <option value={200}>200 per pagina</option>
+            </select>
+
             <div className="flex items-center gap-2 border-l border-gray-200 pl-2">
               {!isSavingView ? (
                 <button
@@ -911,14 +928,25 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="px-6 py-16 text-center">
-                    <p className="text-gray-500 font-medium">Nessun ordine trovato</p>
-                    <p className="text-gray-400 mt-1 text-sm">Prova a cambiare o rimuovere i filtri.</p>
-                  </td>
-                </tr>
-              ) : filteredOrders.map((order, idx) => {
+              {(() => {
+                const totalPages = Math.ceil(filteredOrders.length / pageSize) || 1;
+                const validCurrentPage = Math.min(currentPage, totalPages);
+                const startIndex = (validCurrentPage - 1) * pageSize;
+                const endIndex = Math.min(startIndex + pageSize, filteredOrders.length);
+                const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+
+                if (filteredOrders.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={11} className="px-6 py-16 text-center">
+                        <p className="text-gray-500 font-medium">Nessun ordine trovato</p>
+                        <p className="text-gray-400 mt-1 text-sm">Prova a cambiare o rimuovere i filtri.</p>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return paginatedOrders.map((order, idx) => {
                 const orderNum = order.name;
                 const date = new Date(order.createdAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
                 const isSelected = selected.includes(order.id);
@@ -1160,9 +1188,77 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
                     </td>
                   </tr>
                 );
-              })}
+              });
+            })()}
             </tbody>
           </table>
+
+          {/* BARRA PAGINAZIONE ORDINI SCORREVOLI */}
+          {(() => {
+            const totalPages = Math.ceil(filteredOrders.length / pageSize) || 1;
+            const validCurrentPage = Math.min(currentPage, totalPages);
+            const startIndex = (validCurrentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, filteredOrders.length);
+
+            return (
+              <div className="bg-white px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-semibold text-gray-700">
+                <div className="flex items-center gap-2">
+                  <span>
+                    Mostrati <strong className="text-gray-900 font-mono">{filteredOrders.length > 0 ? startIndex + 1 : 0} - {endIndex}</strong> di <strong className="text-gray-900 font-mono">{filteredOrders.length}</strong> ordini
+                  </span>
+                  <span className="text-gray-400">|</span>
+                  <span>
+                    Pagina <strong className="text-indigo-600 font-mono">{validCurrentPage}</strong> di <strong className="text-gray-900 font-mono">{totalPages}</strong>
+                  </span>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={validCurrentPage === 1}
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                    >
+                      ← Precedente
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - validCurrentPage) <= 2)
+                      .map((page, idx, arr) => {
+                        const prevPage = arr[idx - 1];
+                        const showEllipsis = prevPage && page - prevPage > 1;
+                        return (
+                          <span key={page} className="flex items-center gap-1">
+                            {showEllipsis && <span className="text-gray-400 font-mono px-1">...</span>}
+                            <button
+                              type="button"
+                              onClick={() => setCurrentPage(page)}
+                              className={`w-7 h-7 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                                page === validCurrentPage
+                                  ? "bg-indigo-600 text-white shadow-xs"
+                                  : "bg-gray-50 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          </span>
+                        );
+                      })}
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={validCurrentPage === totalPages}
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                    >
+                      Successiva →
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
       

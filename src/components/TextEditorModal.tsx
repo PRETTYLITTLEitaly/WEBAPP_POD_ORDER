@@ -397,11 +397,7 @@ export default function TextEditorModal({
       textElements += `\n    <tspan x="1000" dy="${idx === 0 ? "0" : `${lHeight}em`}" text-anchor="middle">${escapeXml(line)}</tspan>`;
     });
 
-    const resolvedFontFamily = availableFonts.find(f => {
-      const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const normSelected = fontName.toLowerCase().replace(/[^a-z0-9]/g, "");
-      return normF.includes(normSelected) || normSelected.includes(normF);
-    })?.family || `'${fontName}', sans-serif`;
+    const resolvedFontFamily = getFontFamilyForSelectedFont(fontName);
 
     const strokeAttributes = sWidth > 0 ? `stroke="${hexColor}" stroke-width="${sWidth}" stroke-linejoin="round"` : "";
 
@@ -565,6 +561,60 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
   return targetName;
 }
 
+  const getFontFamilyForSelectedFont = (targetFontName: string): string => {
+    if (!targetFontName) return "sans-serif";
+    const normSelected = targetFontName.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+
+    const matched = availableFonts.find(f => {
+      const normF = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+      return normF === normSelected || normF.includes(normSelected) || normSelected.includes(normF);
+    });
+
+    if (matched) return `'${matched.name}', sans-serif`;
+
+    const mappings = getFontMappings();
+    const mappingMatch = mappings.find(m => {
+      const normShopify = m.shopifyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return normShopify === normSelected || normTarget === normSelected;
+    });
+
+    if (mappingMatch) {
+      const fontByMapping = availableFonts.find(f => {
+        const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const normTarget = mappingMatch.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return normF === normTarget || normF.includes(normTarget) || normTarget.includes(normF);
+      });
+      if (fontByMapping) return `'${fontByMapping.name}', sans-serif`;
+      return `'${mappingMatch.targetFont}', sans-serif`;
+    }
+
+    return `'${targetFontName}', sans-serif`;
+  };
+
+  const detectPresetIndexForItem = (item?: any, attrs?: any[]) => {
+    const itemAttrs = item?.customAttributes || attrs || [];
+    const attrVal = itemAttrs.find((a: any) => {
+      const k = (a.key || "").toLowerCase();
+      return k === "custom.prodotto_personalizzato" ||
+             k === "prodotto_personalizzato" ||
+             k === "_pod_prodotto_personalizzato" ||
+             k === "prodotto personalizzato";
+    })?.value || "";
+
+    const titleStr = (item?.title || "").toLowerCase();
+    const combined = `${attrVal} ${titleStr}`.toLowerCase();
+
+    if (combined.includes("mini") && combined.includes("profumatore")) return 1;
+    if (combined.includes("profumatore")) return 0;
+    if (combined.includes("candela") && combined.includes("450")) return 2;
+    if (combined.includes("candela") && combined.includes("250")) return 3;
+    if (combined.includes("lampada")) return 4;
+    if (combined.includes("vaso")) return 5;
+
+    return 0;
+  };
+
   // Carica i font custom con cache in memoria e auto-aggancia il font del cliente
   useEffect(() => {
     if (!open) return;
@@ -581,6 +631,10 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
           setFont(matchedName);
         }
       }
+
+      // Auto-seleziona il dimensionamento dal metafield custom.prodotto_personalizzato
+      const presetIdx = detectPresetIndexForItem(currentItem, customAttributes);
+      selectProductPreset(presetIdx);
     };
 
     const fetchFonts = async () => {
@@ -948,11 +1002,7 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
               strokeWidth={strokeWidth > 0 ? strokeWidth : undefined}
               strokeLinejoin={strokeWidth > 0 ? "round" : undefined}
               style={{
-                fontFamily: availableFonts.find(f => {
-                  const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-                  const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
-                  return normF.includes(normSelected) || normSelected.includes(normF);
-                })?.family || `'${font}', sans-serif`,
+                fontFamily: getFontFamilyForSelectedFont(font),
                 fontSize: `${fontSize}px`,
                 letterSpacing: `${letterSpacing}px`,
                 fontWeight: "600",
@@ -1165,11 +1215,7 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
                 >
                   <div 
                     style={{
-                      fontFamily: availableFonts.find(f => {
-                        const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
-                        const normSelected = font.toLowerCase().replace(/[^a-z0-9]/g, "");
-                        return normF.includes(normSelected) || normSelected.includes(normF);
-                      })?.family || `'${font}', cursive, sans-serif`,
+                      fontFamily: getFontFamilyForSelectedFont(font),
                       fontSize: "22px",
                       color: color,
                       letterSpacing: `${letterSpacing}px`,
@@ -1557,15 +1603,34 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
                       })}
                     </select>
                     
-                    {font && !availableFonts.some(f => f.name.toLowerCase() === font.toLowerCase()) && 
-                      !["outfit", "dancing script", "montserrat"].includes(font.toLowerCase()) && (
-                        <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-1.5 text-amber-800 text-[10px] leading-relaxed">
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-extrabold">Font non installato sul server!</span> Il PDF di stampa userà il font di default (Helvetica). Per risolvere, scarica il font sul tuo computer e caricalo in <a href="/settings/fonts" target="_blank" className="underline font-bold text-indigo-700 hover:text-indigo-900">Impostazioni &gt; Font</a>.
+                    {(() => {
+                      const targetFontName = font || rawFontAttr || "";
+                      const isInstalled = availableFonts.some(f => {
+                        const normF = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+                        const normTarget = targetFontName.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+                        return normF === normTarget || normF.includes(normTarget) || normTarget.includes(normF);
+                      });
+
+                      const fontMappings = getFontMappings();
+                      const hasMapping = fontMappings.some(m => {
+                        const normS = m.shopifyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        const normTarget = targetFontName.toLowerCase().replace(/[^a-z0-9]/g, "");
+                        return normS === normTarget;
+                      });
+
+                      if (!isInstalled && !hasMapping && targetFontName && !["outfit", "dancing script", "montserrat", "helvetica", "arial"].includes(targetFontName.toLowerCase())) {
+                        return (
+                          <div className="mt-2 p-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-start gap-2 text-amber-900 text-xs leading-relaxed shadow-xs">
+                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+                            <div>
+                              <span className="font-extrabold text-amber-950 block">⚠️ Font non trovato sul server o non associato!</span> 
+                              Il font scelto dal cliente (<strong className="font-extrabold underline">{rawFontAttr || targetFontName}</strong>) non risulta caricato o mappato. Il PDF userà il font predefinito (Helvetica). <a href="/settings/fonts" target="_blank" className="underline font-extrabold text-indigo-700 hover:text-indigo-900 block mt-0.5">Vai in Impostazioni &gt; Font per caricarlo o abbinarlo ➔</a>
+                            </div>
                           </div>
-                        </div>
-                    )}
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   {/* 3. DIMENSIONE FONT */}

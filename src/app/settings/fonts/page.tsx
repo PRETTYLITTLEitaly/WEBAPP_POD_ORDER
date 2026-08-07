@@ -19,14 +19,17 @@ interface FontItem {
 export default function FontLibraryPage() {
   const [fonts, setFonts] = useState<FontItem[]>([]);
   const [mappings, setMappings] = useState<FontMapping[]>([]);
+  const [editedAliases, setEditedAliases] = useState<Record<string, string>>({});
   const [fontSearchQuery, setFontSearchQuery] = useState("");
   const [aliasFilter, setAliasFilter] = useState<"all" | "with_alias" | "without_alias">("all");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [isSavingMappings, setIsSavingMappings] = useState(false);
   const [previewText, setPreviewText] = useState("Giulia & Riccardo 26.09.2026");
   const [fontSize, setFontSize] = useState(28);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showAdvancedCsv, setShowAdvancedCsv] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +59,22 @@ export default function FontLibraryPage() {
       }
     });
   }, []);
+
+  const handleSaveAllMappingsToPlatform = async (currentMappings = mappings) => {
+    setIsSavingMappings(true);
+    setMessage(null);
+
+    try {
+      saveFontMappings(currentMappings);
+      setHasUnsavedChanges(false);
+      setMessage({ type: "success", text: "✓ TUTTI I SETTAGGI E MAPPATURE FONT SALVATI CON SUCCESSO IN PIATTAFORMA!" });
+      setTimeout(() => setMessage(null), 4500);
+    } catch (e: any) {
+      setMessage({ type: "error", text: "Errore durante il salvataggio dei settaggi font: " + e.message });
+    } finally {
+      setIsSavingMappings(false);
+    }
+  };
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -172,15 +191,13 @@ export default function FontLibraryPage() {
         });
 
         setMappings(merged);
-        saveFontMappings(merged);
-        setMessage({ type: "success", text: `✓ CSV Importato! ${newMappings.length} nomi Shopify abbinati ai font installati!` });
-        setTimeout(() => setMessage(null), 4000);
+        handleSaveAllMappingsToPlatform(merged);
       }
     };
     reader.readAsText(file);
   };
 
-  const handleUpdateFontAlias = (fontName: string, filename: string, newShopifyName: string) => {
+  const handleSaveFontCardAlias = (fontName: string, filename: string, newShopifyName: string) => {
     const normF = fontName.toLowerCase().replace(/[^a-z0-9]/g, "");
     const normFile = filename.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
 
@@ -208,7 +225,7 @@ export default function FontLibraryPage() {
     }
 
     setMappings(updated);
-    saveFontMappings(updated);
+    handleSaveAllMappingsToPlatform(updated);
   };
 
   const formatFileSize = (bytes: number) => {
@@ -218,6 +235,8 @@ export default function FontLibraryPage() {
   };
 
   const getFontShopifyAlias = (font: FontItem) => {
+    if (editedAliases[font.id] !== undefined) return editedAliases[font.id];
+
     const normF = font.name.toLowerCase().replace(/[^a-z0-9]/g, "");
     const normFile = font.filename.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
 
@@ -250,7 +269,7 @@ export default function FontLibraryPage() {
   });
 
   return (
-    <div className="p-8 space-y-6 max-w-5xl">
+    <div className="p-8 space-y-6 max-w-5xl pb-24">
       
       {/* Dynamic @font-face CSS Injection */}
       <style dangerouslySetInnerHTML={{
@@ -288,7 +307,17 @@ export default function FontLibraryPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => handleSaveAllMappingsToPlatform()}
+            disabled={isSavingMappings}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+            title="Salva permanentemente in piattaforma Shopify tutti i settaggi dei font"
+          >
+            <Save className="w-4 h-4" />
+            <span>{isSavingMappings ? "Salvataggio..." : "💾 SALVA SETTAGGI FONT IN PIATTAFORMA"}</span>
+          </button>
+
           <input 
             type="file"
             ref={csvInputRef}
@@ -298,7 +327,7 @@ export default function FontLibraryPage() {
           />
           <button
             onClick={() => csvInputRef.current?.click()}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2"
+            className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2"
             title="Carica un file CSV per abbinare automaticamente i nomi dei font di Shopify ai font installati"
           >
             <FileSpreadsheet className="w-4 h-4" />
@@ -316,13 +345,13 @@ export default function FontLibraryPage() {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-xl border flex items-center gap-3 text-sm font-medium ${
+        <div className={`p-4 rounded-xl border flex items-center gap-3 text-sm font-bold ${
           message.type === "success" 
-            ? "bg-green-50 border-green-200 text-green-800" 
+            ? "bg-emerald-50 border-emerald-300 text-emerald-900 shadow-sm" 
             : "bg-red-50 border-red-200 text-red-800"
         }`}>
           {message.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           ) : (
             <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
           )}
@@ -489,25 +518,37 @@ export default function FontLibraryPage() {
                   key={font.id}
                   className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:border-gray-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
-                  {/* Edizione Nome Shopify Diretta sul Cartellino Font */}
-                  <div className="space-y-2 shrink-0 md:w-72">
+                  {/* Edizione Nome Shopify Diretta sul Cartellino Font con Tasto Salva */}
+                  <div className="space-y-2 shrink-0 md:w-80">
                     <div>
                       <label className="block text-[11px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">
                         Nome Font su Shopify (Alias):
                       </label>
-                      <div className="relative flex items-center">
+                      <div className="flex items-center gap-2">
                         <input 
                           type="text"
-                          defaultValue={currentAlias}
+                          value={currentAlias}
                           placeholder='Es: "Save", "Get Show"'
-                          onBlur={e => handleUpdateFontAlias(font.name, font.filename, e.target.value)}
+                          onChange={e => {
+                            setEditedAliases(prev => ({ ...prev, [font.id]: e.target.value }));
+                            setHasUnsavedChanges(true);
+                          }}
                           onKeyDown={e => {
                             if (e.key === "Enter") {
-                              (e.target as HTMLInputElement).blur();
+                              handleSaveFontCardAlias(font.name, font.filename, currentAlias);
                             }
                           }}
                           className="w-full px-3 py-1.5 border border-indigo-200 focus:border-indigo-600 rounded-lg text-xs font-extrabold text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50/30"
                         />
+
+                        <button
+                          onClick={() => handleSaveFontCardAlias(font.name, font.filename, currentAlias)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg shadow-xs transition-all flex items-center gap-1 shrink-0"
+                          title="Salva questo nome font in piattaforma"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Salva</span>
+                        </button>
                       </div>
                     </div>
 
@@ -569,14 +610,10 @@ export default function FontLibraryPage() {
             <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-gray-500">
               <p>Tutti gli abbinamenti salvati vengono utilizzati sia dal generatore PDF sia dall'editor interattivo.</p>
               <button
-                onClick={() => {
-                  saveFontMappings(mappings);
-                  setMessage({ type: "success", text: "✓ Mappature salvate in Piattaforma!" });
-                  setTimeout(() => setMessage(null), 3000);
-                }}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1"
+                onClick={() => handleSaveAllMappingsToPlatform()}
+                className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5"
               >
-                <Save className="w-3.5 h-3.5" />
+                <Save className="w-4 h-4" />
                 <span>Salva Mappature in Piattaforma</span>
               </button>
             </div>

@@ -497,10 +497,13 @@ export default function TextEditorModal({
         }
       };
 
+      measureText();
+      if (typeof window !== "undefined") {
+        requestAnimationFrame(measureText);
+      }
+
       if (typeof document !== "undefined" && (document as any).fonts) {
         (document as any).fonts.ready.then(measureText);
-      } else {
-        setTimeout(measureText, 50);
       }
     }
   }, [text, font, fontSize, letterSpacing, lineHeight, strokeWidth, activeTab, selectedProductIdx, productPresets]);

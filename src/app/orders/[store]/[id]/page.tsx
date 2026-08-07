@@ -39,6 +39,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ store:
                 }
               }
               colore_base: metafield(namespace: "custom", key: "colore_base") { value }
+              prodotto_personalizzato: metafield(namespace: "custom", key: "prodotto_personalizzato") { value }
               colore_base_underscore: metafield(namespace: "custom_colore", key: "base") { value }
               pod_svg_url_custom: metafield(namespace: "custom", key: "pod_svg_url") { value }
               pod_svg_url_pod: metafield(namespace: "pod", key: "svg_url") { value }

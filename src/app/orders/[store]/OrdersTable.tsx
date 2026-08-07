@@ -224,7 +224,11 @@ export default function OrdersTable({ initialOrders, store }: { initialOrders: a
       let foundImage = "";
       let foundUploadedImage = "";
       let foundSvg = "";
-      const attrs = item.customAttributes || [];
+      const attrs = [...(item.customAttributes || [])];
+      const prodPersonalizzatoVal = item.product?.prodotto_personalizzato?.value || item.variant?.prodotto_personalizzato?.value;
+      if (prodPersonalizzatoVal && !attrs.some((a: any) => a.key === "custom.prodotto_personalizzato")) {
+        attrs.push({ key: "custom.prodotto_personalizzato", value: prodPersonalizzatoVal });
+      }
 
       const podSvg = item.product?.pod_svg?.reference?.url || item.product?.pod_svg?.reference?.image?.url || item.variant?.pod_svg?.reference?.url || item.variant?.pod_svg?.reference?.image?.url;
       const customPreviewAttr = attrs.find((attr: any) => 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   X, 
   Pencil, 
@@ -992,31 +992,41 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
     }
   };
 
-  if (!open) return null;
+  const [fontMappings, setFontMappings] = useState<any[]>([]);
 
-  const fontStyles = availableFonts
-    .filter((f: any) => f.url || f.dataUri)
-    .map((f: any) => {
-      const spacedName = f.name.replace(/([a-z])([A-Z])/g, '$1 $2');
-      const fontSrc = f.dataUri || f.url;
-      return `
-        @font-face {
-          font-family: '${f.name}';
-          src: url('${fontSrc}');
-          font-weight: normal;
-          font-style: normal;
-          font-display: block;
-        }
-        @font-face {
-          font-family: '${spacedName}';
-          src: url('${fontSrc}');
-          font-weight: normal;
-          font-style: normal;
-          font-display: block;
-        }
-      `;
-    })
-    .join("\n");
+  useEffect(() => {
+    if (open) {
+      setFontMappings(getFontMappings());
+    }
+  }, [open]);
+
+  const fontStyles = useMemo(() => {
+    return availableFonts
+      .filter((f: any) => f.url || f.dataUri)
+      .map((f: any) => {
+        const spacedName = f.name.replace(/([a-z])([A-Z])/g, '$1 $2');
+        const fontSrc = f.dataUri || f.url;
+        return `
+          @font-face {
+            font-family: '${f.name}';
+            src: url('${fontSrc}');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+          }
+          @font-face {
+            font-family: '${spacedName}';
+            src: url('${fontSrc}');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+          }
+        `;
+      })
+      .join("\n");
+  }, [availableFonts]);
+
+  if (!open) return null;
 
   return (
     <div 
@@ -1623,7 +1633,6 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
                       className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
                     >
                       {availableFonts.map(f => {
-                        const fontMappings = getFontMappings();
                         const mapping = fontMappings.find(m => {
                           const normTarget = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
                           const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");

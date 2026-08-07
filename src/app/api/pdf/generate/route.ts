@@ -207,10 +207,19 @@ export async function POST(req: NextRequest) {
           globalPieceIndex++;
 
           // 1. Cerca se c'è una grafica modificata e salvata specificamente per questo pezzo dell'ordine
-          const pieceEditedImage = 
+          const rawPieceEditedImage = 
             editedImageMemoryCache.get(`${order.id}_${pieceIdx}`) ||
             podMetaNodes.find((m: any) => m.key === `edited_image_${pieceIdx}`)?.value ||
             (pieceIdx === 0 ? (editedImageMemoryCache.get(order.id) || order.edited_image?.value) : null);
+
+          // Rifiuta le foto prodotto mockup (JPG/PNG come PLS_...jpg) memorizzate per errore nei metafield dell'ordine
+          let pieceEditedImage = null;
+          if (rawPieceEditedImage && typeof rawPieceEditedImage === "string") {
+            const isMockupPhoto = /\.(jpg|jpeg|png)(\?.*)?$/i.test(rawPieceEditedImage) && !rawPieceEditedImage.toLowerCase().includes(".svg");
+            if (!isMockupPhoto) {
+              pieceEditedImage = rawPieceEditedImage;
+            }
+          }
 
           let svgUrl = "";
 

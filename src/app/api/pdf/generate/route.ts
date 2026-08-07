@@ -291,11 +291,42 @@ export async function POST(req: NextRequest) {
 
             if (cacheItem && cacheItem.content) {
               let cleanSvgContent = null;
+              let itemWidthMm = parseFloat(baseWidthVal);
+              let itemHeightMm = parseFloat(baseHeightVal);
+
               if (!cacheItem.isImage) {
                 cleanSvgContent = cacheItem.content
                   .replace(/<\?xml[\s\S]*?\?>/i, "")
                   .replace(/<!DOCTYPE[\s\S]*?>/i, "")
                   .trim();
+
+                // Calcola proporzioni reali dall'SVG se il prodotto non ha metafield espliciti di larghezza ed altezza
+                const hasExplicitProductSize = !!(metafields.find((m: any) => m.key === "width") && metafields.find((m: any) => m.key === "height"));
+                if (!hasExplicitProductSize) {
+                  let svgW = 0;
+                  let svgH = 0;
+                  const viewBoxMatch = cleanSvgContent.match(/viewBox=["']([^"']+)["']/i);
+                  if (viewBoxMatch) {
+                    const parts = viewBoxMatch[1].trim().split(/[\s,]+/);
+                    if (parts.length >= 4) {
+                      svgW = parseFloat(parts[2]);
+                      svgH = parseFloat(parts[3]);
+                    }
+                  }
+                  if (!svgW || !svgH) {
+                    const wMatch = cleanSvgContent.match(/width=["']([^"'px%]+)["']/i);
+                    const hMatch = cleanSvgContent.match(/height=["']([^"'px%]+)["']/i);
+                    if (wMatch && hMatch) {
+                      svgW = parseFloat(wMatch[1]);
+                      svgH = parseFloat(hMatch[1]);
+                    }
+                  }
+                  if (svgW > 0 && svgH > 0) {
+                    const aspect = svgW / svgH;
+                    itemWidthMm = 80;
+                    itemHeightMm = Math.round(itemWidthMm / aspect);
+                  }
+                }
               }
 
               let previewUrl = "";
@@ -310,8 +341,8 @@ export async function POST(req: NextRequest) {
                 id: `${order.id}_${item.id}_${q}`,
                 orderName: order.name,
                 itemTitle: item.title,
-                widthMm: parseFloat(baseWidthVal),
-                heightMm: parseFloat(baseHeightVal),
+                widthMm: itemWidthMm,
+                heightMm: itemHeightMm,
                 svgContent: cleanSvgContent,
                 imageContent: cacheItem.isImage ? cacheItem.content : null,
                 previewUrl: previewUrl,

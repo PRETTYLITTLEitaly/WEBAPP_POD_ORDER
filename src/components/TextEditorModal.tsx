@@ -427,7 +427,8 @@ export default function TextEditorModal({
 
     let textElements = "";
     lines.forEach((line, idx) => {
-      textElements += `\n    <tspan x="1000" dy="${idx === 0 ? "0" : `${lHeight}em`}" text-anchor="middle">${escapeXml(line)}</tspan>`;
+      const content = line === "" ? "&#160;" : escapeXml(line);
+      textElements += `\n    <tspan x="1000" dy="${idx === 0 ? "0" : `${lHeight}em`}" text-anchor="middle">${content}</tspan>`;
     });
 
     const resolvedFontFamily = getFontFamilyForSelectedFont(fontName);
@@ -1044,7 +1045,7 @@ function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
             >
               {text.split("\n").map((line, idx) => (
                 <tspan key={idx} x="1000" dy={idx === 0 ? "0" : `${lineHeight}em`} textAnchor="middle">
-                  {line}
+                  {line || "\u00A0"}
                 </tspan>
               ))}
             </text>

@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
 
       let globalPieceIndex = 0;
 
-      for (const item of order.lineItems.nodes) {
+      for (const [itemIdx, item] of order.lineItems.nodes.entries()) {
         const itemQty = item.quantity || 1;
 
         const metafields = [
@@ -210,18 +210,28 @@ export async function POST(req: NextRequest) {
           const pieceIdx = globalPieceIndex;
           globalPieceIndex++;
 
-          // 1. Cerca se c'è una grafica modificata e salvata specificamente per questo pezzo dell'ordine
-          const rawPieceEditedImage = 
+          // 1. Cerca se c'è una grafica modificata salvata specificamente per QUESTO articolo/pezzo
+          const specificPieceEditedImage = 
+            editedImageMemoryCache.get(`${order.id}_${itemIdx}`) ||
             editedImageMemoryCache.get(`${order.id}_${pieceIdx}`) ||
-            podMetaNodes.find((m: any) => m.key === `edited_image_${pieceIdx}`)?.value ||
-            (pieceIdx === 0 ? (editedImageMemoryCache.get(order.id) || order.edited_image?.value) : null);
+            podMetaNodes.find((m: any) => m.key === `edited_image_${itemIdx}` || m.key === `edited_image_${pieceIdx}`)?.value;
 
-          // Rifiuta le foto prodotto mockup (JPG/PNG come PLS_...jpg) memorizzate per errore nei metafield dell'ordine
           let pieceEditedImage = null;
-          if (rawPieceEditedImage && typeof rawPieceEditedImage === "string") {
-            const isMockupPhoto = /\.(jpg|jpeg|png)(\?.*)?$/i.test(rawPieceEditedImage) && !rawPieceEditedImage.toLowerCase().includes(".svg");
+          if (specificPieceEditedImage && typeof specificPieceEditedImage === "string") {
+            const isMockupPhoto = /\.(jpg|jpeg|png)(\?.*)?$/i.test(specificPieceEditedImage) && !specificPieceEditedImage.toLowerCase().includes(".svg");
             if (!isMockupPhoto) {
-              pieceEditedImage = rawPieceEditedImage;
+              pieceEditedImage = specificPieceEditedImage;
+            }
+          }
+
+          // Se NON c'è un'immagine salvata per questo pezzo specifico, valuta il fallback d'ordine SOLO se il prodotto NON è un SVG classico pre-associato
+          if (!pieceEditedImage && !productPreassociatedSvg) {
+            const fallbackOrderEdited = (pieceIdx === 0 || itemIdx === 0) ? (editedImageMemoryCache.get(order.id) || order.edited_image?.value) : null;
+            if (fallbackOrderEdited && typeof fallbackOrderEdited === "string") {
+              const isMockupPhoto = /\.(jpg|jpeg|png)(\?.*)?$/i.test(fallbackOrderEdited) && !fallbackOrderEdited.toLowerCase().includes(".svg");
+              if (!isMockupPhoto) {
+                pieceEditedImage = fallbackOrderEdited;
+              }
             }
           }
 
@@ -229,10 +239,10 @@ export async function POST(req: NextRequest) {
 
           if (pieceEditedImage) {
             svgUrl = pieceEditedImage;
-          } else if (customText && customText.length > 0) {
-            svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;
           } else if (productPreassociatedSvg) {
             svgUrl = productPreassociatedSvg;
+          } else if (customText && customText.length > 0) {
+            svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(generateSvgFromText(customText, fontName, fontColor, fontSizePx))}`;
           }
 
           if (svgUrl) {
@@ -260,13 +270,13 @@ export async function POST(req: NextRequest) {
                   cacheItem = {
                     content: parts[1],
                     isImage: true,
-                    mimeType: mime || "image/png"
+                    mimeType: mime
                   };
                 } else {
                   const mediaRes = await fetch(svgUrl);
                   if (mediaRes.ok) {
                     const contentType = (mediaRes.headers.get("content-type") || "").toLowerCase();
-                    const isSvg = contentType.includes("svg") || /\.svg(\?.*)?$/i.test(svgUrl);
+                    const isSvg = contentType.includes("svg") || svgUrl.toLowerCase().includes(".svg");
                     
                     if (isSvg) {
                       const text = await mediaRes.text();
@@ -305,31 +315,28 @@ export async function POST(req: NextRequest) {
                   .trim();
 
                 // Calcola l'altezza reale ed esatta dell'SVG per racchiudere perfettamente la grafica ed evitare spazio bianco verticale vuoto
-                const hasExplicitProductHeight = !!(metafields.find((m: any) => m.key === "height")?.value);
-                if (!hasExplicitProductHeight) {
-                  let svgW = 0;
-                  let svgH = 0;
-                  const viewBoxMatch = cleanSvgContent.match(/viewBox=["']([^"']+)["']/i);
-                  if (viewBoxMatch) {
-                    const parts = viewBoxMatch[1].trim().split(/[\s,]+/);
-                    if (parts.length >= 4) {
-                      svgW = parseFloat(parts[2]);
-                      svgH = parseFloat(parts[3]);
-                    }
+                let svgW = 0;
+                let svgH = 0;
+                const viewBoxMatch = cleanSvgContent.match(/viewBox=["']([^"']+)["']/i);
+                if (viewBoxMatch) {
+                  const parts = viewBoxMatch[1].trim().split(/[\s,]+/);
+                  if (parts.length >= 4) {
+                    svgW = parseFloat(parts[2]);
+                    svgH = parseFloat(parts[3]);
                   }
-                  if (!svgW || !svgH) {
-                    const wMatch = cleanSvgContent.match(/width=["']([^"'px%]+)["']/i);
-                    const hMatch = cleanSvgContent.match(/height=["']([^"'px%]+)["']/i);
-                    if (wMatch && hMatch) {
-                      svgW = parseFloat(wMatch[1]);
-                      svgH = parseFloat(hMatch[1]);
-                    }
+                }
+                if (!svgW || !svgH) {
+                  const wMatch = cleanSvgContent.match(/width=["']([^"'px%]+)["']/i);
+                  const hMatch = cleanSvgContent.match(/height=["']([^"'px%]+)["']/i);
+                  if (wMatch && hMatch) {
+                    svgW = parseFloat(wMatch[1]);
+                    svgH = parseFloat(hMatch[1]);
                   }
-                  if (svgW > 0 && svgH > 0) {
-                    const aspect = svgW / svgH;
-                    if (!itemWidthMm || isNaN(itemWidthMm) || itemWidthMm <= 0) itemWidthMm = 80;
-                    itemHeightMm = Math.round((itemWidthMm / aspect) * 10) / 10;
-                  }
+                }
+                if (svgW > 0 && svgH > 0) {
+                  const aspect = svgW / svgH;
+                  if (!itemWidthMm || isNaN(itemWidthMm) || itemWidthMm <= 0) itemWidthMm = 80;
+                  itemHeightMm = Math.round((itemWidthMm / aspect) * 10) / 10;
                 }
               }
 

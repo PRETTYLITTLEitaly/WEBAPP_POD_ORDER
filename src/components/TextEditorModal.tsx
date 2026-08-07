@@ -306,13 +306,8 @@ export default function TextEditorModal({
       setText(item.initialText !== undefined ? item.initialText : initialText);
 
       const rawInput = extracted.rawFont || item.initialFont || initialFont || "Outfit";
-      const resolvedFontName = resolveFontName(rawInput);
-      const normResolved = resolvedFontName.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
-      const matchedFont = availableFonts.find(f => {
-        const normName = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
-        return normName === normResolved || normName.includes(normResolved) || normResolved.includes(normName);
-      });
-      setFont(matchedFont ? matchedFont.name : resolvedFontName);
+      const matchedFontName = findInstalledFontForInput(rawInput, availableFonts);
+      setFont(matchedFontName || rawInput);
       setColor(extracted.color || resolveColorHex(item.initialColor || initialColor || "#000000"));
       setFontSize(item.initialFontSize || initialFontSize || 32);
       const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
@@ -378,13 +373,8 @@ export default function TextEditorModal({
       setText(item.initialText !== undefined ? item.initialText : "");
       
       const rawInput = fontAndColor.rawFont || fontAndColor.font || item.initialFont || "Outfit";
-      const resolvedFontName = resolveFontName(rawInput);
-      const normResolved = resolvedFontName.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
-      const matchedFont = availableFonts.find(f => {
-        const normName = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
-        return normName === normResolved || normName.includes(normResolved) || normResolved.includes(normName);
-      });
-      setFont(matchedFont ? matchedFont.name : resolvedFontName);
+      const matchedFontName = findInstalledFontForInput(rawInput, availableFonts);
+      setFont(matchedFontName || rawInput);
       setColor(fontAndColor.color || resolveColorHex(item.initialColor || "#000000"));
       setFontSize(item.initialFontSize || 32);
 
@@ -530,57 +520,96 @@ export default function TextEditorModal({
     }
   };
 
-  // Carica i font custom con cache in memoria per massima velocità
+function findInstalledFontForInput(rawInput: string, fontList: any[]): string {
+  if (!rawInput) return "";
+  const normInput = rawInput.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+  if (!normInput) return "";
+
+  const mappings = getFontMappings();
+
+  // 1. Cerca mappatura shopifyName esplicita o fuzzy
+  const mappingMatch = mappings.find(m => {
+    const normShopify = m.shopifyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return normShopify === normInput || normShopify.includes(normInput) || normInput.includes(normShopify);
+  });
+
+  const targetName = mappingMatch ? mappingMatch.targetFont : rawInput;
+  const normTarget = targetName.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+
+  if (fontList && fontList.length > 0) {
+    // 2. Cerca font installato con nome uguale al target o all'input
+    const matchedInstalled = fontList.find(f => {
+      const normF = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
+      return normF === normTarget || normF === normInput || normF.includes(normTarget) || normTarget.includes(normF);
+    });
+
+    if (matchedInstalled) return matchedInstalled.name;
+
+    // 3. Cerca per alias delle mappature dei font installati
+    const matchedByAlias = fontList.find(f => {
+      const normF = f.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const fontMapping = mappings.find(m => {
+        const normM = m.targetFont.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return normM === normF || normF.includes(normM);
+      });
+      if (fontMapping) {
+        const normShopify = fontMapping.shopifyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return normShopify === normInput || normShopify.includes(normInput) || normInput.includes(normShopify);
+      }
+      return false;
+    });
+
+    if (matchedByAlias) return matchedByAlias.name;
+  }
+
+  return targetName;
+}
+
+  // Carica i font custom con cache in memoria e auto-aggancia il font del cliente
   useEffect(() => {
     if (!open) return;
+
+    const autoMatchFont = (fontList: any[]) => {
+      const currentItem = (lineItems && lineItems[selectedItemIdx]) || {};
+      const currentAttrs = (currentItem.customAttributes && currentItem.customAttributes.length > 0) ? currentItem.customAttributes : customAttributes;
+      const extracted = extractTextFontAndColorFromAttrs(currentAttrs || []);
+      const rawFontInput = extracted.rawFont || currentItem.initialFont || initialFont || "";
+
+      if (rawFontInput) {
+        const matchedName = findInstalledFontForInput(rawFontInput, fontList);
+        if (matchedName) {
+          setFont(matchedName);
+        }
+      }
+    };
+
     const fetchFonts = async () => {
       try {
-        if ((globalThis as any).__pod_cached_fonts) {
-          setAvailableFonts((globalThis as any).__pod_cached_fonts);
-          return;
+        let customList = (globalThis as any).__pod_cached_fonts;
+        if (!customList) {
+          const res = await fetch("/api/fonts");
+          const data = await res.json();
+          if (data.success && Array.isArray(data.fonts) && data.fonts.length > 0) {
+            customList = data.fonts.map((f: any) => ({
+              name: f.name,
+              family: `'${f.name}', sans-serif`,
+              url: f.url,
+              dataUri: f.dataUri
+            }));
+            (globalThis as any).__pod_cached_fonts = customList;
+          }
         }
 
-        const res = await fetch("/api/fonts");
-        const data = await res.json();
-        if (data.success && Array.isArray(data.fonts) && data.fonts.length > 0) {
-           const customList = data.fonts.map((f: any) => ({
-            name: f.name,
-            family: `'${f.name}', sans-serif`,
-            url: f.url,
-            dataUri: f.dataUri
-          }));
-
-          (globalThis as any).__pod_cached_fonts = customList;
+        if (customList && customList.length > 0) {
           setAvailableFonts(customList);
-
-          // Auto-aggancia subito il font consigliato dal cliente con i font del server installati
-          const currentItem = (lineItems && lineItems[selectedItemIdx]) || {};
-          const currentAttrs = (currentItem.customAttributes && currentItem.customAttributes.length > 0) ? currentItem.customAttributes : customAttributes;
-          const extracted = extractTextFontAndColorFromAttrs(currentAttrs || []);
-          const rawFontInput = extracted.rawFont || currentItem.initialFont || initialFont || "Outfit";
-
-          if (rawFontInput) {
-            const resolvedTarget = resolveFontName(rawFontInput);
-            const normResolved = resolvedTarget.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
-
-            const matchedFont = customList.find((f: any) => {
-              const normName = f.name.toLowerCase().replace(/\.(ttf|otf|woff|woff2)$/i, "").replace(/[^a-z0-9]/g, "");
-              return normName === normResolved || normName.includes(normResolved) || normResolved.includes(normName);
-            });
-
-            if (matchedFont) {
-              setFont(matchedFont.name);
-            } else if (resolvedTarget) {
-              setFont(resolvedTarget);
-            }
-          }
+          autoMatchFont(customList);
         }
       } catch (e) {
         console.error("Errore fetch font:", e);
       }
     };
     fetchFonts();
-  }, [open]);
+  }, [open, selectedItemIdx, lineItems, customAttributes, initialFont]);
 
   // COLOR SAMPLER FROM ORIGINAL IMAGE (CONTAGOCCE)
   const sampleColorFromImage = (e: React.MouseEvent<HTMLImageElement>) => {

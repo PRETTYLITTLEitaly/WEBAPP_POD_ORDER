@@ -221,6 +221,8 @@ export default function TextEditorModal({
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!open) return;
+
     setText(initialText);
     setFont(initialFont || "Get Show");
     setColor(resolveColorHex(initialColor || "#000000"));
@@ -322,7 +324,7 @@ export default function TextEditorModal({
         setActiveTab("text");
       }
     }
-  }, [open, initialText, initialFont, initialColor, initialFontSize, initialLetterSpacing, backgroundUrl, uploadedImageUrl, svgUrl, customAttributes, lineItems, orderId, availableFonts]);
+  }, [open, orderId]);
 
   const handleSelectLineItem = (idx: number) => {
     if (idx === selectedItemIdx) return;
@@ -528,11 +530,16 @@ export default function TextEditorModal({
     }
   };
 
-  // Carica i font custom
+  // Carica i font custom con cache in memoria per massima velocità
   useEffect(() => {
     if (!open) return;
     const fetchFonts = async () => {
       try {
+        if ((globalThis as any).__pod_cached_fonts) {
+          setAvailableFonts((globalThis as any).__pod_cached_fonts);
+          return;
+        }
+
         const res = await fetch("/api/fonts");
         const data = await res.json();
         if (data.success && Array.isArray(data.fonts) && data.fonts.length > 0) {
@@ -543,6 +550,7 @@ export default function TextEditorModal({
             dataUri: f.dataUri
           }));
 
+          (globalThis as any).__pod_cached_fonts = customList;
           setAvailableFonts(customList);
 
           // Auto-aggancia subito il font consigliato dal cliente con i font del server installati
@@ -572,7 +580,7 @@ export default function TextEditorModal({
       }
     };
     fetchFonts();
-  }, [open, selectedItemIdx, lineItems, customAttributes, initialFont]);
+  }, [open]);
 
   // COLOR SAMPLER FROM ORIGINAL IMAGE (CONTAGOCCE)
   const sampleColorFromImage = (e: React.MouseEvent<HTMLImageElement>) => {

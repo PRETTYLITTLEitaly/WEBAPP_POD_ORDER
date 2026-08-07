@@ -6,8 +6,8 @@ import os from "os";
 
 const MM_TO_PT = 2.83465;
 const PADDING_MM = 3; 
-const LABEL_GAP_MM = 5; // Spazio di 5mm esatti dal bordo della grafica per taglio sicuro
-const LABEL_HEIGHT_MM = 10; // 5mm di spazio + altezza testo
+const LABEL_GAP_MM = 7; // Spazio di 7mm esatti dal bordo della grafica al numero ordine
+const LABEL_HEIGHT_MM = 12; // 7mm di spazio + altezza testo
 
 // Bin Packing Algorithm con supporto posizionamento manuale e margini di padding interno
 export async function generatePodPdf(itemsInput, binWidthMmInput = 300, marginsInput = { top: 5, bottom: 5, sides: 3 }) {

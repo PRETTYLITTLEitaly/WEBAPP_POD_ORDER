@@ -295,14 +295,42 @@ export async function POST(req: NextRequest) {
 
             if (cacheItem && cacheItem.content) {
               let cleanSvgContent = null;
-              const itemWidthMm = parseFloat(baseWidthVal);
-              const itemHeightMm = parseFloat(baseHeightVal);
+              let itemWidthMm = parseFloat(baseWidthVal);
+              let itemHeightMm = parseFloat(baseHeightVal);
 
               if (!cacheItem.isImage) {
                 cleanSvgContent = cacheItem.content
                   .replace(/<\?xml[\s\S]*?\?>/i, "")
                   .replace(/<!DOCTYPE[\s\S]*?>/i, "")
                   .trim();
+
+                // Calcola l'altezza reale ed esatta dell'SVG per racchiudere perfettamente la grafica ed evitare spazio bianco verticale vuoto
+                const hasExplicitProductHeight = !!(metafields.find((m: any) => m.key === "height")?.value);
+                if (!hasExplicitProductHeight) {
+                  let svgW = 0;
+                  let svgH = 0;
+                  const viewBoxMatch = cleanSvgContent.match(/viewBox=["']([^"']+)["']/i);
+                  if (viewBoxMatch) {
+                    const parts = viewBoxMatch[1].trim().split(/[\s,]+/);
+                    if (parts.length >= 4) {
+                      svgW = parseFloat(parts[2]);
+                      svgH = parseFloat(parts[3]);
+                    }
+                  }
+                  if (!svgW || !svgH) {
+                    const wMatch = cleanSvgContent.match(/width=["']([^"'px%]+)["']/i);
+                    const hMatch = cleanSvgContent.match(/height=["']([^"'px%]+)["']/i);
+                    if (wMatch && hMatch) {
+                      svgW = parseFloat(wMatch[1]);
+                      svgH = parseFloat(hMatch[1]);
+                    }
+                  }
+                  if (svgW > 0 && svgH > 0) {
+                    const aspect = svgW / svgH;
+                    if (!itemWidthMm || isNaN(itemWidthMm) || itemWidthMm <= 0) itemWidthMm = 80;
+                    itemHeightMm = Math.round((itemWidthMm / aspect) * 10) / 10;
+                  }
+                }
               }
 
               let previewUrl = "";

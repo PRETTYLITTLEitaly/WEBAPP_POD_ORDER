@@ -193,7 +193,22 @@ export default function TextEditorModal({
   const [isProcessingImage, setIsProcessingImage] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
-  const [availableFonts, setAvailableFonts] = useState(DEFAULT_FONTS);
+  const [availableFonts, setAvailableFonts] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      if ((globalThis as any).__pod_cached_fonts) return (globalThis as any).__pod_cached_fonts;
+      try {
+        const localCached = localStorage.getItem("pod_cached_fonts_v2");
+        if (localCached) {
+          const parsed = JSON.parse(localCached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            (globalThis as any).__pod_cached_fonts = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_FONTS;
+  });
   const [showAttributes, setShowAttributes] = useState(false);
 
   // Custom Visualization States
@@ -224,10 +239,16 @@ export default function TextEditorModal({
     if (!open) return;
 
     setText(initialText);
-    setFont(initialFont || "Get Show");
     setColor(resolveColorHex(initialColor || "#000000"));
     setFontSize(initialFontSize || 32);
     setLetterSpacing(initialLetterSpacing || 0);
+
+    const firstItem = lineItems?.[0] || {};
+    const firstAttrs = (firstItem.customAttributes && firstItem.customAttributes.length > 0) ? firstItem.customAttributes : customAttributes;
+    const extractedFont = extractTextFontAndColorFromAttrs(firstAttrs || []);
+    const rawFontInput = extractedFont.rawFont || firstItem.initialFont || initialFont || "";
+    const matchedFontName = findInstalledFontForInput(rawFontInput, availableFonts);
+    setFont(matchedFontName || rawFontInput || "Outfit");
     
     let savedLH = 1.25;
     let savedSW = 0;
@@ -246,8 +267,16 @@ export default function TextEditorModal({
     setVectorSvgContent(null);
     setSelectedItemIdx(0);
 
-    const presetIdx = detectPresetIndex();
+    // Auto-detect dimensioning preset directly from custom.prodotto_personalizzato or item title
+    const presetIdx = detectPresetIndexForItem(firstItem, firstAttrs);
     setSelectedProductIdx(presetIdx);
+    const presetsList = productPresets.length > 0 ? productPresets : getProductGraphicPresets();
+    const activePreset = presetsList[presetIdx] || presetsList[0];
+    if (activePreset) {
+      const fitted = fitGraphicInProductMaxDimensions(aspectRatio || 1, activePreset.maxGraphicW, activePreset.maxGraphicH);
+      setGraphicWidth(fitted.w);
+      setGraphicHeight(fitted.h);
+    }
 
     // Get width and height from order metafields or attributes if possible
     let savedW = 80;
@@ -369,7 +398,8 @@ export default function TextEditorModal({
       setCurrentImageUrl(s.currentImageUrl);
       setActiveTab(s.activeTab);
     } else {
-      const fontAndColor = extractTextFontAndColorFromAttrs(item.customAttributes || []);
+      const itemAttrs = item.customAttributes || customAttributes || [];
+      const fontAndColor = extractTextFontAndColorFromAttrs(itemAttrs);
       setText(item.initialText !== undefined ? item.initialText : "");
       
       const rawInput = fontAndColor.rawFont || fontAndColor.font || item.initialFont || "Outfit";
@@ -377,6 +407,9 @@ export default function TextEditorModal({
       setFont(matchedFontName || rawInput);
       setColor(fontAndColor.color || resolveColorHex(item.initialColor || "#000000"));
       setFontSize(item.initialFontSize || 32);
+
+      const presetIdx = detectPresetIndexForItem(item, itemAttrs);
+      selectProductPreset(presetIdx);
 
       const imgUrl = item.uploadedImageUrl || item.backgroundUrl || item.svgUrl || item.displayImage;
       setCurrentImageUrl(imgUrl || "");

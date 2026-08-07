@@ -1518,7 +1518,7 @@ export default function TextEditorModal({
                           return normTarget === normF || normF.includes(normTarget) || normTarget.includes(normF);
                         });
 
-                        const optionLabel = mapping ? `${f.name} (${mapping.shopifyName})` : f.name;
+                        const optionLabel = mapping ? `${mapping.shopifyName} (${f.name})` : f.name;
 
                         return (
                           <option key={f.name} value={f.name}>

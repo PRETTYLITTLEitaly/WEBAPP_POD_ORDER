@@ -21,6 +21,7 @@ import {
   ChevronDown,
   User as UserIcon,
   Layers,
+  MessageSquare,
   Sparkles,
   Sliders
 } from "lucide-react";
@@ -71,6 +72,7 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
         { name: "Home", href: "/", icon: Home },
         { name: "Ordini B2B", href: "/orders/b2b", icon: ShoppingCart, badge: stats.b2bCount },
         { name: "Ordini B2C", href: "/orders/b2c", icon: ShoppingCart, badge: stats.b2cCount },
+        { name: "Messaggi & Chat", href: "/messages", icon: MessageSquare },
         { name: "Metafield Prodotti", href: "/settings/products", icon: Package },
         { name: "Produzione DTF", href: "/produzione", icon: Printer },
         { name: "Spedizioni", href: "/spedizioni", icon: Truck, badge: issuesCount, isAlert: true },

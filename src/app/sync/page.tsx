@@ -51,9 +51,42 @@ export default function SyncB2BPage() {
   const [compareData, setCompareData] = useState<any>(null);
   const [loadingCompare, setLoadingCompare] = useState(false);
 
-  // Modali di Conferma
+  // Modali e Stato Esecuzione Sync
   const [modalDryRunOpen, setModalDryRunOpen] = useState(false);
   const [modalAlignOpen, setModalAlignOpen] = useState(false);
+  const [syncingHandle, setSyncingHandle] = useState<string | null>(null);
+  const [syncBanner, setSyncBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Esegue la sincronizzazione di un prodotto (scrive in DB/Shopify rispettando isDryRun)
+  const handleExecuteSync = async (handleToSync: string) => {
+    try {
+      setSyncingHandle(handleToSync);
+      setSyncBanner(null);
+      const res = await fetch("/api/sync/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync_product", handle: handleToSync })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const r = data.result;
+        setSyncBanner({
+          type: "success",
+          text: `[${r.isDryRun ? "DRY-RUN SIMULAZIONE" : "ESECUZIONE REALE"}] ${r.details}`
+        });
+        loadSyncData();
+        if (selectedHandle === handleToSync) {
+          loadProductCompare(handleToSync);
+        }
+      } else {
+        setSyncBanner({ type: "error", text: data.error || "Errore durante la sincronizzazione" });
+      }
+    } catch (err: any) {
+      setSyncBanner({ type: "error", text: err.message || "Errore di connessione" });
+    } finally {
+      setSyncingHandle(null);
+    }
+  };
 
   // Carica i dati generali della Sync
   const loadSyncData = async () => {
@@ -261,6 +294,23 @@ export default function SyncB2BPage() {
           )}
         </div>
       </div>
+
+      {/* NOTIFICA ESITO SYNC */}
+      {syncBanner && (
+        <div className={`p-4 rounded-xl text-xs font-bold border flex items-center justify-between shadow-sm animate-in fade-in ${
+          syncBanner.type === "success" 
+            ? "bg-emerald-50 text-emerald-800 border-emerald-300" 
+            : "bg-red-50 text-red-800 border-red-300"
+        }`}>
+          <div className="flex items-center gap-2">
+            {syncBanner.type === "success" ? <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" /> : <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />}
+            <span>{syncBanner.text}</span>
+          </div>
+          <button onClick={() => setSyncBanner(null)} className="p-1 hover:bg-black/5 rounded">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* MENU TAB PRINCIPALI */}
       <div className="flex border-b border-gray-200 bg-white rounded-xl p-1 shadow-sm border space-x-1">
@@ -546,7 +596,14 @@ export default function SyncB2BPage() {
                     <td className="p-3">Prodotto non presente nel catalogo B2B</td>
                     <td className="p-3 font-semibold text-green-700">36 Varianti (Profumi e colonie)</td>
                     <td className="p-3 text-gray-400">Non esiste</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right space-x-2">
+                      <button
+                        onClick={() => handleExecuteSync("profumatore-love-me-blu-royal")}
+                        disabled={syncingHandle === "profumatore-love-me-blu-royal"}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {syncingHandle === "profumatore-love-me-blu-royal" ? "Syncing..." : "Sincronizza ora"}
+                      </button>
                       <button
                         onClick={() => loadProductCompare("profumatore-love-me-blu-royal")}
                         className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg transition-colors"
@@ -569,7 +626,14 @@ export default function SyncB2BPage() {
                     <td className="p-3">Metafield Grafica SVG aggiornato in B2C</td>
                     <td className="p-3 font-mono text-[11px] text-indigo-600 truncate max-w-[150px]">whereis_tiffany.svg (MediaImage)</td>
                     <td className="p-3 font-mono text-[11px] text-gray-400 truncate max-w-[150px]">URL Generico Vecchio</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right space-x-2">
+                      <button
+                        onClick={() => handleExecuteSync("profumatore-where-is-my-tiffany")}
+                        disabled={syncingHandle === "profumatore-where-is-my-tiffany"}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {syncingHandle === "profumatore-where-is-my-tiffany" ? "Syncing..." : "Sincronizza ora"}
+                      </button>
                       <button
                         onClick={() => loadProductCompare("profumatore-where-is-my-tiffany")}
                         className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg transition-colors"
@@ -592,7 +656,14 @@ export default function SyncB2BPage() {
                     <td className="p-3">DRAFT in B2C ma ACTIVE in B2B</td>
                     <td className="p-3 font-bold text-amber-600">DRAFT</td>
                     <td className="p-3 font-bold text-green-600">ACTIVE</td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right space-x-2">
+                      <button
+                        onClick={() => handleExecuteSync("confezione-regalo-minimal-edition")}
+                        disabled={syncingHandle === "confezione-regalo-minimal-edition"}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {syncingHandle === "confezione-regalo-minimal-edition" ? "Syncing..." : "Sincronizza ora"}
+                      </button>
                       <button
                         onClick={() => loadProductCompare("confezione-regalo-minimal-edition")}
                         className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg transition-colors"
@@ -631,14 +702,37 @@ export default function SyncB2BPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                <tr className="hover:bg-gray-50">
-                  <td className="p-3 text-gray-500">{new Date().toLocaleString("it-IT")}</td>
-                  <td className="p-3 font-bold text-indigo-600">RECONCILE</td>
-                  <td className="p-3">PRODUCT (Allineamento Iniziale)</td>
-                  <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold rounded">DRY_RUN</span></td>
-                  <td className="p-3 text-gray-500">Manuale (Script Step 1)</td>
-                  <td className="p-3 text-gray-600">Scansionati 1.092 prodotti. 1.009 abbinati, 83 da creare.</td>
-                </tr>
+                {syncData?.recentLogs && syncData.recentLogs.length > 0 ? (
+                  syncData.recentLogs.map((log: any) => (
+                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-3 text-gray-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString("it-IT")}</td>
+                      <td className="p-3 font-bold text-indigo-600">{log.action}</td>
+                      <td className="p-3 font-mono text-gray-700">
+                        {log.entity} {log.handle ? `[${log.handle}]` : ""}
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 font-bold rounded ${
+                          log.outcome === "SUCCESS" ? "bg-green-100 text-green-800" :
+                          log.outcome === "DRY_RUN" ? "bg-amber-100 text-amber-800" :
+                          "bg-red-100 text-red-800"
+                        }`}>
+                          {log.outcome}
+                        </span>
+                      </td>
+                      <td className="p-3 text-gray-500">{log.origin || "manual"}</td>
+                      <td className="p-3 text-gray-700">{log.details}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="hover:bg-gray-50">
+                    <td className="p-3 text-gray-500">{new Date().toLocaleString("it-IT")}</td>
+                    <td className="p-3 font-bold text-indigo-600">RECONCILE</td>
+                    <td className="p-3 font-mono">PRODUCT [initial-alignment]</td>
+                    <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold rounded">DRY_RUN</span></td>
+                    <td className="p-3 text-gray-500">Manuale (Script Step 1)</td>
+                    <td className="p-3 text-gray-600">Scansionati 1.092 prodotti. 1.009 abbinati, 83 da creare.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -667,11 +761,16 @@ export default function SyncB2BPage() {
 
             <div className="flex items-center gap-2">
               <button
-                disabled
-                className="px-4 py-2 bg-gray-100 text-gray-400 font-bold text-xs rounded-xl cursor-not-allowed flex items-center gap-1.5"
-                title="Sincronizzazione reale abilitata dallo Step 2"
+                onClick={() => handleExecuteSync(selectedHandle)}
+                disabled={syncingHandle === selectedHandle}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
               >
-                <RefreshCw className="w-4 h-4" /> Anteprima Sync (Dry-Run Only)
+                <RefreshCw className={`w-4 h-4 ${syncingHandle === selectedHandle ? "animate-spin" : ""}`} />
+                {syncingHandle === selectedHandle 
+                  ? "Sincronizzazione in corso..." 
+                  : isDryRun 
+                    ? "Esegui Simulazione (Dry-Run)" 
+                    : "Sincronizza Ora nel B2B"}
               </button>
               {compareData?.b2cProduct && (
                 <a

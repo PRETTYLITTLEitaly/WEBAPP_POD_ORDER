@@ -15,6 +15,7 @@ import {
   Users, 
   Search, 
   Bell, 
+  Mail,
   LogOut, 
   Store,
   Bug,
@@ -22,8 +23,10 @@ import {
   User as UserIcon,
   Layers,
   MessageSquare,
+  Ticket as TicketIcon,
   Sparkles,
-  Sliders
+  Sliders,
+  RefreshCw
 } from "lucide-react";
 import { getCurrentUser, setCurrentUser, User } from "@/lib/userStore";
 import { logoutAction } from "@/app/admin/login/actions";
@@ -32,28 +35,46 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const [stats, setStats] = useState({ b2bCount: 0, b2cCount: 0 });
   const [issuesCount, setIssuesCount] = useState(0);
+  const [unreadEmailsCount, setUnreadEmailsCount] = useState(0);
   const [user, setUser] = useState<User | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
 
-  useEffect(() => {
-    setUser(getCurrentUser());
-
+  const fetchNotificationsData = () => {
     fetch("/api/stats")
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (!data.error) setStats(data);
       })
       .catch(console.error);
-      
+
     fetch("/api/sendcloud/issues")
-      .then(res => res.json())
-      .then(data => {
-        if (data && typeof data.count === 'number') {
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && typeof data.count === "number") {
           setIssuesCount(data.count);
         }
       })
       .catch(console.error);
+
+    fetch("/api/messages")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.emailMessages)) {
+          const unread = data.emailMessages.filter((m: any) => !m.isRead && m.direction === "INBOUND").length;
+          setUnreadEmailsCount(unread);
+        }
+      })
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+    fetchNotificationsData();
+
+    const interval = setInterval(fetchNotificationsData, 20000);
+    return () => clearInterval(interval);
   }, [pathname]);
 
   if (pathname === "/admin/login") {
@@ -70,14 +91,16 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
       title: "Menu Principale",
       items: [
         { name: "Home", href: "/", icon: Home },
+        { name: "Sync B2C-B2B", href: "/sync", icon: RefreshCw },
         { name: "Ordini B2B", href: "/orders/b2b", icon: ShoppingCart, badge: stats.b2bCount },
         { name: "Ordini B2C", href: "/orders/b2c", icon: ShoppingCart, badge: stats.b2cCount },
-        { name: "Messaggi & Chat", href: "/messages", icon: MessageSquare },
+        { name: "Messaggi & Chat", href: "/messages", icon: MessageSquare, badge: unreadEmailsCount, isAlert: unreadEmailsCount > 0 },
+        { name: "Ticket Assistenza", href: "/tickets", icon: TicketIcon },
         { name: "Metafield Prodotti", href: "/settings/products", icon: Package },
         { name: "Produzione DTF", href: "/produzione", icon: Printer },
         { name: "Spedizioni", href: "/spedizioni", icon: Truck, badge: issuesCount, isAlert: true },
         { name: "Analisi & Report", href: "/report", icon: BarChart3 },
-      ]
+      ],
     },
     {
       title: "Impostazioni App",
@@ -88,16 +111,14 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
         { name: "BUG FIX", href: "/bug-fix", icon: Bug },
         { name: "Gestione Utenti", href: "/settings/users", icon: Users },
         { name: "Account Utente", href: "/settings/account", icon: UserIcon },
-      ]
-    }
+      ],
+    },
   ];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f1f2f4] text-gray-900 font-sans">
-      
       {/* 1. TOP BAR SHOPIFY DARK (#1a1a1a) */}
       <header className="h-14 bg-[#1a1a1a] text-white flex items-center justify-between px-4 z-40 shrink-0 border-b border-gray-800">
-        
         {/* Brand & Logo Shopify */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
@@ -112,7 +133,7 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
 
         {/* BARRA DI RICERCA GLOBALE CENTRALE STILE SHOPIFY */}
         <div className="flex-1 max-w-xl mx-4">
-          <div 
+          <div
             onClick={() => setSearchModalOpen(true)}
             className="relative bg-[#2c2c2c] hover:bg-[#363636] border border-gray-700 rounded-lg px-3 py-1.5 flex items-center justify-between text-gray-400 text-xs cursor-pointer transition-all group"
           >
@@ -126,17 +147,80 @@ export default function ShopifyLayout({ children }: { children: React.ReactNode 
 
         {/* NOTIFICHE E PROFILO IN ALTO A DESTRA */}
         <div className="flex items-center gap-3">
-          
-          {/* Campanello Notifiche */}
-          <button 
-            className="relative p-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title="Notifiche"
+          {/* Icona Mail per Email non lette */}
+          <Link
+            href="/messages"
+            className="relative p-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center justify-center"
+            title={`Posta Assistenza: ${unreadEmailsCount} email non lette`}
           >
-            <Bell className="w-4 h-4" />
-            {issuesCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+            <Mail className="w-4.5 h-4.5 text-indigo-400" />
+            {unreadEmailsCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full border border-gray-900 shadow-sm animate-pulse">
+                {unreadEmailsCount}
+              </span>
             )}
-          </button>
+          </Link>
+
+          {/* Campanello Centro Notifiche */}
+          <div className="relative">
+            <button
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="relative p-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              title="Centro Notifiche"
+            >
+              <Bell className="w-4.5 h-4.5" />
+              {(issuesCount > 0 || unreadEmailsCount > 0) && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+              )}
+            </button>
+
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 py-2 text-gray-800 text-xs z-50 animate-in fade-in duration-100">
+                <div className="px-4 py-2 border-b border-gray-100 font-bold text-gray-900 flex items-center justify-between">
+                  <span>Centro Notifiche</span>
+                  <span className="text-[10px] text-gray-400 font-normal">In tempo reale</span>
+                </div>
+
+                <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                  {unreadEmailsCount > 0 && (
+                    <Link
+                      href="/messages"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="p-3 hover:bg-indigo-50/60 flex items-start gap-2.5 transition-all group"
+                    >
+                      <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg shrink-0 mt-0.5">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 group-hover:text-indigo-600">Nuove Email Assistenza</div>
+                        <div className="text-[11px] text-gray-600">Hai {unreadEmailsCount} email non lette in cassa.</div>
+                      </div>
+                    </Link>
+                  )}
+
+                  {issuesCount > 0 && (
+                    <Link
+                      href="/spedizioni"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="p-3 hover:bg-red-50/60 flex items-start gap-2.5 transition-all group"
+                    >
+                      <div className="p-1.5 bg-red-100 text-red-700 rounded-lg shrink-0 mt-0.5">
+                        <Truck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900 group-hover:text-red-600">Anomalie Spedizioni</div>
+                        <div className="text-[11px] text-gray-600">{issuesCount} spedizioni richiedono attenzione.</div>
+                      </div>
+                    </Link>
+                  )}
+
+                  {unreadEmailsCount === 0 && issuesCount === 0 && (
+                    <div className="p-4 text-center text-xs text-gray-400">Nessuna nuova notifica.</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Profilo Utente / Store */}
           <div className="relative">

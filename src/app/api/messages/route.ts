@@ -10,7 +10,11 @@ import {
   updateEmailAccountConfig,
   sendEmail,
   syncEmailsFromImap,
+  syncEmailReadStatusToImap,
 } from "@/lib/email";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -99,13 +103,89 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, conversationId: conv.id });
     }
 
-    if (actionType === "send_email") {
-      const { to, subject, message, threadId } = body;
-      if (!to || !subject || !message) {
-        return NextResponse.json({ error: "Compila destinatario, oggetto e messaggio." }, { status: 400 });
+    if (actionType === "inbound_email" || actionType === "inbound" || actionType === "receive_email" || body.direction === "INBOUND" || body.fromEmail || body.originalFrom) {
+      const rawSender = String(body.fromEmail || body.from || body.sender || body.mittente || body.originalFrom || body.originalSender || "").trim();
+      const rawRecipient = String(body.toEmail || body.to || body.recipient || "servizioclienti@prettylittle.it").trim();
+      const emailSubject = String(body.subject || body.title || "Email da Assistenza").trim();
+      const emailContent = String(body.message || body.bodyText || body.body || body.text || "").trim();
+
+      const senderMatch = rawSender.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      let sender = senderMatch ? senderMatch[0] : rawSender;
+
+      if (!sender || !sender.includes("@")) {
+        sender = "info@prettylittle.it";
       }
-      const emailMsg = await sendEmail({ to, subject, bodyText: message, threadId });
-      return NextResponse.json({ success: true, message: "Email inviata con successo tramite SMTP Aruba!", data: emailMsg });
+
+      // Se l'email inoltrata proviene da info@prettylittle.it o da un indirizzo aziendale, tenta di estrarre dal testo la vera mail cliente
+      if (sender.toLowerCase().includes("info@prettylittle.it") || sender.toLowerCase().includes("servizioclienti@prettylittle.it")) {
+        const embeddedMatch = emailContent.match(/(?:da|from|mittente|inoltrato\s+da|reply-to)\s*:?\s*([^<\n]+<)?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>?/i);
+        if (embeddedMatch && embeddedMatch[2]) {
+          const foundEmbedded = embeddedMatch[2].toLowerCase();
+          if (!foundEmbedded.includes("info@prettylittle.it") && !foundEmbedded.includes("servizioclienti@prettylittle.it")) {
+            sender = foundEmbedded;
+          }
+        }
+      }
+
+      const account = await getEmailAccount();
+      const newInbound = await prisma.emailMessage.create({
+        data: {
+          emailAccountId: account.id,
+          threadId: sender,
+          messageId: `n8n_inbound_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+          fromEmail: sender,
+          toEmail: rawRecipient,
+          subject: emailSubject,
+          bodyText: emailContent,
+          bodyHtml: `<p>${emailContent.replace(/\n/g, "<br>")}</p>`,
+          direction: "INBOUND",
+          isRead: false,
+          sentAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Email Inbound salvata con successo nel sistema!",
+        data: newInbound,
+      });
+    }
+
+    if (actionType === "send_email" || body.to || body.toEmail) {
+      const rawRecipient = String(body.to || body.toEmail || body.recipient || body.destinatario || "").trim();
+      const emailSubject = String(body.subject || body.title || "Richiesta Numero Ordine").trim();
+      const emailContent = String(body.message || body.bodyText || body.body || body.text || "").trim();
+      const threadId = body.threadId;
+
+      // Estrai indirizzo email pulito tramite Regex
+      const emailMatch = rawRecipient.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      const recipient = emailMatch ? emailMatch[0] : rawRecipient;
+
+      if (!recipient || recipient.length === 0 || !recipient.includes("@")) {
+        return NextResponse.json(
+          {
+            error: `Destinatario non valido o vuoto. Valore ricevuto da n8n: '${rawRecipient}'. Verifica la variabile del destinatario su n8n.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!emailContent) {
+        return NextResponse.json({ error: "Manca il testo del messaggio 'message' o 'body'." }, { status: 400 });
+      }
+
+      const emailMsg = await sendEmail({
+        to: recipient,
+        subject: emailSubject,
+        bodyText: emailContent,
+        threadId,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Email inviata con successo tramite SMTP Aruba!",
+        data: emailMsg,
+      });
     }
 
     if (actionType === "sync_emails") {
@@ -122,6 +202,32 @@ export async function POST(request: Request) {
         verifyToken,
       });
       return NextResponse.json({ success: true, message: "Configurazione WhatsApp salvata!", data: updated });
+    }
+
+    if (actionType === "toggle_email_read") {
+      const { messageId, isRead } = body;
+      if (!messageId) {
+        return NextResponse.json({ error: "messageId richiesto." }, { status: 400 });
+      }
+
+      const updated = await prisma.emailMessage.update({
+        where: { id: messageId },
+        data: { isRead: Boolean(isRead) },
+      });
+
+      // Sincronizza lo stato di lettura direttamente col server IMAP Aruba / Spark / Phone
+      syncEmailReadStatusToImap(messageId, Boolean(isRead)).catch((err) => {
+        console.warn("Errore sync flag IMAP:", err);
+      });
+
+      return NextResponse.json({ success: true, data: updated });
+    }
+
+    if (actionType === "mark_all_read") {
+      await prisma.emailMessage.updateMany({
+        data: { isRead: true },
+      });
+      return NextResponse.json({ success: true, message: "Tutte le email sono state segnate come lette!" });
     }
 
     if (actionType === "save_email_config") {

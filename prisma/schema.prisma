@@ -1,0 +1,255 @@
+// This is your Prisma schema file for Operational Center
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model WhatsAppAccount {
+  id            String                 @id @default(uuid())
+  name          String                 // "B2B" or "B2C"
+  phoneNumberId String                 @default("")
+  wabaId        String                 @default("")
+  accessToken   String                 @default("")
+  verifyToken   String                 @default("")
+  isActive      Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  conversations WhatsAppConversation[]
+}
+
+model WhatsAppConversation {
+  id            String            @id @default(uuid())
+  accountId     String
+  account       WhatsAppAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  customerPhone String
+  customerName  String?
+  unreadCount   Int               @default(0)
+  lastMessageAt DateTime          @default(now())
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  messages      WhatsAppMessage[]
+
+  @@unique([accountId, customerPhone])
+}
+
+model WhatsAppMessage {
+  id             String               @id @default(uuid())
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      String               // "INBOUND" or "OUTBOUND"
+  messageId      String?
+  body           String
+  status         String               @default("SENT") // SENT, DELIVERED, READ, FAILED
+  timestamp      DateTime             @default(now())
+  createdAt      DateTime             @default(now())
+}
+
+model EmailAccount {
+  id          String         @id @default(uuid())
+  accountName String         @default("Aruba Email")
+  email       String         @default("")
+  imapHost    String         @default("imaps.aruba.it")
+  imapPort    Int            @default(993)
+  smtpHost    String         @default("smtps.aruba.it")
+  smtpPort    Int            @default(465)
+  username    String         @default("")
+  password    String         @default("")
+  isSecure    Boolean        @default(true)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  messages    EmailMessage[]
+}
+
+model EmailMessage {
+  id             String       @id @default(uuid())
+  emailAccountId String
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  threadId       String?
+  messageId      String?
+  fromEmail      String
+  toEmail        String
+  subject        String
+  bodyText       String?
+  bodyHtml       String?
+  direction      String       // "INBOUND" or "OUTBOUND"
+  isRead         Boolean      @default(false)
+  sentAt         DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+}
+
+model Ticket {
+  id                String       @id @default(uuid())
+  ticketNumber      Int          @default(autoincrement())
+  orderNumber       String
+  causale           String       // "ORDINE SMARRITO", "RITARDO", "ERRORE SPEDIZIONE", "ALTRO"
+  urgenza           String       // "ALTO", "MEDIO", "BASSO"
+  title             String
+  description       String?
+  isResolved        Boolean      @default(false)
+  source            String       @default("MANUAL") // "WHATSAPP_B2B", "WHATSAPP_B2C", "EMAIL", "MANUAL"
+  customerPhone     String?
+  customerEmail     String?
+  whatsappMessageId String?
+  emailMessageId    String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  notes             TicketNote[]
+}
+
+model TicketNote {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    String   @default("Operatore")
+  note      String
+  createdAt DateTime @default(now())
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model SyncSetting {
+  id                   String   @id @default("default")
+  isPaused             Boolean  @default(false)
+  isDryRun             Boolean  @default(true)
+  podMetafieldStrategy String   @default("SYNC_ALWAYS") // SYNC_ALWAYS, EXCLUDE, SYNC_IF_EMPTY
+  syncInventory        Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+}
+
+model PriceRule {
+  id                 String   @id @default(uuid())
+  name               String
+  priority           Int      @default(0)
+  active             Boolean  @default(true)
+  scopeType          String   // ALL, PRODUCT_TYPE, TAG, COLLECTION, VENDOR, PRODUCT
+  scopeValue         String?
+  optionConditions   Json     @default("[]") // [{ option: "Formato", value: "150ml" }]
+  priceType          String   @default("FIXED") // FIXED, PERCENT_OF_B2C, COEFFICIENT
+  priceValue         Decimal  @db.Decimal(10, 2)
+  rounding           String   @default("NONE") // NONE, 0.90, 0.50, 1.00
+  compareAtPriceMode String   @default("NONE") // NONE, B2C_PRICE
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model SyncMappingProduct {
+  id           String   @id @default(uuid())
+  b2cProductId String   @unique
+  b2bProductId String
+  b2cHandle    String
+  b2bHandle    String
+  syncedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([b2cProductId])
+  @@index([b2bProductId])
+  @@index([b2cHandle])
+}
+
+model SyncMappingVariant {
+  id           String   @id @default(uuid())
+  b2cVariantId String   @unique
+  b2bVariantId String
+  b2cSku       String?
+  b2bSku       String?
+  syncedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([b2cVariantId])
+  @@index([b2bVariantId])
+}
+
+model SyncMappingCollection {
+  id              String   @id @default(uuid())
+  b2cCollectionId String   @unique
+  b2bCollectionId String
+  b2cHandle       String
+  b2bHandle       String
+  syncedAt        DateTime @default(now())
+  createdAt       DateTime @default(now())
+}
+
+model SyncMappingFile {
+  id        String   @id @default(uuid())
+  b2cFileId String   @unique
+  b2bFileId String
+  b2cUrl    String
+  b2bUrl    String
+  createdAt DateTime @default(now())
+}
+
+model SyncMappingMetaobject {
+  id              String   @id @default(uuid())
+  b2cMetaobjectId String   @unique
+  b2bMetaobjectId String
+  type            String
+  createdAt       DateTime @default(now())
+}
+
+model SyncSnapshot {
+  id         String   @id @default(uuid())
+  entityType String   // PRODUCT, VARIANT, COLLECTION
+  b2cId      String   @unique
+  hash       String
+  data       Json
+  syncedAt   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SyncJobQueue {
+  id          String    @id @default(uuid())
+  topic       String    // products/create, products/update, products/delete, collections/create, etc.
+  entityId    String    // B2C entity ID
+  payload     Json
+  status      String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  attempts    Int       @default(0)
+  errorLog    String?
+  scheduledAt DateTime  @default(now())
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([status, scheduledAt])
+}
+
+model SyncLog {
+  id         String   @id @default(uuid())
+  action     String   // CREATE, UPDATE, ARCHIVE, RECONCILE
+  entityType String   // PRODUCT, VARIANT, COLLECTION, METAFIELD
+  b2cId      String?
+  b2bId      String?
+  status     String   // SUCCESS, ERROR, DRY_RUN
+  details    Json?
+  createdAt  DateTime @default(now())
+}
+

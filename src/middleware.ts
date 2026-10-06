@@ -4,11 +4,15 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Escludiamo file statici e rotta pubblica di generazione PDF
+  // Escludiamo file statici e rotta pubblica di generazione PDF & Webhooks Meta & API Stats
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/pdf") ||
+    pathname.startsWith("/api/stats") ||
+    pathname.startsWith("/api/sendcloud") ||
     pathname.startsWith("/api/users") ||
+    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/messages") ||
     pathname.startsWith("/fonts") ||
     pathname === "/favicon.ico"
   ) {
@@ -57,6 +61,6 @@ export const config = {
     /*
      * Protegge tutte le pagine dell'applicazione tranne asset statici, font ed API pubbliche
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/pdf|api/users|fonts).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/pdf|api/stats|api/sendcloud|api/users|api/webhooks|api/messages|fonts).*)",
   ],
 };

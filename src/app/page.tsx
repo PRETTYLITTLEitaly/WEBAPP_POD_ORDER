@@ -3,23 +3,53 @@ import { Package, Truck, AlertCircle } from "lucide-react";
 import { shopifyFetch } from "@/lib/shopify";
 import { getSendcloudIssues } from "@/lib/sendcloud";
 
-async function getCounts() {
+async function fetchUnfulfilledCountForStore(store: "b2b" | "b2c") {
   const query = `#graphql
-    query getUnfulfilledCount {
-      orders(first: 250, query: "status:open fulfillment_status:unfulfilled") {
-        nodes { id }
+    query getUnfulfilledCount($after: String) {
+      orders(first: 250, after: $after, sortKey: CREATED_AT, reverse: true) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          id
+          displayFulfillmentStatus
+        }
       }
     }
   `;
 
-  try {
-    const [b2bRes, b2cRes] = await Promise.allSettled([
-      shopifyFetch({ store: "b2b", query }),
-      shopifyFetch({ store: "b2c", query })
-    ]);
+  let count = 0;
+  let after: string | null = null;
+  let hasNextPage = true;
+  let safetyCounter = 0;
 
-    const b2bCount = b2bRes.status === "fulfilled" ? b2bRes.value.data?.orders?.nodes?.length || 0 : 0;
-    const b2cCount = b2cRes.status === "fulfilled" ? b2cRes.value.data?.orders?.nodes?.length || 0 : 0;
+  while (hasNextPage && safetyCounter < 2) {
+    safetyCounter++;
+    const res: any = await shopifyFetch({
+      store,
+      query,
+      variables: after ? { after } : {},
+    });
+
+    const nodes = res.data?.orders?.nodes || [];
+    const inevasiInPage = nodes.filter((o: any) => o.displayFulfillmentStatus !== "FULFILLED").length;
+
+    count += inevasiInPage;
+
+    hasNextPage = Boolean(res.data?.orders?.pageInfo?.hasNextPage);
+    after = res.data?.orders?.pageInfo?.endCursor || null;
+  }
+
+  return count;
+}
+
+async function getCounts() {
+  try {
+    const [b2bCount, b2cCount] = await Promise.all([
+      fetchUnfulfilledCountForStore("b2b"),
+      fetchUnfulfilledCountForStore("b2c"),
+    ]);
     return { b2bCount, b2cCount };
   } catch (error) {
     console.error(error);

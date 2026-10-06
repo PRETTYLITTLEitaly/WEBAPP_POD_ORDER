@@ -1,0 +1,162 @@
+=================================================================
+       REPORT DI ALLINEAMENTO B2C -> B2B (SOLA LETTURA / DRY-RUN) 
+       Data esecuzione: 2026-10-06T12:11:26.392Z
+=================================================================
+
+--- SINTESI GENERALE PRODOTTI ---
+Prodotti B2C Totali Scansionati: 1092
+  - Esclusi da Sync (Tag "no-b2b"): 0
+  - Prodotti ABBINATI (Presenti sia in B2C che B2B per Handle): 1009
+  - Prodotti DA CREARE in B2B (Esistono in B2C ma non in B2B): 83
+  - Prodotti ORFANI solo in B2B (Mai toccati né cancellati): 210
+
+=================================================================
+a) ELENCO PRODOTTI DA CREARE IN B2B (83)
+=================================================================
+1. [profumatore-love-me-blu-royal] "Profumatore - “Love Me like u do”" (Type: "Profumi e colonie", Varianti: 36)
+2. [profumo-ambiente-300ml-ricarica] "Profumo Ambiente 300ml Ricarica" (Type: "Refill", Varianti: 5)
+3. [profumatore-50ml-busta] "Profumatore 50ml + Busta" (Type: "", Varianti: 1)
+4. [profumatore-150ml-busta] "Profumatore 150ml + Busta" (Type: "", Varianti: 1)
+5. [candela-busta] "Candela + Busta" (Type: "", Varianti: 1)
+6. [profumatore-cool-people-live-here-ciliegia] "Profumatore - "Cool People Live Here"" (Type: "Profumi e colonie", Varianti: 36)
+7. [lampada-where-is-my-cc-nero-viola-copia] "Lampada - “Where is my CC?" - Nero / Arancione" (Type: "Lampade", Varianti: 2)
+8. [profumatore-tese] "Profumatore - TESE" (Type: "Profumi e colonie", Varianti: 36)
+9. [confezione-regalo-christmas-edition] "Confezione Regalo CHRISTMAS Edition" (Type: "Confezione Regalo", Varianti: 1)
+10. [profumatore-scusa-se-esisto-1] "Profumatore - "Scusa se esisto"" (Type: "Profumi e colonie", Varianti: 36)
+11. [profumatore-best-mom-ever] "Profumatore - "Best mom ever"" (Type: "Profumi e colonie", Varianti: 36)
+12. [profumatore-i-got-it-from-my-mama] "Profumatore - "I got it from my mama"" (Type: "Profumi e colonie", Varianti: 36)
+13. [profumatore-ti-voglio-bene-mamma] "Profumatore - "Ti voglio bene mamma"" (Type: "Profumi e colonie", Varianti: 36)
+14. [profumatore-best-mum-ever] "Profumatore - "Best mum ever"" (Type: "Profumi e colonie", Varianti: 36)
+15. [profumatore-love-you-mom] "Profumatore - "Love you mom"" (Type: "Profumi e colonie", Varianti: 36)
+16. [profumatore-mamma-sei-speciale] "Profumatore - "Mamma sei speciale"" (Type: "Profumi e colonie", Varianti: 36)
+17. [profumatore-from-my-mama] "Profumatore - "From my mama"" (Type: "Profumi e colonie", Varianti: 36)
+18. [profumatore-mamma-sei-la-piu-bella] "Profumatore - "Mamma sei la più bella"" (Type: "Profumi e colonie", Varianti: 36)
+19. [profumatore-lucky-to-have-you-as-my-mom] "Profumatore - "Lucky to have you as my mom"" (Type: "Profumi e colonie", Varianti: 36)
+20. [profumatore-mamma-sei-la-mia-ispirazione] "Profumatore - "Mamma sei la mia ispirazione"" (Type: "Profumi e colonie", Varianti: 36)
+21. [profumatore-happy-mothers-day] "Profumatore - "Happy mother's day!"" (Type: "Profumi e colonie", Varianti: 36)
+22. [profumatore-mamma-sei-unica-e-inimitabile] "Profumatore - "Mamma sei unica e inimitabile"" (Type: "Profumi e colonie", Varianti: 36)
+23. [profumatore-flower-bouquet] "Profumatore - "Flower Bouquet"" (Type: "Profumi e colonie", Varianti: 36)
+24. [profumatore-best-mom-ever-1] "Profumatore - "Best mom ever"" (Type: "Profumi e colonie", Varianti: 36)
+25. [profumatore-happy-mothers-day-bouquet] "Profumatore - "Happy mother's day bouquet"" (Type: "Profumi e colonie", Varianti: 36)
+26. [profumatore-hmd-flowers] "Profumatore - "HMD flowers"" (Type: "Profumi e colonie", Varianti: 36)
+27. [profumatore-queen-of-moms] "Profumatore - "Queen of moms"" (Type: "Profumi e colonie", Varianti: 36)
+28. [profumatore-zest-mom] "Profumatore - "Zest mom"" (Type: "Profumi e colonie", Varianti: 36)
+29. [profumatore-love-you-bouquet] "Profumatore - "Love You - Bouquet"" (Type: "Profumi e colonie", Varianti: 36)
+30. [profumatore-per-certi-versi-per-altri-bevi] "Profumatore - "Per certi versi, per altri bevi"" (Type: "Profumi e colonie", Varianti: 36)
+31. [profumatore-abc-f-k] "Profumatore - "Abc F**K"" (Type: "Profumi e colonie", Varianti: 36)
+32. [profumatore-anni-di-gin-tonic-bicchiere] "Profumatore - "Anni Di Gin Tonic - Bicchiere"" (Type: "Profumi e colonie", Varianti: 36)
+33. [mini-scent-anni-di-gin-tonic-bicchiere] "Mini Scent - "Anni Di Gin Tonic - Bicchiere"" (Type: "Profumi e colonie", Varianti: 9)
+34. [mini-scent-anni-di-gin-tonic-bicchiere-1] "Candela - "Anni Di Gin Tonic - Bicchiere"" (Type: "Profumi e colonie", Varianti: 9)
+35. [mini-scent-abc-f-k] "Mini Scent - "Abc F**k"" (Type: "Profumi e colonie", Varianti: 9)
+36. [candela-dont-cag] "Candela - "Don't Cag"" (Type: "Profumi e colonie", Varianti: 9)
+37. [profumatore-good-luck-corno-e-mano] "Profumatore - "Good Luck - Corno E Mano"" (Type: "Profumi e colonie", Varianti: 36)
+38. [profumatore-miettec-o-core] "Profumatore - "Miettec O Core"" (Type: "Profumi e colonie", Varianti: 36)
+39. [mini-scent-miettec-o-core] "Mini Scent - "Miettec O Core"" (Type: "Profumi e colonie", Varianti: 9)
+40. [candela-miettec-o-core] "Candela - "Miettec O Core"" (Type: "Profumi e colonie", Varianti: 9)
+41. [lampada-miettec-o-core] "Lampada - "Miettec O Core"" (Type: "Lampade", Varianti: 2)
+42. [profumatore-be-my-love] "Profumatore - "Be My Love"" (Type: "Profumi e colonie", Varianti: 36)
+43. [profumatore-love-at-first] "Profumatore - "Love At First"" (Type: "Profumi e colonie", Varianti: 36)
+44. [profumatore-ammor-assaj] "Profumatore - "Ammor Assaj"" (Type: "Profumi e colonie", Varianti: 36)
+45. [candele-ammor-assaj] "Candela - "Ammor Assaj"" (Type: "Profumi e colonie", Varianti: 9)
+46. [candela-ce-capit-coccos] "Candela - "Ce Capit Coccos"" (Type: "Profumi e colonie", Varianti: 9)
+47. [profumatore-ciliegia-l-endless-lovve] "Profumatore - "Endless Love"" (Type: "Profumi e colonie", Varianti: 36)
+48. [profumatore-bordeaux-l-ce-capit-coccos] "Profumatore - "Ce Capit Coccos"" (Type: "Profumi e colonie", Varianti: 36)
+49. [profumatore-l-a-chiu-bell] "Profumatore - "L A Chiu Bell"" (Type: "Profumi e colonie", Varianti: 36)
+50. [mini-scent-cytron-a-chiu-bell] "Mini Scent - "Chiu Bell"" (Type: "Profumi e colonie", Varianti: 9)
+51. [candela-a-chiu-bell] "Candela - "A Chiu Bell"" (Type: "Profumi e colonie", Varianti: 9)
+52. [mini-scent-bordeaux-ce-capit-coccos] "Mini Scent - "Bordeaux Ce Capit Coccos"" (Type: "Profumi e colonie", Varianti: 9)
+53. [profumatore-napoli-l-anema-e-core] "Profumatore - "Anema E Core"" (Type: "Profumi e colonie", Varianti: 36)
+54. [mini-scent-mandarino-dolce-vita-arance] "Mini Scent - "Mandarino Dolce Vita Arance"" (Type: "Profumi e colonie", Varianti: 9)
+55. [profumatore-mandarino-l-dolce-vita-arance] "Profumatore - "Dolce Vita Arance"" (Type: "Profumi e colonie", Varianti: 36)
+56. [mini-scent-oliva-persone-fanno-danno-blu] "Mini Scent - "Oliva Persone Fanno Danno - Blu"" (Type: "Profumi e colonie", Varianti: 9)
+57. [candela-persone-fanno-danno-blu] "Candela - "Persone Fanno Danno - Blu"" (Type: "Profumi e colonie", Varianti: 9)
+58. [profumatore-salmone-l-persone-fanno-danno-blu] "Profumatore - "Persone Fanno Danno - Blu"" (Type: "Profumi e colonie", Varianti: 36)
+59. [mini-scent-oliva-sara-perche-ti-amo] "Mini Scent - "Oliva Sarà Perchè Ti Amo"" (Type: "Profumi e colonie", Varianti: 9)
+60. [candela-sara-perche-ti-amo] "Candela - "Sarà Perchè Ti Amo"" (Type: "Profumi e colonie", Varianti: 9)
+61. [profumatore-cobalto-l-sara-perche-ti-amo] "Profumatore - "Sarà Perchè Ti Amo"" (Type: "Profumi e colonie", Varianti: 36)
+62. [mini-scent-never-give-up] "Candle - "Never Give Up"" (Type: "Profumi e colonie", Varianti: 9)
+63. [mini-scent-home-sweet-home] "Candle - "Home Sweet Home"" (Type: "Profumi e colonie", Varianti: 9)
+64. [mini-scent-home-sweet-home-1] "Mini Scent - "Home Sweet Home"" (Type: "Profumi e colonie", Varianti: 9)
+65. [profumatore-rosa-l-home-sweet-home] "Profumatore - "Rosa L Home Sweet Home"" (Type: "Profumi e colonie", Varianti: 36)
+66. [lampada-be-my-love] "Lampada - "Be My Love"" (Type: "Profumi e colonie", Varianti: 2)
+67. [mini-scent-so-pazz-e-te-rosso] "Mini Scent - "So Pazz E Te - Rosso"" (Type: "Profumi e colonie", Varianti: 9)
+68. [mini-scent-my-happy-place-plc] "Candle - "My Happy Place"" (Type: "Profumi e colonie", Varianti: 9)
+69. [stick-mini-profumatore-nero] "Stick Mini Profumatore Nero" (Type: "Stick", Varianti: 1)
+70. [stick-mini-profumatore-bianco] "Stick Mini Profumatore Bianco" (Type: "Stick", Varianti: 1)
+71. [stick-mini-profumatore-beige] "Stick Mini Profumatore Beige" (Type: "Stick", Varianti: 1)
+72. [stick-mini-profumatore-blu-royal] "Stick Mini Profumatore Blu Royal" (Type: "Stick", Varianti: 1)
+73. [stick-mini-profumatore-tiffany] "Stick Mini Profumatore Tiffany" (Type: "Stick", Varianti: 1)
+74. [stick-mini-profumatore-verde] "Stick Mini Profumatore Verde" (Type: "Stick", Varianti: 1)
+75. [stick-mini-profumatore-marrone] "Stick Mini Profumatore Marrone" (Type: "Stick", Varianti: 1)
+76. [stick-mini-profumatore-rosa] "Stick Mini Profumatore Rosa" (Type: "Stick", Varianti: 1)
+77. [stick-mini-profumatore-viola] "Stick Mini Profumatore Viola" (Type: "Stick", Varianti: 1)
+78. [stick-mini-profumatore-giallo] "Stick Mini Profumatore Giallo" (Type: "Stick", Varianti: 1)
+79. [stick-mini-profumatore-arancio] "Stick Mini Profumatore Arancio" (Type: "Stick", Varianti: 1)
+80. [stick-mini-profumatore-rosso] "Stick Mini Profumatore Rosso" (Type: "Stick", Varianti: 1)
+81. [stick-mini-profumatore-magenta] "Stick Mini Profumatore Magenta" (Type: "Stick", Varianti: 1)
+82. [disco-mini-profumatore] "Disco Mini Profumatore" (Type: "Accessori per profumi per la casa", Varianti: 1)
+83. [mini-scent-home-sweet-home-copia] "Mini Scent - "Home Sweet Home"" (Type: "Profumi e colonie", Varianti: 9)
+
+=================================================================
+b) DETTAGLIO VARIANTI E CAMPI PER PRODOTTI ABBINATI (1009)
+=================================================================
+Totale Varianti Abbinate per Opzioni: 25033
+Totale Varianti Nuove da Creare nei Prodotti Abbinati: 119
+Totale Varianti Orfane solo in B2B (Preservate): 1
+
+=================================================================
+c) DIFFERENZE POD ED DIFFERENZE DI STATO (ACTIVE/DRAFT)
+=================================================================
+Prodotti Abbinati con Differenze POD (B2C vs B2B): 194
+  - [rgb-lampadina-wireless-pll®] B2C SVG: https://cdn.shopify.com/s/files/1/0663/7702/3737/files/test.svg | B2B SVG: Nessuno
+  - [profumatore-where-is-my-tiffany] B2C SVG: gid://shopify/MediaImage/59925133820243 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/whereis_tiffamy.svg?v=1776349878
+  - [profumatore-where-is-my-birkin] B2C SVG: gid://shopify/MediaImage/59925124317523 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/whereis_hermes.svg?v=1776349836
+  - [profumatore-bale-smile-nero] B2C SVG: gid://shopify/MediaImage/59925025063251 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/bale_bianco_magenta.svg?v=1776349303
+  - [profumatore-bale-smile-rosa] B2C SVG: gid://shopify/MediaImage/59925024964947 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/bale_bianco_azzurro.svg?v=1776349303
+  - [profumatore-bale-smile-verde-fluo] B2C SVG: gid://shopify/MediaImage/59925024997715 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/bale_bianco_blu.svg?v=1776349303
+  - [profumatore-bale-smile-viola] B2C SVG: gid://shopify/MediaImage/59925025030483 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/bale_bianco_giallo.svg?v=1776349303
+  - [profumatore-bale-smile-giallo] B2C SVG: gid://shopify/MediaImage/59925025063251 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/bale_bianco_magenta.svg?v=1776349303
+  - [profumatore-bale-smile-bianco-blu] B2C SVG: gid://shopify/MediaImage/59925024997715 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/bale_bianco_blu.svg?v=1776349303
+  - [profumatore-flowers-jadior-arancione] B2C SVG: gid://shopify/MediaImage/59925007892819 | B2B SVG: https://cdn.shopify.com/s/files/1/0644/0904/3193/files/dior_bianco_blu.svg?v=1776349258
+  ... e altri 184 prodotti.
+
+Prodotti Abbinati con Differenze di Stato (B2C vs B2B): 3
+  - [confezione-regalo] Stato B2C: DRAFT vs Stato B2B: ACTIVE
+  - [confezione-regalo-profumatore-singola] Stato B2C: DRAFT vs Stato B2B: ACTIVE
+  - [confezione-regalo-minimal-edition] Stato B2C: DRAFT vs Stato B2B: ACTIVE
+
+=================================================================
+d) COPERTURA REGOLE PREZZO SULLE NUOVE VARIANTI B2B
+=================================================================
+Totale Nuove Varianti da Creare nel B2B: 1750
+Varianti con Regola Prezzo Applicata: 0 (0.0%)
+Varianti Senza Regola (Lista "Prezzi da definire", Prezzo B2C segnaposto, DRAFT): 1750
+
+Esempi di Varianti senza Regola Prezzo Trovata (Primi 15):
+  1. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Frutti Rossi" (Prezzo B2C: €34.90)
+  2. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Ambra" (Prezzo B2C: €34.90)
+  3. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Legno" (Prezzo B2C: €34.90)
+  4. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Limoncè" (Prezzo B2C: €34.90)
+  5. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Floreale" (Prezzo B2C: €34.90)
+  6. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Vetiver" (Prezzo B2C: €34.90)
+  7. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Miele Bianco" (Prezzo B2C: €34.90)
+  8. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Acqua Marina" (Prezzo B2C: €34.90)
+  9. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 150ml / Arancia&Cannella" (Prezzo B2C: €34.90)
+  10. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 300ml / Frutti Rossi" (Prezzo B2C: €44.90)
+  11. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 300ml / Ambra" (Prezzo B2C: €44.90)
+  12. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 300ml / Legno" (Prezzo B2C: €44.90)
+  13. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 300ml / Limoncè" (Prezzo B2C: €44.90)
+  14. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 300ml / Floreale" (Prezzo B2C: €44.90)
+  15. [profumatore-love-me-blu-royal] (Type: "Profumi e colonie") - Variante: "Liscio / 300ml / Vetiver" (Prezzo B2C: €44.90)
+
+=================================================================
+e) VERIFICA REGOLE INIZIALI VS DATI REALI B2C
+=================================================================
+1. Verifiche Tipo Prodotto B2C:
+   Tipi Prodotto Reali in B2C: ["Accessori illuminazione","Lampade","Profumi e colonie","Stick","Refill","Spray Ambiente","PPLR_HIDDEN_PRODUCT","Box Candela-Profumo","Confezione Regalo","Accessori per profumi per la casa"]
+
+2. Verifiche Handle Specifici del Listino:
+   - Handle "mini-profumatore-50ml": NON TROVATO IN B2C (Da verificare nome handle)
+   - Handle "cestello-vaso": NON TROVATO IN B2C (Da verificare nome handle)
+   - Handle "kit-sua": NON TROVATO IN B2C (Da verificare nome handle)
+   - Handle "box-cerimonia": NON TROVATO IN B2C (Da verificare nome handle)

@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { shopifyFetch } from "@/lib/shopify";
-import fs from "fs";
-import path from "path";
-import os from "os";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const LOCAL_TICKETS_FILE = path.join(os.tmpdir(), "bug_tickets.json");
 
 export interface TicketMessage {
   id: string;
@@ -35,259 +31,264 @@ export interface Ticket {
   messages: TicketMessage[];
 }
 
-const DEFAULT_TICKETS: Ticket[] = [
-  {
-    id: "TCK-1001",
-    title: "Mappatura Font Saveur-Sans in Stampa DTF",
-    description: "In alcuni ordini con VASO AMMACCATO, il font Save non caricava il corsivo corretto sul canvas.",
-    operatorName: "Luca V.",
-    priority: "alta",
-    status: "risolto",
-    resolutionNote: "Risolto aggiungendo la mappatura automatica cloud Save -> Saveur-sans-semi-bold ed auto-selezione nell'editor.",
-    resolvedBy: "Super Admin",
-    resolvedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    attachments: [],
-    messages: [
-      {
-        id: "MSG-1",
-        ticketId: "TCK-1001",
-        authorName: "Luca V.",
-        authorRole: "Operatore",
-        content: "Potete verificare se il font Save viene preso correttamente sul server?",
-        createdAt: new Date(Date.now() - 3600000 * 40).toISOString()
-      },
-      {
-        id: "MSG-2",
-        ticketId: "TCK-1001",
-        authorName: "Super Admin",
-        authorRole: "Admin",
-        content: "Mappatura aggiornata e testata su Vercel Production. Tutto risolto!",
-        createdAt: new Date(Date.now() - 3600000 * 24).toISOString()
-      }
-    ]
-  }
-];
+// Helper per recuperare i dettagli completi dell'ordine da Shopify (B2C o B2B)
+async function fetchShopifyOrderDetails(orderNum: string) {
+  const cleanNum = orderNum.replace("#", "").trim();
+  const queryStr = `name:#${cleanNum} OR name:${cleanNum}`;
 
-// Read tickets from Shopify Shop Metafield or fallback to local disk
-async function loadTicketsFromStorage(): Promise<Ticket[]> {
-  try {
-    const query = `#graphql
-      query getBugTickets {
-        shop {
-          metafields(first: 20, namespace: "pod_settings") {
+  const gqlQuery = `#graphql
+    query getOrderForTicket($queryStr: String!) {
+      orders(first: 1, query: $queryStr) {
+        nodes {
+          id
+          name
+          createdAt
+          displayFulfillmentStatus
+          displayFinancialStatus
+          totalPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+          }
+          shippingAddress {
+            name
+            address1
+            address2
+            city
+            province
+            zip
+            country
+            phone
+          }
+          customer {
+            firstName
+            lastName
+            email
+            phone
+          }
+          lineItems(first: 25) {
             nodes {
               id
-              key
-              value
+              title
+              quantity
+              variantTitle
+              sku
+              image {
+                url
+              }
+            }
+          }
+          fulfillments {
+            status
+            trackingInfo {
+              number
+              url
+              company
             }
           }
         }
       }
-    `;
-    const res = await shopifyFetch({ store: "b2c", query });
-    const nodes = res.data?.shop?.metafields?.nodes || [];
-    const ticketNode = nodes.find((n: any) => n.key === "bug_tickets");
-
-    if (ticketNode && ticketNode.value) {
-      const parsed = JSON.parse(ticketNode.value);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        try { fs.writeFileSync(LOCAL_TICKETS_FILE, JSON.stringify(parsed)); } catch (e) {}
-        return parsed;
-      }
     }
-  } catch (err: any) {
-    console.error("Errore lettura bug_tickets da Shopify:", err.message);
+  `;
+
+  let foundOrder: any = null;
+  let storeType: "b2c" | "b2b" = "b2c";
+
+  try {
+    const resB2C = await shopifyFetch({ store: "b2c", query: gqlQuery, variables: { queryStr } });
+    const nodesB2C = resB2C.data?.orders?.nodes || [];
+    if (nodesB2C.length > 0) {
+      foundOrder = nodesB2C[0];
+      storeType = "b2c";
+    }
+  } catch (e) {
+    console.error("Errore ricerca ordine B2C:", e);
   }
 
-  if (fs.existsSync(LOCAL_TICKETS_FILE)) {
+  if (!foundOrder) {
     try {
-      const localData = fs.readFileSync(LOCAL_TICKETS_FILE, "utf-8");
-      return JSON.parse(localData);
-    } catch (e) {}
-  }
-
-  return DEFAULT_TICKETS;
-}
-
-// Save tickets persistently to Shopify Shop Metafield and local disk
-async function saveTicketsToStorage(tickets: Ticket[]) {
-  try {
-    fs.writeFileSync(LOCAL_TICKETS_FILE, JSON.stringify(tickets));
-  } catch (e) {}
-
-  try {
-    const shopRes = await shopifyFetch({
-      store: "b2c",
-      query: `#graphql query { shop { id } }`
-    });
-    const shopId = shopRes.data?.shop?.id;
-
-    if (shopId) {
-      // Streamline attachments if payload is huge to ensure Shopify Metafield acceptance
-      const sanitizedTickets = tickets.map(t => ({
-        ...t,
-        attachments: (t.attachments || []).map(att => {
-          if (att.length > 500000) {
-            // Keep first 500KB or compressed base64 prefix
-            return att.substring(0, 500000);
-          }
-          return att;
-        })
-      }));
-
-      const payloadStr = JSON.stringify(sanitizedTickets);
-
-      const mutation = `#graphql
-        mutation setBugTicketsMetafield($metafields: [MetafieldsSetInput!]!) {
-          metafieldsSet(metafields: $metafields) {
-            metafields { id key value }
-            userErrors { field message }
-          }
-        }
-      `;
-
-      const setRes = await shopifyFetch({
-        store: "b2c",
-        query: mutation,
-        variables: {
-          metafields: [
-            {
-              ownerId: shopId,
-              namespace: "pod_settings",
-              key: "bug_tickets",
-              type: "json",
-              value: payloadStr
-            }
-          ]
-        }
-      });
-
-      const userErrors = setRes.data?.metafieldsSet?.userErrors || [];
-      if (userErrors.length > 0) {
-        console.error("Shopify metafieldsSet userErrors:", userErrors);
+      const resB2B = await shopifyFetch({ store: "b2b", query: gqlQuery, variables: { queryStr } });
+      const nodesB2B = resB2B.data?.orders?.nodes || [];
+      if (nodesB2B.length > 0) {
+        foundOrder = nodesB2B[0];
+        storeType = "b2b";
       }
+    } catch (e) {
+      console.error("Errore ricerca ordine B2B:", e);
     }
-  } catch (err: any) {
-    console.error("Errore salvataggio bug_tickets su Shopify:", err.message);
   }
+
+  if (!foundOrder) return null;
+
+  return {
+    id: foundOrder.id,
+    name: foundOrder.name,
+    store: storeType,
+    createdAt: foundOrder.createdAt,
+    fulfillmentStatus: foundOrder.displayFulfillmentStatus,
+    financialStatus: foundOrder.displayFinancialStatus,
+    totalPrice: `${foundOrder.totalPriceSet?.shopMoney?.amount || "0"} ${foundOrder.totalPriceSet?.shopMoney?.currencyCode || "EUR"}`,
+    customer: foundOrder.customer,
+    shippingAddress: foundOrder.shippingAddress,
+    products: foundOrder.lineItems?.nodes || [],
+    fulfillments: foundOrder.fulfillments || [],
+  };
 }
 
 // GET /api/tickets
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const tickets = await loadTicketsFromStorage();
+    const { searchParams } = new URL(req.url);
+    const orderNumber = searchParams.get("orderNumber");
+    const statusFilter = searchParams.get("status"); // "all", "open", "resolved"
+
+    let whereClause: any = {};
+    if (orderNumber) {
+      whereClause.orderNumber = { contains: orderNumber.replace("#", "").trim(), mode: "insensitive" };
+    }
+    if (statusFilter === "open") {
+      whereClause.isResolved = false;
+    } else if (statusFilter === "resolved") {
+      whereClause.isResolved = true;
+    }
+
+    const tickets = await prisma.ticket.findMany({
+      where: whereClause,
+      include: {
+        notes: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
     return NextResponse.json({ success: true, tickets });
   } catch (error: any) {
+    console.error("Errore GET /api/tickets:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
-// POST /api/tickets — Crea nuovo ticket, o aggiunge messaggio, o aggiorna stato
+// POST /api/tickets
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, ticket, message, ticketId, status, resolutionNote, resolvedBy } = body;
-
-    let tickets = await loadTicketsFromStorage();
+    const { actionType } = body;
 
     // 1. CREAZIONE NUOVO TICKET
-    if (action === "create" && ticket) {
-      const newTicket: Ticket = {
-        id: `TCK-${Math.floor(1000 + Math.random() * 9000)}`,
-        title: ticket.title || "Nuovo Segnalazione Bug",
-        description: ticket.description || "",
-        operatorName: ticket.operatorName || "Operatore",
-        priority: ticket.priority || "media",
-        status: "aperto",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        attachments: Array.isArray(ticket.attachments) ? ticket.attachments : [],
-        messages: []
-      };
+    if (actionType === "create") {
+      const {
+        orderNumber,
+        causale,
+        urgenza,
+        title,
+        description,
+        source,
+        customerPhone,
+        customerEmail,
+        whatsappMessageId,
+        emailMessageId,
+      } = body;
 
-      tickets = [newTicket, ...tickets];
-      await saveTicketsToStorage(tickets);
-      return NextResponse.json({ success: true, ticket: newTicket, tickets });
+      if (!orderNumber || !causale || !urgenza || !title) {
+        return NextResponse.json(
+          { success: false, error: "Compila i campi obbligatori: Numero Ordine, Causale, Urgenza e Titolo." },
+          { status: 400 }
+        );
+      }
+
+      const cleanOrderNum = orderNumber.replace("#", "").trim();
+
+      const newTicket = await prisma.ticket.create({
+        data: {
+          orderNumber: cleanOrderNum,
+          causale: causale, // "ORDINE SMARRITO", "RITARDO", "ERRORE SPEDIZIONE", "ALTRO"
+          urgenza: urgenza, // "ALTO", "MEDIO", "BASSO"
+          title: title,
+          description: description || "",
+          source: source || "MANUAL",
+          customerPhone: customerPhone || null,
+          customerEmail: customerEmail || null,
+          whatsappMessageId: whatsappMessageId || null,
+          emailMessageId: emailMessageId || null,
+          isResolved: false,
+        },
+        include: {
+          notes: true,
+        },
+      });
+
+      return NextResponse.json({ success: true, ticket: newTicket });
     }
 
-    // 2. AGGIUNTA MESSAGGIO A UN TICKET ESISTENTE
-    if (action === "add_message" && ticketId && message) {
-      let targetIdx = tickets.findIndex(t => t.id === ticketId);
-      
-      // Se il ticket non esiste ancora sul server (es. creato sul client), effettua l'upsert
-      if (targetIdx === -1 && ticket) {
-        tickets = [ticket, ...tickets];
-        targetIdx = 0;
+    // 2. CAMBIO STATO RISOLTO (CHECKPOINT)
+    if (actionType === "toggle_resolve") {
+      const { ticketId, isResolved } = body;
+      if (!ticketId) {
+        return NextResponse.json({ success: false, error: "ticketId mancante." }, { status: 400 });
       }
 
-      if (targetIdx === -1) {
-        return NextResponse.json({ success: false, error: "Ticket non trovato." }, { status: 404 });
-      }
+      const updatedTicket = await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { isResolved: Boolean(isResolved) },
+        include: { notes: { orderBy: { createdAt: "desc" } } },
+      });
 
-      const newMessage: TicketMessage = {
-        id: `MSG-${Date.now()}`,
-        ticketId,
-        authorName: message.authorName || "Operatore",
-        authorRole: message.authorRole || "Admin",
-        content: message.content || "",
-        attachments: message.attachments || [],
-        createdAt: new Date().toISOString()
-      };
-
-      tickets[targetIdx].messages = [...(tickets[targetIdx].messages || []), newMessage];
-      tickets[targetIdx].updatedAt = new Date().toISOString();
-      if (tickets[targetIdx].status === "aperto" && message.authorRole?.toLowerCase().includes("admin")) {
-        tickets[targetIdx].status = "in_lavorazione";
-      }
-
-      await saveTicketsToStorage(tickets);
-      return NextResponse.json({ success: true, message: newMessage, ticket: tickets[targetIdx], tickets });
+      return NextResponse.json({ success: true, ticket: updatedTicket });
     }
 
-    // 3. CAMBIO STATO O RISOLUZIONE TICKET (SOLO ADMIN/SUPER ADMIN)
-    if (action === "update_status" && ticketId && status) {
-      const targetIdx = tickets.findIndex(t => t.id === ticketId);
-      if (targetIdx === -1) {
-        return NextResponse.json({ success: false, error: "Ticket non trovato." }, { status: 404 });
+    // 3. AGGIUNTA NOTA INTERNA AL TICKET
+    if (actionType === "add_note") {
+      const { ticketId, note, author } = body;
+      if (!ticketId || !note?.trim()) {
+        return NextResponse.json({ success: false, error: "Testo della nota obbligatorio." }, { status: 400 });
       }
 
-      tickets[targetIdx].status = status;
-      tickets[targetIdx].updatedAt = new Date().toISOString();
+      const newNote = await prisma.ticketNote.create({
+        data: {
+          ticketId,
+          note: note.trim(),
+          author: author || "Operatore",
+        },
+      });
 
-      if (status === "risolto") {
-        tickets[targetIdx].resolutionNote = resolutionNote || "Problema risolto con successo.";
-        tickets[targetIdx].resolvedBy = resolvedBy || "Admin";
-        tickets[targetIdx].resolvedAt = new Date().toISOString();
-      }
+      const updatedTicket = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        include: { notes: { orderBy: { createdAt: "desc" } } },
+      });
 
-      await saveTicketsToStorage(tickets);
-      return NextResponse.json({ success: true, ticket: tickets[targetIdx], tickets });
+      return NextResponse.json({ success: true, note: newNote, ticket: updatedTicket });
     }
 
-    return NextResponse.json({ success: false, error: "Azione non riconosciuta." }, { status: 400 });
+    // 4. RECUPERO DETTAGLI ORDINE SHOPIFY
+    if (actionType === "fetch_order") {
+      const { orderNumber } = body;
+      if (!orderNumber) {
+        return NextResponse.json({ success: false, error: "Numero ordine mancante." }, { status: 400 });
+      }
+
+      const orderDetails = await fetchShopifyOrderDetails(orderNumber);
+      return NextResponse.json({ success: true, order: orderDetails });
+    }
+
+    // 5. ELIMINAZIONE TICKET
+    if (actionType === "delete") {
+      const { ticketId } = body;
+      if (!ticketId) {
+        return NextResponse.json({ success: false, error: "ticketId mancante." }, { status: 400 });
+      }
+
+      await prisma.ticket.delete({
+        where: { id: ticketId },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ success: false, error: "Azione sconosciuta." }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
-
-// DELETE /api/tickets — Elimina ticket (Admin)
-export async function DELETE(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ success: false, error: "ID ticket mancante." }, { status: 400 });
-    }
-
-    let tickets = await loadTicketsFromStorage();
-    tickets = tickets.filter(t => t.id !== id);
-
-    await saveTicketsToStorage(tickets);
-    return NextResponse.json({ success: true, tickets });
-  } catch (error: any) {
+    console.error("Errore POST /api/tickets:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
